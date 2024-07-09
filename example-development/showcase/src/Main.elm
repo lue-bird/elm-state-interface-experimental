@@ -566,7 +566,7 @@ atSignInterface =
                                 |> Web.Dom.text
                             ]
                         , Web.Dom.element "a"
-                            [ Web.Dom.attribute "href" "https://github.com/lue-bird/elm-state-interface/discussions/new/choose"
+                            [ Web.Dom.attribute "href" "https://github.com/lue-bird/elm-state-interface-experimental/discussions/new/choose"
                             , Web.Dom.style "color" "inherit"
                             ]
                             [ "letter" |> Web.Dom.text ]
@@ -1277,7 +1277,7 @@ directionToXYOffset direction =
 
 mapWithExitInterface : Web.Interface future_
 mapWithExitInterface =
-    Web.Navigation.load "https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest/"
+    Web.Navigation.load "https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/"
 
 
 stateCodec : Serialize.Codec error_ InitializedState

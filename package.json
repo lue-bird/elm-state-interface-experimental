@@ -1,12 +1,12 @@
 {
-    "name": "@lue-bird/elm-state-interface",
-    "version": "2.0.3",
+    "name": "@lue-bird/elm-state-interface-experimental",
+    "version": "1.0.0",
     "description": "define an app in a simple, safe and declarative way",
     "author": "lue-bird",
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/lue-bird/elm-state-interface.git"
+        "url": "git+https://github.com/lue-bird/elm-state-interface-experimental.git"
     },
     "keywords": [
         "elm",
@@ -17,7 +17,7 @@
         "the-elm-architecture",
         "tea"
     ],
-    "homepage": "https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest/",
+    "homepage": "https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/",
     "main": "runner-compiled/index.js",
     "types": "runner-compiled/index.d.ts",
     "files": [

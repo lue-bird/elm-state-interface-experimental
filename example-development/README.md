@@ -1,6 +1,6 @@
 ```bash
-git clone https://github.com/lue-bird/elm-state-interface.git
-cd elm-state-interface
+git clone https://github.com/lue-bird/elm-state-interface-experimental.git
+cd elm-state-interface-experimental
 tsc
 cd example-development/showcase # or another example
 npm install

@@ -14,78 +14,328 @@ import Web.Svg
 benchmarks : Benchmark.Benchmark
 benchmarks =
     Benchmark.describe "StructuredId"
-        [ Benchmark.Alternative.rank "List justs any order"
-            (\justs -> justs exampleListOfJustStrings)
-            [ ( "List.filterMap", listJustsUsingListFilterMap )
-            , ( "foldl", listJustsToAnyOrderUsingFoldl )
-            ]
-        , Benchmark.Alternative.rank "String order"
-            (\stringOrder ->
-                let
-                    a =
-                        (List.range 100 200 |> List.map Char.fromCode |> String.fromList) ++ (Char.fromCode 123 |> String.fromChar)
+        [ {- Benchmark.Alternative.rank "List justs any order"
+                 (\justs -> justs exampleListOfJustStrings)
+                 [ ( "List.filterMap", listJustsUsingListFilterMap )
+                 , ( "foldl", listJustsToAnyOrderUsingFoldl )
+                 ]
+             , Benchmark.Alternative.rank "String order"
+                 (\stringOrder ->
+                     let
+                         a =
+                             (List.range 100 200 |> List.map Char.fromCode |> String.fromList) ++ (Char.fromCode 123 |> String.fromChar)
 
-                    b =
-                        (List.range 100 200 |> List.map Char.fromCode |> String.fromList) ++ (Char.fromCode 100 |> String.fromChar)
-                in
-                stringOrder a b
-            )
-            [ ( "Basics.compare", Basics.compare )
-            , ( "Basics.compare with ++ \"\"", basicsCompareWithAppendEmpty )
-            , ( "< and > with ++ \"\"", basicsLessOrGreaterWithAppendEmpty )
-            , ( "Basics.compare by List Char", basicsCompareByListChar )
-            , ( "Basics.compare by List Char < or >", orderByListCharLessOrGreater )
-            , ( "Basics.compare by List Char code < or >", orderByListCharCodeLessOrGreater )
-            ]
-        , Benchmark.Alternative.rank "Int -> String"
-            (\toListOfString -> List.map toListOfString exampleListOfInts)
-            [ ( "String.fromInt", String.fromInt )
-            , ( "Json.Encode.int |> Json.Encode.encode 0", intJsonEncode0 )
+                         b =
+                             (List.range 100 200 |> List.map Char.fromCode |> String.fromList) ++ (Char.fromCode 100 |> String.fromChar)
+                     in
+                     stringOrder a b
+                 )
+                 [ ( "Basics.compare", Basics.compare )
+                 , ( "Basics.compare with ++ \"\"", basicsCompareWithAppendEmpty )
+                 , ( "< and > with ++ \"\"", basicsLessOrGreaterWithAppendEmpty )
+                 , ( "Basics.compare by List Char", basicsCompareByListChar )
+                 , ( "Basics.compare by List Char < or >", orderByListCharLessOrGreater )
+                 , ( "Basics.compare by List Char code < or >", orderByListCharCodeLessOrGreater )
+                 ]
+             , Benchmark.Alternative.rank "Int -> String"
+                 (\toListOfString -> List.map toListOfString exampleListOfInts)
+                 [ ( "String.fromInt", String.fromInt )
+                 , ( "Json.Encode.int |> Json.Encode.encode 0", intJsonEncode0 )
+                 , ( "String.fromInt |> Json.Encode.string |> Json.Encode.encode 0", stringFromIntJsonEncode0 )
+                 ]
+             , Benchmark.Alternative.rank "Float -> String"
+                 (\floatToString -> List.map floatToString exampleListOfFloats)
+                 [ ( "String.fromFloat", String.fromFloat )
+                 , ( "Json.Encode.float |> Json.Encode.encode 0", floatJsonEncode0 )
+                 , ( "String.fromFloat |> Json.Encode.string |> Json.Encode.encode 0", stringFromFloatJsonEncode0 )
+                 ]
+             , Benchmark.Alternative.rank "tagged -> String"
+                 (\taggedToString -> List.map (\tag -> taggedToString { tag = tag, value = Json.Encode.null }) exampleListOfStrings)
+                 [ ( "Json.Encode.list Basics.identity [ Json.Encode.string  ,  ]", taggedToJsonStringUsingList )
+                 , ( "Json.Encode.object [ (  ,  ) ]", taggedToJsonStringUsingObject )
+                 , ( "Json.Encode.dict Basics.identity Basics.identity (Dict.singleton     )", taggedToJsonStringUsingDict )
+                 ]
+             ,
+          -}
+          Benchmark.Alternative.rank "index Int -> json String"
+            (\indexIntToString -> List.map indexIntToString exampleListOfIndexInts)
+            [ ( "Json.Encode.int |> Json.Encode.encode 0", intJsonEncode0 )
             , ( "String.fromInt |> Json.Encode.string |> Json.Encode.encode 0", stringFromIntJsonEncode0 )
+            , ( "base36 |> Json.Encode.string |> Json.Encode.encode 0", base36IndexIntToJsonString )
             ]
-        , Benchmark.Alternative.rank "Float -> String"
-            (\floatToString -> List.map floatToString exampleListOfFloats)
-            [ ( "String.fromFloat", String.fromFloat )
-            , ( "Json.Encode.float |> Json.Encode.encode 0", floatJsonEncode0 )
-            , ( "String.fromFloat |> Json.Encode.string |> Json.Encode.encode 0", stringFromFloatJsonEncode0 )
-            ]
-        , Benchmark.Alternative.rank "tagged -> String"
-            (\taggedToString -> List.map (\tag -> taggedToString { tag = tag, value = Json.Encode.null }) exampleListOfStrings)
-            [ ( "Json.Encode.list Basics.identity [ Json.Encode.string  ,  ]", taggedToJsonStringUsingList )
-            , ( "Json.Encode.object [ (  ,  ) ]", taggedToJsonStringUsingObject )
-            , ( "Json.Encode.dict Basics.identity Basics.identity (Dict.singleton     )", taggedToJsonStringUsingDict )
-            ]
-        , Benchmark.Alternative.rank "List String -> String"
-            (\listOfStringToString -> listOfStringToString exampleListOfStrings)
-            [ ( "map |> join", listOfStringToStringUsingMapJoin )
-            , ( "foldr appending right", listOfStringToStringUsingFoldrAppendingRight )
-            , ( "foldl appending right", listOfStringToStringUsingFoldlAppendingRight )
-            , ( "foldr appending left", listOfStringToStringUsingFoldrAppendingLeft )
-            , ( "foldl appending left", listOfStringToStringUsingFoldlAppendingLeft )
-            , ( "json encode 0", listOfStringToStringUsingJsonEncode0 )
-            , ( "json encode 1", listOfStringToStringUsingJsonEncode1 )
-            , ( "json encode 2", listOfStringToStringUsingJsonEncode2 )
-            , ( "json encode 3", listOfStringToStringUsingJsonEncode3 )
-            , ( "json encode 4", listOfStringToStringUsingJsonEncode4 )
-            ]
-        , Benchmark.Alternative.rank "StructuredId -> String"
-            (\toListOfString -> toListOfString exampleStructuredId)
-            [ ( "rope", toStringUsingRope )
-            , ( "json encode all the way", toStringUsingJsonEncodeAllTheWay )
-            ]
-        , Benchmark.Alternative.rank "dom render"
-            (\domRender -> domRender exampleDom)
-            [ ( "nested recursion given path", domRenderUsingNestedRecursionWithPath )
-            , ( "nested recursion with subs map, final List.map", domRenderUsingNestedRecursionWithSubsMapAndFinalListMap )
-            , ( "TCO", domRenderUsingTCO )
-            , ( "TCO but paths reversed", domRenderUsingTCOButReversedPath )
-            ]
-        , Benchmark.Alternative.rank "List map indexed, resulting order doesn't matter"
-            (\mapIndexed -> mapIndexed Tuple.pair exampleListOfStrings)
-            [ ( "foldl", listMapIndexedNotGuaranteeingOrder )
-            , ( "map2 with range (used by List.indexedMap)", List.indexedMap )
-            ]
+
+        {- , Benchmark.Alternative.rank "List index Int -> json String"
+               (\listOfStringToString -> listOfStringToString exampleListOfIndexInts)
+               [ ( "map String.fromInt |> join |> Json.Encode.string", listOfIntToJsonStringUsingMapJoin )
+               , ( "foldl |> Json.Encode.string", listOfIntToJsonStringUsingFoldl )
+               , ( "Json.Encode.list Json.Encode.int", listOfIntToJsonStringUsingJsonEncodeList )
+               , ( "map to chars from code string |> Json.Encode.string", listOfIntToJsonStringUsingMapToCharsFromCodeString )
+               , ( "foldl to chars from code string |> Json.Encode.string", listOfIntToJsonStringUsingFoldlToCharsFromCodeString )
+               , ( "combine in pairs as Int |> Json.Encode.list Json.Encode.int", listOfIntToJsonStringUsingCombineInPairsAsIntToJsonEncodeList )
+               , ( "combine in triples as Int |> Json.Encode.list Json.Encode.int", listOfIntToJsonStringUsingCombineInTriplesAsIntToJsonEncodeList )
+               ]
+
+           , Benchmark.Alternative.rank "List String -> String"
+                  (\listOfStringToString -> listOfStringToString exampleListOfStrings)
+                  [ ( "map |> join", listOfStringToStringUsingMapJoin )
+                  , ( "foldr appending right", listOfStringToStringUsingFoldrAppendingRight )
+                  , ( "foldl appending right", listOfStringToStringUsingFoldlAppendingRight )
+                  , ( "foldr appending left", listOfStringToStringUsingFoldrAppendingLeft )
+                  , ( "foldl appending left", listOfStringToStringUsingFoldlAppendingLeft )
+                  , ( "json encode 0", listOfStringToStringUsingJsonEncode0 )
+                  , ( "json encode 1", listOfStringToStringUsingJsonEncode1 )
+                  , ( "json encode 2", listOfStringToStringUsingJsonEncode2 )
+                  , ( "json encode 3", listOfStringToStringUsingJsonEncode3 )
+                  , ( "json encode 4", listOfStringToStringUsingJsonEncode4 )
+                  ]
+              , Benchmark.Alternative.rank "StructuredId -> String"
+                  (\toListOfString -> toListOfString exampleStructuredId)
+                  [ ( "rope", toStringUsingRope )
+                  , ( "json encode all the way", toStringUsingJsonEncodeAllTheWay )
+                  ]
+              , Benchmark.Alternative.rank "dom render"
+                  (\domRender -> domRender exampleDom)
+                  [ ( "nested recursion given path", domRenderUsingNestedRecursionWithPath )
+                  , ( "nested recursion with subs map, final List.map", domRenderUsingNestedRecursionWithSubsMapAndFinalListMap )
+                  , ( "TCO", domRenderUsingTCO )
+                  , ( "TCO but paths reversed", domRenderUsingTCOButReversedPath )
+                  ]
+              , Benchmark.Alternative.rank "List map indexed, resulting order doesn't matter"
+                  (\mapIndexed -> mapIndexed Tuple.pair exampleListOfStrings)
+                  [ ( "foldl", listMapIndexedNotGuaranteeingOrder )
+                  , ( "map2 with range (used by List.indexedMap)", List.indexedMap )
+                  ]
+        -}
         ]
+
+
+listOfIntToJsonStringUsingMapJoin : List Int -> String
+listOfIntToJsonStringUsingMapJoin =
+    \listOfInt ->
+        listOfInt
+            |> List.map String.fromInt
+            |> String.join ","
+            |> Json.Encode.string
+            |> Json.Encode.encode 0
+
+
+listOfIntToJsonStringUsingFoldl : List Int -> String
+listOfIntToJsonStringUsingFoldl =
+    \listOfInt ->
+        listOfInt
+            |> List.foldl
+                (\element soFar ->
+                    soFar ++ String.cons ',' (element |> String.fromInt)
+                )
+                ""
+            |> Json.Encode.string
+            |> Json.Encode.encode 0
+
+
+listOfIntToJsonStringUsingJsonEncodeList : List Int -> String
+listOfIntToJsonStringUsingJsonEncodeList =
+    \listOfInt ->
+        listOfInt |> Json.Encode.list Json.Encode.int |> Json.Encode.encode 0
+
+
+listOfIntToJsonStringUsingCombineInPairsAsIntToJsonEncodeList : List Int -> String
+listOfIntToJsonStringUsingCombineInPairsAsIntToJsonEncodeList =
+    \listOfInt ->
+        listOfInt
+            |> listCombineInPairsAsIntInto []
+            |> Json.Encode.list Json.Encode.int
+            |> Json.Encode.encode 0
+
+
+listCombineInPairsAsIntInto : List Int -> List Int -> List Int
+listCombineInPairsAsIntInto soFar remaining =
+    case remaining of
+        [] ->
+            soFar
+
+        [ onlyInt ] ->
+            onlyInt :: soFar
+
+        int0 :: int1 :: int2Up ->
+            listCombineInPairsAsIntInto (int0 * 10 ^ 17 + int1 :: soFar) int2Up
+
+
+listOfIntToJsonStringUsingCombineInTriplesAsIntToJsonEncodeList : List Int -> String
+listOfIntToJsonStringUsingCombineInTriplesAsIntToJsonEncodeList =
+    \listOfInt ->
+        listOfInt
+            |> listCombineInTriplesAsIntInto []
+            |> Json.Encode.list Json.Encode.int
+            |> Json.Encode.encode 0
+
+
+base36IndexIntToJsonString : Int -> String
+base36IndexIntToJsonString =
+    \int -> int |> base36IndexIntToStringFrom "" |> Json.Encode.string |> Json.Encode.encode 0
+
+
+base36IndexIntToStringFrom : String -> Int -> String
+base36IndexIntToStringFrom soFar int =
+    case int of
+        0 ->
+            soFar
+
+        non0Int ->
+            let
+                digitValue : Int
+                digitValue =
+                    non0Int |> Basics.remainderBy 36
+
+                digitChar : Char
+                digitChar =
+                    case digitValue of
+                        0 ->
+                            '0'
+
+                        1 ->
+                            '1'
+
+                        2 ->
+                            '2'
+
+                        3 ->
+                            '3'
+
+                        4 ->
+                            '4'
+
+                        5 ->
+                            '5'
+
+                        6 ->
+                            '6'
+
+                        7 ->
+                            '7'
+
+                        8 ->
+                            '8'
+
+                        9 ->
+                            '9'
+
+                        10 ->
+                            'a'
+
+                        11 ->
+                            'b'
+
+                        12 ->
+                            'c'
+
+                        13 ->
+                            'd'
+
+                        14 ->
+                            'e'
+
+                        15 ->
+                            'f'
+
+                        16 ->
+                            'g'
+
+                        17 ->
+                            'h'
+
+                        18 ->
+                            'i'
+
+                        19 ->
+                            'j'
+
+                        20 ->
+                            'k'
+
+                        21 ->
+                            'l'
+
+                        22 ->
+                            'm'
+
+                        23 ->
+                            'n'
+
+                        24 ->
+                            'o'
+
+                        25 ->
+                            'p'
+
+                        26 ->
+                            'q'
+
+                        27 ->
+                            'r'
+
+                        28 ->
+                            's'
+
+                        29 ->
+                            't'
+
+                        30 ->
+                            'u'
+
+                        31 ->
+                            'v'
+
+                        32 ->
+                            'w'
+
+                        33 ->
+                            'x'
+
+                        34 ->
+                            'y'
+
+                        --  35
+                        _ ->
+                            'z'
+            in
+            base36IndexIntToStringFrom (String.cons digitChar soFar)
+                (non0Int // 36)
+
+
+listCombineInTriplesAsIntInto : List Int -> List Int -> List Int
+listCombineInTriplesAsIntInto soFar remaining =
+    case remaining of
+        [] ->
+            soFar
+
+        [ onlyInt ] ->
+            onlyInt :: soFar
+
+        [ int0In2, int1In2 ] ->
+            int0In2 :: int1In2 :: soFar
+
+        int0 :: int1 :: int2 :: int3Up ->
+            listCombineInTriplesAsIntInto (int0 * 10 ^ 34 + int2 * 10 ^ 17 + int1 :: soFar) int3Up
+
+
+listOfIntToJsonStringUsingMapToCharsFromCodeString : List Int -> String
+listOfIntToJsonStringUsingMapToCharsFromCodeString =
+    \listOfInt ->
+        listOfInt
+            |> List.map (\int -> int |> Char.fromCode |> String.fromChar)
+            |> String.concat
+            |> Json.Encode.string
+            |> Json.Encode.encode 0
+
+
+listOfIntToJsonStringUsingFoldlToCharsFromCodeString : List Int -> String
+listOfIntToJsonStringUsingFoldlToCharsFromCodeString =
+    \listOfInt ->
+        listOfInt
+            |> List.foldl (\int soFar -> soFar |> String.cons (int |> Char.fromCode))
+                ""
+            |> Json.Encode.string
+            |> Json.Encode.encode 0
 
 
 taggedToJsonStringUsingList : { tag : String, value : Json.Encode.Value } -> String
@@ -618,6 +868,11 @@ listMapIndexedNotGuaranteeingOrder indexAndElementCombine =
 exampleListOfInts : List Int
 exampleListOfInts =
     [ -200, 1, 13243 ]
+
+
+exampleListOfIndexInts : List Int
+exampleListOfIndexInts =
+    List.range 0 200
 
 
 exampleListOfFloats : List Float

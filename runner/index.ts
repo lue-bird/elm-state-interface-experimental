@@ -1035,13 +1035,13 @@ function askForNotificationPermissionIfNotAsked(): Promise<"granted" | "denied">
 // helpers
 
 function warn(warning: string) {
-    window?.console.warn(warning + " (lue-bird/elm-state-interface)")
+    window?.console.warn(warning + " (lue-bird/elm-state-interface-experimental)")
 }
 function notifyOfUnknownMessageKind(messageTag: string) {
     notifyOfBug("Unknown message kind " + messageTag + " from elm. The associated js implementation is missing")
 }
 function notifyOfBug(bugDescription: string) {
-    window?.console.error("bug: " + bugDescription + ". Please open an issue on github.com/lue-bird/elm-state-interface")
+    window?.console.error("bug: " + bugDescription + ". Please open an issue on github.com/lue-bird/elm-state-interface-experimental")
 }
 
 function posixToContextTime(posix: number, currentTimePosix: number) {

@@ -1,3 +1,7 @@
+> Use [elm-state-interface-experimental](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest) instead.
+> This package will intentionally break a lot and contains untested optimizations.
+> If you want to help test before release or can't wait, you've come to the right place!
+
 ### define an app in a simple, safe and declarative way
 
 > 🌱 New to elm? Learn about [the basics](https://guide.elm-lang.org/core_language) and [types](https://guide.elm-lang.org/types/), [install elm](https://guide.elm-lang.org/install/elm) and set up an editor like [vs code](https://github.com/elm-tooling/elm-language-client-vscode?tab=readme-ov-file#install)
@@ -26,9 +30,9 @@ app =
     }
 ```
 
-> To play around with the examples, set up a [playground](https://github.com/lue-bird/elm-state-interface-hello):
+> To play around with the examples, set up a [playground](https://github.com/lue-bird/elm-state-interface-experimental-hello):
 > ```bash
-> git clone https://github.com/lue-bird/elm-state-interface-hello.git && cd elm-state-interface-hello && npm install && npx vite
+> git clone https://github.com/lue-bird/elm-state-interface-experimental-hello.git && cd elm-state-interface-experimental-hello && npm install && npx vite
 > ```
 > http://localhost:5173/ now shows your app. Open `src/App.elm` in your editor to paste in examples.
 
@@ -43,8 +47,8 @@ interface : Int -> Interface Int
 in our case an incremented counter state.
 The app will use this result as the new state.
 
-We use [`Web.Dom.listenTo`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest/Web-Dom#listenTo) to be notified when a user clicks the button.
-Without [`Web.Dom.futureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest/Web-Dom#futureMap), our interface would have the type
+We use [`Web.Dom.listenTo`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Dom#listenTo) to be notified when a user clicks the button.
+Without [`Web.Dom.futureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Dom#futureMap), our interface would have the type
 ```elm
 Web.Dom.element "button" [ Web.Dom.listenTo "click" ] []
     |> Web.Dom.render
@@ -53,7 +57,7 @@ Web.Dom.element "button" [ Web.Dom.listenTo "click" ] []
 which means this interface will on click come back with an event as [json](https://dark.elm.dmy.fr/packages/elm/json/latest/).
 Later, we'll see how to get information out of this kind of event.
 
-Right now, we use [`Web.Dom.futureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest/Web-Dom#futureMap) to change the information the interface will send back to us in the future by just ignoring the event `\_ ->` and returning the incremented state.
+Right now, we use [`Web.Dom.futureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Dom#futureMap) to change the information the interface will send back to us in the future by just ignoring the event `\_ ->` and returning the incremented state.
 
 You can change the value that comes back from an interface in many places, like
 ```elm
@@ -399,7 +403,7 @@ we have everything we need to update the state.
 
 If you want to learn a bit more about app url parsing and building, visit [lydell/elm-app-url](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/)
 
-And what's the deal with [`movementListen`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest/Web-Navigation#movementListen) vs [`urlRequest`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest/Web-Navigation#urlRequest)?
+And what's the deal with [`movementListen`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Navigation#movementListen) vs [`urlRequest`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Navigation#urlRequest)?
 Don't both just give you the latest url?
 
 > **an `Interface` that requests ≠ `Interface` that listens**
@@ -444,8 +448,8 @@ in which case you'll receive the url pushed by you.
 
 ## what we need to actually run it as an elm program
 
-For a minimal working setup, the [playground](https://github.com/lue-bird/elm-state-interface-hello) has everything you need.
-For example apps, see [example/](https://github.com/lue-bird/elm-state-interface/tree/main/example). You'll see that the basic setup hasn't changed.
+For a minimal working setup, the [playground](https://github.com/lue-bird/elm-state-interface-experimental-hello) has everything you need.
+For example apps, see [example/](https://github.com/lue-bird/elm-state-interface-experimental/tree/main/example). You'll see that the basic setup hasn't changed.
 
 In case you want to create your own setup instead:
 
@@ -472,11 +476,11 @@ These "ports" are the connection points to the actual implementations of the int
 To set them up:
 
 ```bash
-npm install @lue-bird/elm-state-interface
+npm install @lue-bird/elm-state-interface-experimental
 ```
 in js
 ```javascript
-import * as Web from "@lue-bird/elm-state-interface";
+import * as Web from "@lue-bird/elm-state-interface-experimental";
 // import your Main.elm. Name and path depend on bundler+plugin
 
 const elmApp = Main.init();
@@ -580,24 +584,24 @@ type alias State =
 which feels a bit more explicit, declarative and less wiring-heavy at least.
 
 Note: This example is only supposed to show differences in architecture.
-Unlike [`andrewMacmurray/elm-concurrent-task`](https://dark.elm.dmy.fr/packages/andrewMacmurray/elm-concurrent-task/latest/), `elm-state-interface` does not allow custom tasks/interfaces.
+Unlike [`andrewMacmurray/elm-concurrent-task`](https://dark.elm.dmy.fr/packages/andrewMacmurray/elm-concurrent-task/latest/), `elm-state-interface-experimental` does not allow custom tasks/interfaces.
 Instead, the goal of this package is to publish more browser APIs like gamepads instead of users doing the work only for their own projects. Since I'm a noob in the js world, feedback and contributions are super welcome ❀
 
 ## present
 
-There should be feature-parity with elm's exposed browser APIs ([tell me](https://github.com/lue-bird/elm-state-interface/issues/new) if I've missed some!) plus a couple of APIs that elm's exposed browser APIs don't offer, including websockets, localstorage, audio, clipboard.
+There should be feature-parity with elm's exposed browser APIs ([tell me](https://github.com/lue-bird/elm-state-interface-experimental/issues/new) if I've missed some!) plus a couple of APIs that elm's exposed browser APIs don't offer, including websockets, localstorage, audio, clipboard.
 
 For now, some more niche interfaces like [`WebGL.Texture.loadWith`](https://dark.elm.dmy.fr/packages/elm-explorations/webgl/latest/WebGL-Texture#loadWith) are left out.
 
 ## future
 
-  - ⛵ add more [example projects](https://github.com/lue-bird/elm-state-interface/tree/main/example). Would you like to see something specific? Or maybe you're motivated to make one yourself 👀
+  - ⛵ add more [example projects](https://github.com/lue-bird/elm-state-interface-experimental/tree/main/example). Would you like to see something specific? Or maybe you're motivated to make one yourself 👀
   - 📐 `Web.Dom.element "div" ...` etc are a bit clumsy. Sadly, most ui packages out there only convert to a type inaccessible to `state-interface`, making them incompatible. Though a port of them would be awesome, a good first step may be creating a package for generating the html/svg/... elements, inspired by [`Orasund/elm-html-style`](https://dark.elm.dmy.fr/packages/Orasund/elm-html-style/latest/)
   - 🔋 add the web APIs you miss the most. Maybe [MIDI](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API), [speech](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API), [sensors](https://developer.mozilla.org/en-US/docs/Web/API/Sensor_APIs) or [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)?
   - 🗃️ add basic `node` or `deno` APIs (only with help!)
 
 If you have knowledge in these fields on the js side, have pointers or already 
-a basic implementation using ports, [come by](https://github.com/lue-bird/elm-state-interface/discussions/new/choose)!
+a basic implementation using ports, [come by](https://github.com/lue-bird/elm-state-interface-experimental/discussions/new/choose)!
 
 Note: The package is very much not designed to be easily extensible.
 Adding stuff _will_ force a major version bump.
@@ -615,7 +619,7 @@ The module and interface structure is also not equipped to support multiple plat
 To not be blocked on missing interfaces, you have the option of [custom elements](https://guide.elm-lang.org/interop/custom_elements), custom events and [data attributes](https://developer.mozilla.org/en-US/docs/Learn/HTML/Howto/Use_data_attributes) at least.
 
 If that would only work short term: Fork it!
-And if you think everyone would profit, [opening a PR](https://github.com/lue-bird/elm-state-interface/pulls) would be awesome.
+And if you think everyone would profit, [opening a PR](https://github.com/lue-bird/elm-state-interface-experimental/pulls) would be awesome.
 
 I don't believe I will add the ability to provide custom interfaces
 for simplicity reasons alone (I aggressively don't want state-interface to become like an elm-review in terms of complexity).

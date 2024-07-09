@@ -9,7 +9,7 @@ import Test exposing (Test)
 
 tests : Test
 tests =
-    Test.describe "elm-state-interface"
+    Test.describe "elm-state-interface-experimental"
         [ Test.describe "StructuredId"
             [ Test.fuzz
                 (Fuzz.constant (\a b -> { a = a, b = b })

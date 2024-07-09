@@ -310,7 +310,7 @@ For example to get `<a href="https://elm-lang.org">elm</a>`
         [ Web.Dom.text "elm" ]
 
 Btw: If you can think of a nicer name for this like "customization", "characteristic" or "aspect",
-please [open an issue](https://github.com/lue-bird/elm-state-interface/issues/new).
+please [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new).
 
 
 ## attribute vs property
@@ -344,7 +344,7 @@ Use properties to set anything related to interactivity
 and attributes for everything else.
 
 If you have some opinions or better explanations,
-please [open an issue](https://github.com/lue-bird/elm-state-interface/issues/new).
+please [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new).
 
 -}
 type alias Modifier future =

@@ -122,7 +122,7 @@ see [`FastDict.merge`](https://dark.elm.dmy.fr/packages/miniBill/elm-fast-dict/l
 
 @docs interfaceSingleEdits, InterfaceSingleEdit, AudioEdit, DomEdit
 
-If you need more things like json encoders/decoders, [open an issue](https://github.com/lue-bird/elm-state-interface/issues/new)
+If you need more things like json encoders/decoders, [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new)
 
 -}
 
@@ -3083,7 +3083,7 @@ windowVisibilityJsonDecoder =
 Implementation note:
 As you know, gamepad layouts differ between models.
 For most of them, we're able to map them to the buttons and thumbsticks above.
-If you experience issues with some model, [open an issue](https://github.com/lue-bird/elm-state-interface/issues/new)
+If you experience issues with some model, [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new)
 
 -}
 type alias Gamepad =
@@ -3159,7 +3159,7 @@ programUpdate appConfig =
                         notifyOfBugInterface =
                             ([ "bug: js event failed to decode: "
                              , jsonError |> Json.Decode.errorToString
-                             , ". Please open an issue on github.com/lue-bird/elm-state-interface"
+                             , ". Please open an issue on github.com/lue-bird/elm-state-interface-experimental"
                              ]
                                 |> String.concat
                             )

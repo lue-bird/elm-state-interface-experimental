@@ -58,7 +58,7 @@ function copyExampleDevelopmentToExample(sub) {
 
     fs.writeFileSync(
         path.resolve(__dirname, "..", "example", sub, "src", "index.js"),
-        `import * as Web from "@lue-bird/elm-state-interface"
+        `import * as Web from "@lue-bird/elm-state-interface-experimental"
 import Main from "./Main.elm"
 
 const elmApp = Main.init()
@@ -72,7 +72,7 @@ Web.programStart({ ports: elmApp.ports, domElement: document.getElementById("app
     "type": "module",
     "main": "index.js",
     "dependencies": {
-        "@lue-bird/elm-state-interface": "^2.0.0",
+        "@lue-bird/elm-state-interface-experimental": "^2.0.0",
         "vite": "^5.1.2",
         "vite-plugin-elm-watch": "^1.3.2"
     }

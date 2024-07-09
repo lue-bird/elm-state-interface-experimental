@@ -57,7 +57,7 @@ We want to avoid missed inputs before your next simulation tick,
 so we just had to guess a good interval number.
 <https://stackoverflow.com/a/51483510>
 
-If you have issues with unresponsiveness, [open an issue](https://github.com/lue-bird/elm-state-interface/issues/new)
+If you have issues with unresponsiveness, [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new)
 
 -}
 changeListen : Web.Interface (Dict Int Web.Gamepad)
