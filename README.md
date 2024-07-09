@@ -1,4 +1,4 @@
-> Use [elm-state-interface-experimental](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest) instead.
+> Use [elm-state-interface](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest) instead.
 > This package will intentionally break a lot and contains untested optimizations.
 > If you want to help test before release or can't wait, you've come to the right place!
 
