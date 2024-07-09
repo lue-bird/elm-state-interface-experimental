@@ -31,10 +31,11 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 
 -}
 
-import FastDict
 import Json.Decode
+import List.LocalExtra
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Rope exposing (Rope)
+import SortedKeyValueList
 import Web
 
 
@@ -170,7 +171,7 @@ domElementHeaderFutureMap futureChange =
                 |> Maybe.map (\request position -> position |> request |> futureChange)
         , eventListens =
             domElementToMap.eventListens
-                |> FastDict.map
+                |> SortedKeyValueList.map
                     (\_ listen ->
                         { on = \event -> listen.on event |> futureChange
                         , defaultActionHandling = listen.defaultActionHandling
@@ -193,74 +194,142 @@ elementWithMaybeNamespace :
     -> List (Node future)
     -> Node future
 elementWithMaybeNamespace maybeNamespace tag modifiers subs =
+    let
+        modifiersFlat : List (ModifierSingle future)
+        modifiersFlat =
+            modifiers
+                |> modifierBatch
+                |> Rope.toList
+    in
     { header =
-        modifiers
-            |> modifierBatch
-            |> Rope.foldl
-                (\modifier soFar ->
-                    case modifier of
-                        ScrollToPosition position ->
-                            { soFar | scrollToPosition = position |> Just }
+        { namespace = maybeNamespace
+        , tag = tag
+        , scrollToPosition =
+            modifiersFlat
+                |> List.LocalExtra.firstJustMap
+                    (\modifier ->
+                        case modifier of
+                            ScrollToPosition position ->
+                                position |> Just
 
-                        ScrollToShow alignment ->
-                            { soFar | scrollToShow = alignment |> Just }
+                            _ ->
+                                Nothing
+                    )
+        , scrollToShow =
+            modifiersFlat
+                |> List.LocalExtra.firstJustMap
+                    (\modifier ->
+                        case modifier of
+                            ScrollToShow alignment ->
+                                alignment |> Just
 
-                        ScrollPositionRequest positionRequest ->
-                            { soFar | scrollPositionRequest = positionRequest |> Just }
+                            _ ->
+                                Nothing
+                    )
+        , scrollPositionRequest =
+            modifiersFlat
+                |> List.LocalExtra.firstJustMap
+                    (\modifier ->
+                        case modifier of
+                            ScrollPositionRequest positionRequest ->
+                                positionRequest |> Just
 
-                        Listen listen ->
-                            { soFar
-                                | eventListens =
-                                    soFar.eventListens
-                                        |> FastDict.insert listen.eventName
-                                            { on = listen.on
-                                            , defaultActionHandling = listen.defaultActionHandling
-                                            }
-                            }
-
-                        Style keyValue ->
-                            { soFar | styles = soFar.styles |> FastDict.insert keyValue.key keyValue.value }
-
-                        StringProperty keyValue ->
-                            { soFar
-                                | stringProperties =
-                                    soFar.stringProperties |> FastDict.insert keyValue.key keyValue.value
-                            }
-
-                        BoolProperty keyValue ->
-                            { soFar
-                                | boolProperties =
-                                    soFar.boolProperties |> FastDict.insert keyValue.key keyValue.value
-                            }
-
-                        Attribute keyValue ->
-                            case keyValue.namespace of
-                                Just namespace ->
-                                    { soFar
-                                        | attributesNamespaced =
-                                            soFar.attributesNamespaced
-                                                |> FastDict.insert ( namespace, keyValue.key ) keyValue.value
+                            _ ->
+                                Nothing
+                    )
+        , eventListens =
+            modifiersFlat
+                |> List.LocalExtra.justsToAnyOrderMap
+                    (\modifier ->
+                        case modifier of
+                            Listen listen ->
+                                { key = listen.eventName
+                                , value =
+                                    { on = listen.on
+                                    , defaultActionHandling = listen.defaultActionHandling
                                     }
+                                }
+                                    |> Just
 
-                                Nothing ->
-                                    { soFar
-                                        | attributes =
-                                            soFar.attributes
-                                                |> FastDict.insert keyValue.key keyValue.value
-                                    }
-                )
-                { namespace = maybeNamespace
-                , tag = tag
-                , scrollToPosition = Nothing
-                , scrollToShow = Nothing
-                , scrollPositionRequest = Nothing
-                , eventListens = FastDict.empty
-                , styles = FastDict.empty
-                , stringProperties = FastDict.empty
-                , boolProperties = FastDict.empty
-                , attributes = FastDict.empty
-                , attributesNamespaced = FastDict.empty
-                }
+                            _ ->
+                                Nothing
+                    )
+                |> SortedKeyValueList.fromList
+        , styles =
+            modifiersFlat
+                |> List.LocalExtra.justsToAnyOrderMap
+                    (\modifier ->
+                        case modifier of
+                            Style keyValue ->
+                                keyValue |> Just
+
+                            _ ->
+                                Nothing
+                    )
+                |> SortedKeyValueList.fromList
+        , stringProperties =
+            modifiersFlat
+                |> List.LocalExtra.justsToAnyOrderMap
+                    (\modifier ->
+                        case modifier of
+                            StringProperty keyValue ->
+                                keyValue |> Just
+
+                            _ ->
+                                Nothing
+                    )
+                |> SortedKeyValueList.fromList
+        , boolProperties =
+            modifiersFlat
+                |> List.LocalExtra.justsToAnyOrderMap
+                    (\modifier ->
+                        case modifier of
+                            BoolProperty keyValue ->
+                                keyValue |> Just
+
+                            _ ->
+                                Nothing
+                    )
+                |> SortedKeyValueList.fromList
+        , attributes =
+            modifiersFlat
+                |> List.LocalExtra.justsToAnyOrderMap
+                    (\modifier ->
+                        case modifier of
+                            Attribute keyValue ->
+                                case keyValue.namespace of
+                                    Just _ ->
+                                        Nothing
+
+                                    Nothing ->
+                                        { key = keyValue.key, value = keyValue.value }
+                                            |> Just
+
+                            _ ->
+                                Nothing
+                    )
+                |> SortedKeyValueList.fromList
+        , attributesNamespaced =
+            modifiersFlat
+                |> List.LocalExtra.justsToAnyOrderMap
+                    (\modifier ->
+                        case modifier of
+                            Attribute keyValue ->
+                                case keyValue.namespace of
+                                    Nothing ->
+                                        Nothing
+
+                                    Just namespace ->
+                                        { key = ( namespace, keyValue.key )
+                                        , value = keyValue.value
+                                        }
+                                            |> Just
+
+                            _ ->
+                                Nothing
+                    )
+                |> SortedKeyValueList.fromList
+        }
     , subs = subs
     }
         |> Element

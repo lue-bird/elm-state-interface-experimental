@@ -1,4 +1,4 @@
-module List.LocalExtra exposing (firstJustMap, foldUpIndexedFrom, justsMapIndexed, justsToAnyOrder)
+module List.LocalExtra exposing (firstJustMap, foldUpIndexedFrom, justsMapIndexed, justsToAnyOrder, justsToAnyOrderMap)
 
 
 firstJustMap : (a -> Maybe b) -> List a -> Maybe b
@@ -19,10 +19,16 @@ firstJustMap elementToMaybeFound list =
 justsToAnyOrder : List (Maybe value) -> List value
 justsToAnyOrder =
     \list ->
+        list |> justsToAnyOrderMap Basics.identity
+
+
+justsToAnyOrderMap : (element -> Maybe value) -> (List element -> List value)
+justsToAnyOrderMap elementToMaybeValue =
+    \list ->
         list
             |> List.foldl
-                (\maybe soFar ->
-                    case maybe of
+                (\element soFar ->
+                    case element |> elementToMaybeValue of
                         Nothing ->
                             soFar
 
