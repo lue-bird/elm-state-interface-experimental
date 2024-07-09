@@ -11,6 +11,7 @@ module Web exposing
     , WindowVisibility(..)
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..)
+    , SortedKeyValueList(..), sortedKeyValueListMerge
     , interfaceSingleEdits, InterfaceSingleEdit(..), AudioEdit(..), DomEdit(..)
     )
 
@@ -108,17 +109,7 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 
 @docs ProgramState, ProgramEvent, InterfaceSingle, DomTextOrElementHeader
 
-To simulate diffing of interfaces, use
-
-    FastDict.merge
-        (\id toAdd -> ..add toAdd..)
-        (\id old updated -> ..edit (interfaceSingleEdits { old, updated })..)
-        (id toRemove -> ..remove toRemove..)
-        updatedInterfaces
-        oldInterfaces
-        ..what you fold into..
-
-see [`FastDict.merge`](https://dark.elm.dmy.fr/packages/miniBill/elm-fast-dict/latest/FastDict#merge)
+@docs SortedKeyValueList, sortedKeyValueListMerge
 
 @docs interfaceSingleEdits, InterfaceSingleEdit, AudioEdit, DomEdit
 
@@ -207,9 +198,16 @@ import Url.LocalExtra
 -}
 type ProgramState appState
     = State
-        { interface : FastDict.Dict String (InterfaceSingle appState)
+        { interface : SortedKeyValueList String (InterfaceSingle appState)
         , appState : appState
         }
+
+
+{-| Alternative to Dict optimized for fast merge and fast creation.
+Would be a terrible fit if we needed fast insert and get.
+-}
+type SortedKeyValueList key value
+    = SortedKeyValueList (List { key : key, value : value })
 
 
 {-| What's needed to create a state-interface [`program`](#program)
@@ -1185,6 +1183,70 @@ interfaceSingleEdits =
     \interfaces -> interfaces |> interfaceSingleEditsMap Basics.identity
 
 
+{-| Fold 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
+The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
+
+To simulate diffing of interfaces, use
+
+    Web.sortedKeyValueListMerge
+        (\id toAdd -> ..add toAdd..)
+        (\id old updated -> ..edit (interfaceSingleEdits { old, updated })..)
+        (id toRemove -> ..remove toRemove..)
+        updatedInterfaces
+        oldInterfaces
+        ..what you fold into..
+
+-}
+sortedKeyValueListMerge :
+    (comparableKey -> a -> folded -> folded)
+    -> (comparableKey -> a -> b -> folded -> folded)
+    -> (comparableKey -> b -> folded -> folded)
+    -> SortedKeyValueList comparableKey a
+    -> SortedKeyValueList comparableKey b
+    -> folded
+    -> folded
+sortedKeyValueListMerge onlyA bothAB onlyB (SortedKeyValueList aSortedKeyValueList) (SortedKeyValueList bSortedKeyValueList) initialFolded =
+    case aSortedKeyValueList of
+        [] ->
+            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry.key entry.value soFar) initialFolded
+
+        aLowest :: aWithoutLowest ->
+            case bSortedKeyValueList of
+                [] ->
+                    aWithoutLowest
+                        |> List.foldl (\entry soFar -> onlyA entry.key entry.value soFar)
+                            (onlyA aLowest.key aLowest.value initialFolded)
+
+                bLowest :: bWithoutLowest ->
+                    case compare aLowest.key bLowest.key of
+                        EQ ->
+                            sortedKeyValueListMerge
+                                onlyA
+                                bothAB
+                                onlyB
+                                (SortedKeyValueList aWithoutLowest)
+                                (SortedKeyValueList bWithoutLowest)
+                                (bothAB aLowest.key aLowest.value bLowest.value initialFolded)
+
+                        LT ->
+                            sortedKeyValueListMerge
+                                onlyA
+                                bothAB
+                                onlyB
+                                (SortedKeyValueList aWithoutLowest)
+                                (SortedKeyValueList bSortedKeyValueList)
+                                (onlyA aLowest.key aLowest.value initialFolded)
+
+                        GT ->
+                            sortedKeyValueListMerge
+                                onlyA
+                                bothAB
+                                onlyB
+                                (SortedKeyValueList aSortedKeyValueList)
+                                (SortedKeyValueList bWithoutLowest)
+                                (onlyB bLowest.key bLowest.value initialFolded)
+
+
 {-| Determine which outgoing effects need to be executed based on the difference between old and updated interfaces
 
 To for example determine the initial effects, use
@@ -1196,14 +1258,14 @@ To for example determine the initial effects, use
 interfacesDiffMap :
     ({ id : String, diff : InterfaceSingleDiff future } -> combined)
     ->
-        ({ old : FastDict.Dict String (InterfaceSingle future)
-         , updated : FastDict.Dict String (InterfaceSingle future)
+        ({ old : SortedKeyValueList String (InterfaceSingle future)
+         , updated : SortedKeyValueList String (InterfaceSingle future)
          }
          -> List combined
         )
 interfacesDiffMap idAndDiffCombine =
     \interfaces ->
-        FastDict.merge
+        sortedKeyValueListMerge
             (\id _ soFar ->
                 idAndDiffCombine { id = id, diff = Remove } :: soFar
             )
@@ -1946,17 +2008,6 @@ audioToJson audio =
         ]
 
 
-interfacesFromRope : Rope (InterfaceSingle future) -> FastDict.Dict String (InterfaceSingle future)
-interfacesFromRope =
-    \rope ->
-        rope
-            |> Rope.foldl
-                (\interfaceSingle soFar ->
-                    soFar |> insertInterface interfaceSingle
-                )
-                FastDict.empty
-
-
 interfaceSingleToStructuredId : InterfaceSingle future_ -> StructuredId
 interfaceSingleToStructuredId =
     \interfaceSingle ->
@@ -2163,15 +2214,29 @@ socketIdToStructuredId =
     \(SocketId raw) -> raw |> StructuredId.ofInt
 
 
-insertInterface :
-    InterfaceSingle future
-    -> (FastDict.Dict String (InterfaceSingle future) -> FastDict.Dict String (InterfaceSingle future))
-insertInterface element =
-    \dict ->
-        dict
-            |> FastDict.insert
-                (element |> interfaceSingleToStructuredId |> StructuredId.toString)
-                element
+interfacesFromRope : Rope (InterfaceSingle future) -> SortedKeyValueList String (InterfaceSingle future)
+interfacesFromRope =
+    \rope ->
+        let
+            flattened : List { key : String, value : InterfaceSingle future }
+            flattened =
+                rope
+                    |> Rope.foldl
+                        (\interfaceSingle soFar ->
+                            { key = interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
+                            , value = interfaceSingle
+                            }
+                                :: soFar
+                        )
+                        []
+        in
+        flattened |> keyValueListToSorted
+
+
+keyValueListToSorted : List { value : value, key : comparable } -> SortedKeyValueList comparable value
+keyValueListToSorted =
+    \unsortedList ->
+        SortedKeyValueList (unsortedList |> List.sortBy .key)
 
 
 {-| The "init" part for an embedded program
@@ -2179,7 +2244,7 @@ insertInterface element =
 programInit : ProgramConfig state -> ( ProgramState state, Cmd (ProgramEvent state) )
 programInit appConfig =
     let
-        initialInterface : FastDict.Dict String (InterfaceSingle state)
+        initialInterface : SortedKeyValueList String (InterfaceSingle state)
         initialInterface =
             appConfig.initialState
                 |> appConfig.interface
@@ -2189,12 +2254,17 @@ programInit appConfig =
         { interface = initialInterface
         , appState = appConfig.initialState
         }
-    , { old = FastDict.empty, updated = initialInterface }
+    , { old = sortedKeyValueListEmpty, updated = initialInterface }
         |> interfacesDiffMap
             (\diff -> appConfig.ports.toJs (diff |> toJsToJson))
         |> Cmd.batch
         |> Cmd.map never
     )
+
+
+sortedKeyValueListEmpty : SortedKeyValueList key_ value_
+sortedKeyValueListEmpty =
+    SortedKeyValueList []
 
 
 {-| The "subscriptions" part for an embedded program
@@ -2209,7 +2279,7 @@ programSubscriptions appConfig =
                         (Json.Decode.field "id" Json.Decode.string
                             |> Json.Decode.andThen
                                 (\originalInterfaceId ->
-                                    case state.interface |> FastDict.get originalInterfaceId of
+                                    case state.interface |> sortedKeyValueListGet originalInterfaceId of
                                         Just interfaceSingleAcceptingFuture ->
                                             case interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder of
                                                 Just eventDataDecoder ->
@@ -2224,6 +2294,22 @@ programSubscriptions appConfig =
                             |> Json.Decode.map JsEventEnabledConstructionOfNewAppState
                         )
                     |> Result.LocalExtra.valueOrOnError JsEventFailedToDecode
+            )
+
+
+{-| The fact that this can only be implemented linearly might seem shocking.
+In reality, merging and creating a Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
+-}
+sortedKeyValueListGet : key -> SortedKeyValueList key value -> Maybe value
+sortedKeyValueListGet keyToFind (SortedKeyValueList sortedKeyValueList) =
+    sortedKeyValueList
+        |> List.LocalExtra.firstJustMap
+            (\entry ->
+                if entry.key == keyToFind then
+                    Just entry.value
+
+                else
+                    Nothing
             )
 
 
@@ -3176,7 +3262,7 @@ programUpdate appConfig =
             JsEventEnabledConstructionOfNewAppState updatedAppState ->
                 \(State oldState) ->
                     let
-                        updatedInterface : FastDict.Dict String (InterfaceSingle state)
+                        updatedInterface : SortedKeyValueList String (InterfaceSingle state)
                         updatedInterface =
                             updatedAppState |> appConfig.interface |> interfacesFromRope
                     in

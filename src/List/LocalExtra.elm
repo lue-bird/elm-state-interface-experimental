@@ -1,4 +1,19 @@
-module List.LocalExtra exposing (foldUpIndexedFrom, justsMapIndexed, justsToAnyOrder)
+module List.LocalExtra exposing (firstJustMap, foldUpIndexedFrom, justsMapIndexed, justsToAnyOrder)
+
+
+firstJustMap : (a -> Maybe b) -> List a -> Maybe b
+firstJustMap elementToMaybeFound list =
+    case list of
+        [] ->
+            Nothing
+
+        head :: tail ->
+            case elementToMaybeFound head of
+                Nothing ->
+                    firstJustMap elementToMaybeFound tail
+
+                Just found ->
+                    Just found
 
 
 justsToAnyOrder : List (Maybe value) -> List value
