@@ -31,7 +31,7 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 
 -}
 
-import Dict
+import FastDict
 import Json.Decode
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Rope exposing (Rope)
@@ -170,7 +170,7 @@ domElementHeaderFutureMap futureChange =
                 |> Maybe.map (\request position -> position |> request |> futureChange)
         , eventListens =
             domElementToMap.eventListens
-                |> Dict.map
+                |> FastDict.map
                     (\_ listen ->
                         { on = \event -> listen.on event |> futureChange
                         , defaultActionHandling = listen.defaultActionHandling
@@ -212,25 +212,25 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
                             { soFar
                                 | eventListens =
                                     soFar.eventListens
-                                        |> Dict.insert listen.eventName
+                                        |> FastDict.insert listen.eventName
                                             { on = listen.on
                                             , defaultActionHandling = listen.defaultActionHandling
                                             }
                             }
 
                         Style keyValue ->
-                            { soFar | styles = soFar.styles |> Dict.insert keyValue.key keyValue.value }
+                            { soFar | styles = soFar.styles |> FastDict.insert keyValue.key keyValue.value }
 
                         StringProperty keyValue ->
                             { soFar
                                 | stringProperties =
-                                    soFar.stringProperties |> Dict.insert keyValue.key keyValue.value
+                                    soFar.stringProperties |> FastDict.insert keyValue.key keyValue.value
                             }
 
                         BoolProperty keyValue ->
                             { soFar
                                 | boolProperties =
-                                    soFar.boolProperties |> Dict.insert keyValue.key keyValue.value
+                                    soFar.boolProperties |> FastDict.insert keyValue.key keyValue.value
                             }
 
                         Attribute keyValue ->
@@ -239,14 +239,14 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
                                     { soFar
                                         | attributesNamespaced =
                                             soFar.attributesNamespaced
-                                                |> Dict.insert ( namespace, keyValue.key ) keyValue.value
+                                                |> FastDict.insert ( namespace, keyValue.key ) keyValue.value
                                     }
 
                                 Nothing ->
                                     { soFar
                                         | attributes =
                                             soFar.attributes
-                                                |> Dict.insert keyValue.key keyValue.value
+                                                |> FastDict.insert keyValue.key keyValue.value
                                     }
                 )
                 { namespace = maybeNamespace
@@ -254,12 +254,12 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
                 , scrollToPosition = Nothing
                 , scrollToShow = Nothing
                 , scrollPositionRequest = Nothing
-                , eventListens = Dict.empty
-                , styles = Dict.empty
-                , stringProperties = Dict.empty
-                , boolProperties = Dict.empty
-                , attributes = Dict.empty
-                , attributesNamespaced = Dict.empty
+                , eventListens = FastDict.empty
+                , styles = FastDict.empty
+                , stringProperties = FastDict.empty
+                , boolProperties = FastDict.empty
+                , attributes = FastDict.empty
+                , attributesNamespaced = FastDict.empty
                 }
     , subs = subs
     }

@@ -122,7 +122,7 @@ import AppUrl exposing (AppUrl)
 import AppUrl.LocalExtra
 import Bytes exposing (Bytes)
 import Bytes.LocalExtra
-import Dict exposing (Dict)
+import Dict
 import Duration exposing (Duration)
 import FastDict
 import Json.Decode
@@ -203,7 +203,7 @@ type ProgramState appState
         }
 
 
-{-| Alternative to Dict optimized for fast merge and fast creation.
+{-| Alternative to FastDict.Dict optimized for fast merge and fast creation.
 Would be a terrible fit if we needed fast insert and get.
 -}
 type SortedKeyValueList key value
@@ -291,8 +291,8 @@ type InterfaceSingle future
         }
     | GeoLocationRequest (GeoLocation -> future)
     | GeoLocationChangeListen (GeoLocation -> future)
-    | GamepadsRequest (Dict Int Gamepad -> future)
-    | GamepadsChangeListen (Dict Int Gamepad -> future)
+    | GamepadsRequest (Dict.Dict Int Gamepad -> future)
+    | GamepadsChangeListen (Dict.Dict Int Gamepad -> future)
 
 
 {-| These are possible errors we can get when loading an audio source file.
@@ -424,16 +424,16 @@ type alias DomElementHeader future =
     RecordWithoutConstructorFunction
         { namespace : Maybe String
         , tag : String
-        , styles : Dict String String
-        , attributes : Dict String String
-        , attributesNamespaced : Dict ( String, String ) String
-        , stringProperties : Dict String String
-        , boolProperties : Dict String Bool
+        , styles : FastDict.Dict String String
+        , attributes : FastDict.Dict String String
+        , attributesNamespaced : FastDict.Dict ( String, String ) String
+        , stringProperties : FastDict.Dict String String
+        , boolProperties : FastDict.Dict String Bool
         , scrollToPosition : Maybe { fromLeft : Float, fromTop : Float }
         , scrollToShow : Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment }
         , scrollPositionRequest : Maybe ({ fromLeft : Float, fromTop : Float } -> future)
         , eventListens :
-            Dict
+            FastDict.Dict
                 String
                 { on : Json.Decode.Value -> future
                 , defaultActionHandling : DefaultActionHandling
@@ -745,7 +745,7 @@ domElementHeaderFutureMap futureChange =
                 |> Maybe.map (\request position -> position |> request |> futureChange)
         , eventListens =
             domElementToMap.eventListens
-                |> Dict.map
+                |> FastDict.map
                     (\_ listen ->
                         { on = \event -> listen.on event |> futureChange
                         , defaultActionHandling = listen.defaultActionHandling
@@ -1082,12 +1082,12 @@ domElementHeaderDiffMap fromDomEdit =
                                 |> fromDomEdit
                                 |> Just
             , let
-                updatedElementEventListensId : Dict String DefaultActionHandling
+                updatedElementEventListensId : FastDict.Dict String DefaultActionHandling
                 updatedElementEventListensId =
-                    elements.updated.eventListens |> Dict.map (\_ v -> v.defaultActionHandling)
+                    elements.updated.eventListens |> FastDict.map (\_ v -> v.defaultActionHandling)
               in
               if
-                (elements.old.eventListens |> Dict.map (\_ v -> v.defaultActionHandling))
+                (elements.old.eventListens |> FastDict.map (\_ v -> v.defaultActionHandling))
                     == updatedElementEventListensId
               then
                 Nothing
@@ -1104,7 +1104,7 @@ dictEditAndRemoveDiffMap :
     ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
     -> { remove : comparableKey -> removeSingle, edit : comparableKey -> value -> editSingle }
     ->
-        ({ old : Dict comparableKey value, updated : Dict comparableKey value }
+        ({ old : FastDict.Dict comparableKey value, updated : FastDict.Dict comparableKey value }
          -> Maybe fromRemoveAndEdit
         )
 dictEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle =
@@ -1112,7 +1112,7 @@ dictEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle =
         let
             diff : { remove : List removeSingle, edit : List editSingle }
             diff =
-                Dict.merge
+                FastDict.merge
                     (\key _ soFar ->
                         { soFar | remove = soFar.remove |> (::) (asDiffSingle.remove key) }
                     )
@@ -1417,11 +1417,11 @@ domTextOrElementHeaderInfoToJson =
             )
 
 
-domElementEventListensInfoToJson : Dict String DefaultActionHandling -> Json.Encode.Value
+domElementEventListensInfoToJson : FastDict.Dict String DefaultActionHandling -> Json.Encode.Value
 domElementEventListensInfoToJson =
     \listens ->
         listens
-            |> Dict.toList
+            |> FastDict.toList
             |> Json.Encode.list
                 (\( name, defaultActionHandling ) ->
                     Json.Encode.object
@@ -1507,17 +1507,17 @@ domElementHeaderInfoToJson =
               )
             , ( "eventListens"
               , header.eventListens
-                    |> Dict.map (\_ listen -> listen.defaultActionHandling)
+                    |> FastDict.map (\_ listen -> listen.defaultActionHandling)
                     |> domElementEventListensInfoToJson
               )
             ]
 
 
-domElementAttributesNamespacedToJson : Dict ( String, String ) String -> Json.Encode.Value
+domElementAttributesNamespacedToJson : FastDict.Dict ( String, String ) String -> Json.Encode.Value
 domElementAttributesNamespacedToJson =
     \attributes ->
         attributes
-            |> Dict.toList
+            |> FastDict.toList
             |> Json.Encode.list
                 (\( ( namespace, key ), value ) ->
                     Json.Encode.object
@@ -1528,11 +1528,11 @@ domElementAttributesNamespacedToJson =
                 )
 
 
-domElementAttributesToJson : Dict String String -> Json.Encode.Value
+domElementAttributesToJson : FastDict.Dict String String -> Json.Encode.Value
 domElementAttributesToJson =
     \attributes ->
         attributes
-            |> Dict.toList
+            |> FastDict.toList
             |> Json.Encode.list
                 (\( key, value ) ->
                     Json.Encode.object
@@ -1542,11 +1542,11 @@ domElementAttributesToJson =
                 )
 
 
-domElementStylesToJson : Dict String String -> Json.Encode.Value
+domElementStylesToJson : FastDict.Dict String String -> Json.Encode.Value
 domElementStylesToJson =
     \styles ->
         styles
-            |> Dict.toList
+            |> FastDict.toList
             |> Json.Encode.list
                 (\( key, value ) ->
                     Json.Encode.object
@@ -1556,11 +1556,11 @@ domElementStylesToJson =
                 )
 
 
-domElementBoolPropertiesToJson : Dict String Bool -> Json.Encode.Value
+domElementBoolPropertiesToJson : FastDict.Dict String Bool -> Json.Encode.Value
 domElementBoolPropertiesToJson =
     \boolProperties ->
         boolProperties
-            |> Dict.toList
+            |> FastDict.toList
             |> Json.Encode.list
                 (\( key, value ) ->
                     Json.Encode.object
@@ -1570,11 +1570,11 @@ domElementBoolPropertiesToJson =
                 )
 
 
-domElementStringPropertiesToJson : Dict String String -> Json.Encode.Value
+domElementStringPropertiesToJson : FastDict.Dict String String -> Json.Encode.Value
 domElementStringPropertiesToJson =
     \stringProperties ->
         stringProperties
-            |> Dict.toList
+            |> FastDict.toList
             |> Json.Encode.list
                 (\( key, value ) ->
                     Json.Encode.object
@@ -2298,7 +2298,7 @@ programSubscriptions appConfig =
 
 
 {-| The fact that this can only be implemented linearly might seem shocking.
-In reality, merging and creating a Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
+In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
 -}
 sortedKeyValueListGet : key -> SortedKeyValueList key value -> Maybe value
 sortedKeyValueListGet keyToFind (SortedKeyValueList sortedKeyValueList) =
@@ -2404,7 +2404,7 @@ interfaceSingleFutureJsonDecoder =
                                         (Json.Decode.string
                                             |> Json.Decode.andThen
                                                 (\specificEventName ->
-                                                    case domElement.eventListens |> Dict.get specificEventName of
+                                                    case domElement.eventListens |> FastDict.get specificEventName of
                                                         Nothing ->
                                                             Json.Decode.fail "received event of a kind that isn't listened for"
 
@@ -2637,7 +2637,7 @@ geoLocationJsonDecoder =
         (Json.Decode.nullable (Json.Decode.map Speed.metersPerSecond Json.Decode.float))
 
 
-gamepadsJsonDecoder : Json.Decode.Decoder (Dict Int Gamepad)
+gamepadsJsonDecoder : Json.Decode.Decoder (Dict.Dict Int Gamepad)
 gamepadsJsonDecoder =
     Json.Decode.map
         (\maybeGamepads ->
@@ -3105,7 +3105,7 @@ httpMetadataJsonDecoder =
         (Json.Decode.field "url" Json.Decode.string)
         (Json.Decode.field "statusCode" Json.Decode.int)
         (Json.Decode.field "statusText" Json.Decode.string)
-        (Json.Decode.field "headers" (Json.Decode.dict Json.Decode.string))
+        (Json.Decode.field "headers" (Json.Decode.map FastDict.fromList (Json.Decode.keyValuePairs Json.Decode.string)))
 
 
 httpErrorJsonDecoder : Json.Decode.Decoder HttpError
@@ -3309,7 +3309,7 @@ type alias HttpMetadata =
         { url : String
         , statusCode : Int
         , statusText : String
-        , headers : Dict String String
+        , headers : FastDict.Dict String String
         }
 
 
@@ -3409,7 +3409,7 @@ type DomEdit
     | ReplacementDomElementScrollToPosition (Maybe { fromLeft : Float, fromTop : Float })
     | ReplacementDomElementScrollToShow (Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment })
     | ReplacementDomElementScrollPositionRequest
-    | ReplacementDomElementEventListens (Dict String DefaultActionHandling)
+    | ReplacementDomElementEventListens (FastDict.Dict String DefaultActionHandling)
 
 
 {-| Create a [`Program`](#Program):
