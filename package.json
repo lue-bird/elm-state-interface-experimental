@@ -1,7 +1,7 @@
 {
     "name": "@lue-bird/elm-state-interface-experimental",
     "version": "1.0.0",
-    "description": "define an app in a simple, safe and declarative way",
+    "description": "fast-moving, less tested version of elm-state-interface",
     "author": "lue-bird",
     "license": "MIT",
     "repository": {
