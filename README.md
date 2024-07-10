@@ -2,7 +2,7 @@
 > This package will intentionally break a lot and contains untested optimizations.
 > If you want to help test before release or can't wait, you've come to the right place!
 >
-> changes compared to the stable [elm-state-interface](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest):
+> Changes so far compared to the stable [elm-state-interface](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest):
 > 
 >   - internal: switch `interfaces` representation from `FastDict.Dict` to sorted assoc-list
 >   - internal: switch `Dict` values to sorted assoc-list or `FastDict.Dict`
