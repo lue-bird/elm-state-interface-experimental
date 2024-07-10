@@ -3,16 +3,20 @@ module List.LocalExtra exposing (atIndex, firstJustMap, foldUpIndexedFrom, justs
 
 atIndex : Int -> (List a -> Maybe a)
 atIndex index sticks =
-    case sticks of
-        [] ->
-            Nothing
+    if index <= -1 then
+        Nothing
 
-        head :: tail ->
-            if index <= 0 then
-                head |> Just
+    else
+        case sticks of
+            [] ->
+                Nothing
 
-            else
-                atIndex (index - 1) tail
+            head :: tail ->
+                if index <= 0 then
+                    head |> Just
+
+                else
+                    atIndex (index - 1) tail
 
 
 firstJustMap : (a -> Maybe b) -> List a -> Maybe b
