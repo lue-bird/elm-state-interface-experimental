@@ -1,4 +1,4 @@
-module SortedKeyValueList exposing (SortedKeyValueList, empty, fromList, get, map, toList)
+module SortedKeyValueList exposing (SortedKeyValueList, fromList, get, map, toList)
 
 {-| Alternative to FastDict.Dict optimized for fast merge and fast creation.
 Would be a terrible fit if we needed fast insert and get.
@@ -22,11 +22,6 @@ map elementChange sortedKeyValueList =
                     { key = entry.key, value = elementChange entry.key entry.value }
                 )
     }
-
-
-empty : SortedKeyValueList key_ value_
-empty =
-    { sortedKeyValueList = [] }
 
 
 {-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](#SortedKeyValueList)
