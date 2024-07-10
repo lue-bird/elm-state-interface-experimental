@@ -32,7 +32,6 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 -}
 
 import Json.Decode
-import List.LocalExtra
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Rope exposing (Rope)
 import SortedKeyValueList
