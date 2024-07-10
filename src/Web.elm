@@ -204,7 +204,7 @@ type ProgramState appState
         }
 
 
-{-| Alternative to FastDict.Dict optimized for fast merge and fast creation.
+{-| Alternative to `Dict` optimized for fast merge and fast creation.
 Would be a terrible fit if we needed fast insert and get.
 -}
 type alias SortedKeyValueList key value =
@@ -1257,7 +1257,7 @@ sortedKeyValueListMerge onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueLi
 
 To for example determine the initial effects, use
 
-    { old = FastDict.empty, updated = initialInterface }
+    { old = SortedKeyValueList.empty, updated = initialInterface }
         |> interfacesDiffMap identity
 
 -}
@@ -2994,10 +2994,16 @@ buttonMapping =
             }
 
 
-fastDictInsertSameValueFor : List comparableKey -> value -> (FastDict.Dict comparableKey value -> FastDict.Dict comparableKey value)
+fastDictInsertSameValueFor :
+    List comparableKey
+    -> value
+    -> (FastDict.Dict comparableKey value -> FastDict.Dict comparableKey value)
 fastDictInsertSameValueFor keyList value =
     \dict ->
-        keyList |> List.foldl (\key dictSoFar -> dictSoFar |> FastDict.insert key value) dict
+        keyList
+            |> List.foldl
+                (\key dictSoFar -> dictSoFar |> FastDict.insert key value)
+                dict
 
 
 listAtIndex : Int -> (List a -> Maybe a)
@@ -3090,7 +3096,16 @@ httpMetadataJsonDecoder =
         (Json.Decode.field "url" Json.Decode.string)
         (Json.Decode.field "statusCode" Json.Decode.int)
         (Json.Decode.field "statusText" Json.Decode.string)
-        (Json.Decode.field "headers" (Json.Decode.map FastDict.fromList (Json.Decode.keyValuePairs Json.Decode.string)))
+        (Json.Decode.field "headers"
+            (Json.Decode.map
+                (\headerTuples ->
+                    headerTuples
+                        |> List.map (\( key, value ) -> { key = key, value = value })
+                        |> SortedKeyValueList.fromList
+                )
+                (Json.Decode.keyValuePairs Json.Decode.string)
+            )
+        )
 
 
 httpErrorJsonDecoder : Json.Decode.Decoder HttpError
@@ -3285,7 +3300,7 @@ type HttpError
   - headers like Content-Length and Expires
 
 Note: It is possible for a response to have the same header multiple times.
-In that case, all the values end up in a single entry in the headers dictionary.
+In that case, all the values end up in a single entry in the headers.
 The values are separated by commas, following the rules outlined [here](https://stackoverflow.com/questions/4371328/are-duplicate-http-response-headers-acceptable).
 
 -}
@@ -3294,7 +3309,7 @@ type alias HttpMetadata =
         { url : String
         , statusCode : Int
         , statusText : String
-        , headers : FastDict.Dict String String
+        , headers : SortedKeyValueList String String
         }
 
 
