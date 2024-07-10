@@ -556,234 +556,230 @@ interfaceFutureMap futureChange =
 
 
 interfaceSingleFutureMap : (future -> mappedFuture) -> (InterfaceSingle future -> InterfaceSingle mappedFuture)
-interfaceSingleFutureMap futureChange =
-    \interface ->
-        case interface of
-            DocumentTitleReplaceBy title ->
-                DocumentTitleReplaceBy title
+interfaceSingleFutureMap futureChange interfaceSingle =
+    case interfaceSingle of
+        DocumentTitleReplaceBy title ->
+            DocumentTitleReplaceBy title
 
-            DocumentAuthorSet author ->
-                DocumentAuthorSet author
+        DocumentAuthorSet author ->
+            DocumentAuthorSet author
 
-            DocumentKeywordsSet keywords ->
-                DocumentKeywordsSet keywords
+        DocumentKeywordsSet keywords ->
+            DocumentKeywordsSet keywords
 
-            DocumentDescriptionSet description ->
-                DocumentDescriptionSet description
+        DocumentDescriptionSet description ->
+            DocumentDescriptionSet description
 
-            ConsoleLog message ->
-                ConsoleLog message
+        ConsoleLog message ->
+            ConsoleLog message
 
-            ConsoleWarn message ->
-                ConsoleWarn message
+        ConsoleWarn message ->
+            ConsoleWarn message
 
-            ConsoleError message ->
-                ConsoleError message
+        ConsoleError message ->
+            ConsoleError message
 
-            NavigationReplaceUrl appUrl ->
-                NavigationReplaceUrl appUrl
+        NavigationReplaceUrl appUrl ->
+            NavigationReplaceUrl appUrl
 
-            NavigationPushUrl appUrl ->
-                NavigationPushUrl appUrl
+        NavigationPushUrl appUrl ->
+            NavigationPushUrl appUrl
 
-            NavigationGo urlStepCount ->
-                NavigationGo urlStepCount
+        NavigationGo urlStepCount ->
+            NavigationGo urlStepCount
 
-            NavigationLoad url ->
-                NavigationLoad url
+        NavigationLoad url ->
+            NavigationLoad url
 
-            NavigationReload ->
-                NavigationReload
+        NavigationReload ->
+            NavigationReload
 
-            FileDownloadUnsignedInt8s download ->
-                FileDownloadUnsignedInt8s download
+        FileDownloadUnsignedInt8s download ->
+            FileDownloadUnsignedInt8s download
 
-            ClipboardReplaceBy clipboard ->
-                ClipboardReplaceBy clipboard
+        ClipboardReplaceBy clipboard ->
+            ClipboardReplaceBy clipboard
 
-            AudioPlay audio ->
-                AudioPlay audio
+        AudioPlay audio ->
+            AudioPlay audio
 
-            SocketMessage socketMessage ->
-                SocketMessage socketMessage
+        SocketMessage socketMessage ->
+            SocketMessage socketMessage
 
-            SocketDisconnect id ->
-                SocketDisconnect id
+        SocketDisconnect id ->
+            SocketDisconnect id
 
-            LocalStorageSet localStorageItem ->
-                LocalStorageSet localStorageItem
+        LocalStorageSet localStorageItem ->
+            LocalStorageSet localStorageItem
 
-            NotificationAskForPermission ->
-                NotificationAskForPermission
+        NotificationAskForPermission ->
+            NotificationAskForPermission
 
-            DomNodeRender toRender ->
-                { pathReverse = toRender.pathReverse
-                , node = toRender.node |> domNodeFutureMap futureChange
-                }
-                    |> DomNodeRender
+        DomNodeRender toRender ->
+            { pathReverse = toRender.pathReverse
+            , node = toRender.node |> domNodeFutureMap futureChange
+            }
+                |> DomNodeRender
 
-            AudioSourceLoad load ->
-                { url = load.url, on = \event -> load.on event |> futureChange }
-                    |> AudioSourceLoad
+        AudioSourceLoad load ->
+            { url = load.url, on = \event -> load.on event |> futureChange }
+                |> AudioSourceLoad
 
-            SocketConnect connect ->
-                { address = connect.address, on = \event -> event |> connect.on |> futureChange }
-                    |> SocketConnect
+        SocketConnect connect ->
+            { address = connect.address, on = \event -> event |> connect.on |> futureChange }
+                |> SocketConnect
 
-            NotificationShow show ->
-                { id = show.id
-                , message = show.message
-                , details = show.details
-                , on = \future -> future |> show.on |> futureChange
-                }
-                    |> NotificationShow
+        NotificationShow show ->
+            { id = show.id
+            , message = show.message
+            , details = show.details
+            , on = \future -> future |> show.on |> futureChange
+            }
+                |> NotificationShow
 
-            HttpRequest httpRequest ->
-                httpRequest |> httpRequestFutureMap futureChange |> HttpRequest
+        HttpRequest httpRequest ->
+            httpRequest |> httpRequestFutureMap futureChange |> HttpRequest
 
-            LocalStorageRequest request ->
-                { key = request.key, on = \event -> event |> request.on |> futureChange }
-                    |> LocalStorageRequest
+        LocalStorageRequest request ->
+            { key = request.key, on = \event -> event |> request.on |> futureChange }
+                |> LocalStorageRequest
 
-            WindowSizeRequest toFuture ->
-                (\event -> toFuture event |> futureChange) |> WindowSizeRequest
+        WindowSizeRequest toFuture ->
+            (\event -> toFuture event |> futureChange) |> WindowSizeRequest
 
-            WindowPreferredLanguagesRequest toFuture ->
-                (\event -> toFuture event |> futureChange) |> WindowPreferredLanguagesRequest
+        WindowPreferredLanguagesRequest toFuture ->
+            (\event -> toFuture event |> futureChange) |> WindowPreferredLanguagesRequest
 
-            NavigationUrlRequest toFuture ->
-                (\event -> toFuture event |> futureChange) |> NavigationUrlRequest
+        NavigationUrlRequest toFuture ->
+            (\event -> toFuture event |> futureChange) |> NavigationUrlRequest
 
-            ClipboardRequest toFuture ->
-                (\event -> toFuture event |> futureChange) |> ClipboardRequest
+        ClipboardRequest toFuture ->
+            (\event -> toFuture event |> futureChange) |> ClipboardRequest
 
-            TimePosixRequest requestTimeNow ->
-                (\event -> requestTimeNow event |> futureChange)
-                    |> TimePosixRequest
+        TimePosixRequest requestTimeNow ->
+            (\event -> requestTimeNow event |> futureChange)
+                |> TimePosixRequest
 
-            TimezoneOffsetRequest requestTimezone ->
-                (\event -> requestTimezone event |> futureChange)
-                    |> TimezoneOffsetRequest
+        TimezoneOffsetRequest requestTimezone ->
+            (\event -> requestTimezone event |> futureChange)
+                |> TimezoneOffsetRequest
 
-            TimezoneNameRequest requestTimezoneName ->
-                (\event -> requestTimezoneName event |> futureChange)
-                    |> TimezoneNameRequest
+        TimezoneNameRequest requestTimezoneName ->
+            (\event -> requestTimezoneName event |> futureChange)
+                |> TimezoneNameRequest
 
-            TimeOnce once ->
-                { pointInTime = once.pointInTime
-                , on = \event -> event |> once.on |> futureChange
-                }
-                    |> TimeOnce
+        TimeOnce once ->
+            { pointInTime = once.pointInTime
+            , on = \event -> event |> once.on |> futureChange
+            }
+                |> TimeOnce
 
-            RandomUnsignedInt32sRequest randomUnsignedInt32sRequest ->
-                { count = randomUnsignedInt32sRequest.count
-                , on = \ints -> randomUnsignedInt32sRequest.on ints |> futureChange
-                }
-                    |> RandomUnsignedInt32sRequest
+        RandomUnsignedInt32sRequest randomUnsignedInt32sRequest ->
+            { count = randomUnsignedInt32sRequest.count
+            , on = \ints -> randomUnsignedInt32sRequest.on ints |> futureChange
+            }
+                |> RandomUnsignedInt32sRequest
 
-            GeoLocationRequest toFuture ->
-                (\event -> event |> toFuture |> futureChange) |> GeoLocationRequest
+        GeoLocationRequest toFuture ->
+            (\event -> event |> toFuture |> futureChange) |> GeoLocationRequest
 
-            GamepadsRequest toFuture ->
-                (\event -> event |> toFuture |> futureChange) |> GamepadsRequest
+        GamepadsRequest toFuture ->
+            (\event -> event |> toFuture |> futureChange) |> GamepadsRequest
 
-            WindowEventListen listen ->
-                { eventName = listen.eventName, on = listen.on |> Json.Decode.map futureChange }
-                    |> WindowEventListen
+        WindowEventListen listen ->
+            { eventName = listen.eventName, on = listen.on |> Json.Decode.map futureChange }
+                |> WindowEventListen
 
-            WindowVisibilityChangeListen toFuture ->
-                (\event -> toFuture event |> futureChange) |> WindowVisibilityChangeListen
+        WindowVisibilityChangeListen toFuture ->
+            (\event -> toFuture event |> futureChange) |> WindowVisibilityChangeListen
 
-            WindowAnimationFrameListen toFuture ->
-                (\event -> toFuture event |> futureChange) |> WindowAnimationFrameListen
+        WindowAnimationFrameListen toFuture ->
+            (\event -> toFuture event |> futureChange) |> WindowAnimationFrameListen
 
-            WindowPreferredLanguagesChangeListen toFuture ->
-                (\event -> toFuture event |> futureChange) |> WindowPreferredLanguagesChangeListen
+        WindowPreferredLanguagesChangeListen toFuture ->
+            (\event -> toFuture event |> futureChange) |> WindowPreferredLanguagesChangeListen
 
-            TimePeriodicallyListen timePeriodicallyListen ->
-                { intervalDurationMilliSeconds = timePeriodicallyListen.intervalDurationMilliSeconds
-                , on = \posix -> timePeriodicallyListen.on posix |> futureChange
-                }
-                    |> TimePeriodicallyListen
+        TimePeriodicallyListen timePeriodicallyListen ->
+            { intervalDurationMilliSeconds = timePeriodicallyListen.intervalDurationMilliSeconds
+            , on = \posix -> timePeriodicallyListen.on posix |> futureChange
+            }
+                |> TimePeriodicallyListen
 
-            DocumentEventListen listen ->
-                { eventName = listen.eventName, on = listen.on |> Json.Decode.map futureChange }
-                    |> DocumentEventListen
+        DocumentEventListen listen ->
+            { eventName = listen.eventName, on = listen.on |> Json.Decode.map futureChange }
+                |> DocumentEventListen
 
-            SocketMessageListen messageListen ->
-                { id = messageListen.id, on = \event -> event |> messageListen.on |> futureChange }
-                    |> SocketMessageListen
+        SocketMessageListen messageListen ->
+            { id = messageListen.id, on = \event -> event |> messageListen.on |> futureChange }
+                |> SocketMessageListen
 
-            LocalStorageRemoveOnADifferentTabListen listen ->
-                { key = listen.key, on = \event -> event |> listen.on |> futureChange }
-                    |> LocalStorageRemoveOnADifferentTabListen
+        LocalStorageRemoveOnADifferentTabListen listen ->
+            { key = listen.key, on = \event -> event |> listen.on |> futureChange }
+                |> LocalStorageRemoveOnADifferentTabListen
 
-            LocalStorageSetOnADifferentTabListen listen ->
-                { key = listen.key, on = \event -> event |> listen.on |> futureChange }
-                    |> LocalStorageSetOnADifferentTabListen
+        LocalStorageSetOnADifferentTabListen listen ->
+            { key = listen.key, on = \event -> event |> listen.on |> futureChange }
+                |> LocalStorageSetOnADifferentTabListen
 
-            GeoLocationChangeListen toFuture ->
-                (\event -> event |> toFuture |> futureChange) |> GeoLocationChangeListen
+        GeoLocationChangeListen toFuture ->
+            (\event -> event |> toFuture |> futureChange) |> GeoLocationChangeListen
 
-            GamepadsChangeListen toFuture ->
-                (\event -> event |> toFuture |> futureChange) |> GamepadsChangeListen
+        GamepadsChangeListen toFuture ->
+            (\event -> event |> toFuture |> futureChange) |> GamepadsChangeListen
 
 
 domElementHeaderFutureMap : (future -> mappedFuture) -> (DomElementHeader future -> DomElementHeader mappedFuture)
-domElementHeaderFutureMap futureChange =
-    \domElementToMap ->
-        { namespace = domElementToMap.namespace
-        , tag = domElementToMap.tag
-        , styles = domElementToMap.styles
-        , attributes = domElementToMap.attributes
-        , attributesNamespaced = domElementToMap.attributesNamespaced
-        , stringProperties = domElementToMap.stringProperties
-        , boolProperties = domElementToMap.boolProperties
-        , scrollToPosition = domElementToMap.scrollToPosition
-        , scrollToShow = domElementToMap.scrollToShow
-        , scrollPositionRequest =
-            domElementToMap.scrollPositionRequest
-                |> Maybe.map (\request position -> position |> request |> futureChange)
-        , eventListens =
-            domElementToMap.eventListens
-                |> SortedKeyValueList.map
-                    (\_ listen ->
-                        { on = \event -> listen.on event |> futureChange
-                        , defaultActionHandling = listen.defaultActionHandling
-                        }
-                    )
-        }
+domElementHeaderFutureMap futureChange domElementToMap =
+    { namespace = domElementToMap.namespace
+    , tag = domElementToMap.tag
+    , styles = domElementToMap.styles
+    , attributes = domElementToMap.attributes
+    , attributesNamespaced = domElementToMap.attributesNamespaced
+    , stringProperties = domElementToMap.stringProperties
+    , boolProperties = domElementToMap.boolProperties
+    , scrollToPosition = domElementToMap.scrollToPosition
+    , scrollToShow = domElementToMap.scrollToShow
+    , scrollPositionRequest =
+        domElementToMap.scrollPositionRequest
+            |> Maybe.map (\request position -> position |> request |> futureChange)
+    , eventListens =
+        domElementToMap.eventListens
+            |> SortedKeyValueList.map
+                (\_ listen ->
+                    { on = \event -> listen.on event |> futureChange
+                    , defaultActionHandling = listen.defaultActionHandling
+                    }
+                )
+    }
 
 
 domNodeFutureMap : (future -> mappedFuture) -> (DomTextOrElementHeader future -> DomTextOrElementHeader mappedFuture)
-domNodeFutureMap futureChange =
-    \domElementToMap ->
-        case domElementToMap of
-            DomText text ->
-                DomText text
+domNodeFutureMap futureChange domElementToMap =
+    case domElementToMap of
+        DomText text ->
+            DomText text
 
-            DomElementHeader domElement ->
-                domElement |> domElementHeaderFutureMap futureChange |> DomElementHeader
+        DomElementHeader domElement ->
+            domElement |> domElementHeaderFutureMap futureChange |> DomElementHeader
 
 
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
-httpRequestFutureMap futureChange =
-    \httpRequest ->
-        { url = httpRequest.url
-        , method = httpRequest.method
-        , headers = httpRequest.headers
-        , body = httpRequest.body
-        , expect =
-            case httpRequest.expect of
-                HttpExpectWhatever expectWhatever ->
-                    (\unit -> expectWhatever unit |> futureChange) |> HttpExpectWhatever
+httpRequestFutureMap futureChange httpRequest =
+    { url = httpRequest.url
+    , method = httpRequest.method
+    , headers = httpRequest.headers
+    , body = httpRequest.body
+    , expect =
+        case httpRequest.expect of
+            HttpExpectWhatever expectWhatever ->
+                (\unit -> expectWhatever unit |> futureChange) |> HttpExpectWhatever
 
-                HttpExpectString expectString ->
-                    (\string -> expectString string |> futureChange) |> HttpExpectString
+            HttpExpectString expectString ->
+                (\string -> expectString string |> futureChange) |> HttpExpectString
 
-                HttpExpectBytes expectBytes ->
-                    (\bytes -> expectBytes bytes |> futureChange) |> HttpExpectBytes
-        }
+            HttpExpectBytes expectBytes ->
+                (\bytes -> expectBytes bytes |> futureChange) |> HttpExpectBytes
+    }
 
 
 {-| The "msg" in a [`Web.program`](#program)
@@ -799,181 +795,180 @@ interfaceSingleEditsMap :
         ({ old : InterfaceSingle future, updated : InterfaceSingle future }
          -> List fromSingeEdit
         )
-interfaceSingleEditsMap fromSingeEdit =
-    \interfaces ->
-        case interfaces.old of
-            DomNodeRender domElementPreviouslyRendered ->
-                case interfaces.updated of
-                    DomNodeRender domElementToRender ->
-                        { old = domElementPreviouslyRendered.node, updated = domElementToRender.node }
-                            |> domTextOrElementHeaderDiffMap
-                                (\diff ->
-                                    { pathReverse = domElementPreviouslyRendered.pathReverse
-                                    , replacement = diff
-                                    }
-                                        |> EditDom
-                                        |> fromSingeEdit
-                                )
+interfaceSingleEditsMap fromSingeEdit interfaces =
+    case interfaces.old of
+        DomNodeRender domElementPreviouslyRendered ->
+            case interfaces.updated of
+                DomNodeRender domElementToRender ->
+                    { old = domElementPreviouslyRendered.node, updated = domElementToRender.node }
+                        |> domTextOrElementHeaderDiffMap
+                            (\diff ->
+                                { pathReverse = domElementPreviouslyRendered.pathReverse
+                                , replacement = diff
+                                }
+                                    |> EditDom
+                                    |> fromSingeEdit
+                            )
 
-                    _ ->
-                        []
+                _ ->
+                    []
 
-            AudioPlay previouslyPlayed ->
-                case interfaces.updated of
-                    AudioPlay toPlay ->
-                        { old = previouslyPlayed, updated = toPlay }
-                            |> audioDiffMap
-                                (\diff ->
-                                    { url = toPlay.url, startTime = toPlay.startTime, replacement = diff }
-                                        |> EditAudio
-                                        |> fromSingeEdit
-                                )
+        AudioPlay previouslyPlayed ->
+            case interfaces.updated of
+                AudioPlay toPlay ->
+                    { old = previouslyPlayed, updated = toPlay }
+                        |> audioDiffMap
+                            (\diff ->
+                                { url = toPlay.url, startTime = toPlay.startTime, replacement = diff }
+                                    |> EditAudio
+                                    |> fromSingeEdit
+                            )
 
-                    _ ->
-                        []
+                _ ->
+                    []
 
-            NotificationShow _ ->
-                case interfaces.updated of
-                    NotificationShow toShow ->
-                        { id = toShow.id, message = toShow.message, details = toShow.details }
-                            |> EditNotification
-                            |> fromSingeEdit
-                            |> List.singleton
+        NotificationShow _ ->
+            case interfaces.updated of
+                NotificationShow toShow ->
+                    { id = toShow.id, message = toShow.message, details = toShow.details }
+                        |> EditNotification
+                        |> fromSingeEdit
+                        |> List.singleton
 
-                    _ ->
-                        []
+                _ ->
+                    []
 
-            DocumentTitleReplaceBy _ ->
-                []
+        DocumentTitleReplaceBy _ ->
+            []
 
-            DocumentAuthorSet _ ->
-                []
+        DocumentAuthorSet _ ->
+            []
 
-            DocumentKeywordsSet _ ->
-                []
+        DocumentKeywordsSet _ ->
+            []
 
-            DocumentDescriptionSet _ ->
-                []
+        DocumentDescriptionSet _ ->
+            []
 
-            DocumentEventListen _ ->
-                []
+        DocumentEventListen _ ->
+            []
 
-            ConsoleLog _ ->
-                []
+        ConsoleLog _ ->
+            []
 
-            ConsoleWarn _ ->
-                []
+        ConsoleWarn _ ->
+            []
 
-            ConsoleError _ ->
-                []
+        ConsoleError _ ->
+            []
 
-            NavigationReplaceUrl _ ->
-                []
+        NavigationReplaceUrl _ ->
+            []
 
-            NavigationPushUrl _ ->
-                []
+        NavigationPushUrl _ ->
+            []
 
-            NavigationGo _ ->
-                []
+        NavigationGo _ ->
+            []
 
-            NavigationLoad _ ->
-                []
+        NavigationLoad _ ->
+            []
 
-            NavigationReload ->
-                []
+        NavigationReload ->
+            []
 
-            NavigationUrlRequest _ ->
-                []
+        NavigationUrlRequest _ ->
+            []
 
-            FileDownloadUnsignedInt8s _ ->
-                []
+        FileDownloadUnsignedInt8s _ ->
+            []
 
-            ClipboardReplaceBy _ ->
-                []
+        ClipboardReplaceBy _ ->
+            []
 
-            ClipboardRequest _ ->
-                []
+        ClipboardRequest _ ->
+            []
 
-            AudioSourceLoad _ ->
-                []
+        AudioSourceLoad _ ->
+            []
 
-            NotificationAskForPermission ->
-                []
+        NotificationAskForPermission ->
+            []
 
-            HttpRequest _ ->
-                []
+        HttpRequest _ ->
+            []
 
-            TimePosixRequest _ ->
-                []
+        TimePosixRequest _ ->
+            []
 
-            TimezoneOffsetRequest _ ->
-                []
+        TimezoneOffsetRequest _ ->
+            []
 
-            TimeOnce _ ->
-                []
+        TimeOnce _ ->
+            []
 
-            TimePeriodicallyListen _ ->
-                []
+        TimePeriodicallyListen _ ->
+            []
 
-            TimezoneNameRequest _ ->
-                []
+        TimezoneNameRequest _ ->
+            []
 
-            RandomUnsignedInt32sRequest _ ->
-                []
+        RandomUnsignedInt32sRequest _ ->
+            []
 
-            WindowSizeRequest _ ->
-                []
+        WindowSizeRequest _ ->
+            []
 
-            WindowPreferredLanguagesRequest _ ->
-                []
+        WindowPreferredLanguagesRequest _ ->
+            []
 
-            WindowEventListen _ ->
-                []
+        WindowEventListen _ ->
+            []
 
-            WindowVisibilityChangeListen _ ->
-                []
+        WindowVisibilityChangeListen _ ->
+            []
 
-            WindowAnimationFrameListen _ ->
-                []
+        WindowAnimationFrameListen _ ->
+            []
 
-            WindowPreferredLanguagesChangeListen _ ->
-                []
+        WindowPreferredLanguagesChangeListen _ ->
+            []
 
-            SocketConnect _ ->
-                []
+        SocketConnect _ ->
+            []
 
-            SocketMessage _ ->
-                []
+        SocketMessage _ ->
+            []
 
-            SocketDisconnect _ ->
-                []
+        SocketDisconnect _ ->
+            []
 
-            SocketMessageListen _ ->
-                []
+        SocketMessageListen _ ->
+            []
 
-            LocalStorageSet _ ->
-                []
+        LocalStorageSet _ ->
+            []
 
-            LocalStorageRequest _ ->
-                []
+        LocalStorageRequest _ ->
+            []
 
-            LocalStorageRemoveOnADifferentTabListen _ ->
-                []
+        LocalStorageRemoveOnADifferentTabListen _ ->
+            []
 
-            LocalStorageSetOnADifferentTabListen _ ->
-                []
+        LocalStorageSetOnADifferentTabListen _ ->
+            []
 
-            GeoLocationRequest _ ->
-                []
+        GeoLocationRequest _ ->
+            []
 
-            GeoLocationChangeListen _ ->
-                []
+        GeoLocationChangeListen _ ->
+            []
 
-            GamepadsRequest _ ->
-                []
+        GamepadsRequest _ ->
+            []
 
-            GamepadsChangeListen _ ->
-                []
+        GamepadsChangeListen _ ->
+            []
 
 
 domTextOrElementHeaderDiffMap :
@@ -982,42 +977,41 @@ domTextOrElementHeaderDiffMap :
         ({ old : DomTextOrElementHeader state, updated : DomTextOrElementHeader state }
          -> List fromDomEdit
         )
-domTextOrElementHeaderDiffMap fromDomEdit =
-    \nodes ->
-        case nodes.old of
-            DomText oldText ->
-                case nodes.updated of
-                    DomElementHeader updatedElement ->
-                        updatedElement
-                            |> domElementHeaderFutureMap (\_ -> ())
-                            |> DomElementHeader
-                            |> ReplacementDomNode
-                            |> fromDomEdit
-                            |> List.singleton
+domTextOrElementHeaderDiffMap fromDomEdit nodes =
+    case nodes.old of
+        DomText oldText ->
+            case nodes.updated of
+                DomElementHeader updatedElement ->
+                    updatedElement
+                        |> domElementHeaderFutureMap (\_ -> ())
+                        |> DomElementHeader
+                        |> ReplacementDomNode
+                        |> fromDomEdit
+                        |> List.singleton
 
-                    DomText updatedText ->
-                        if oldText == updatedText then
-                            []
+                DomText updatedText ->
+                    if oldText == updatedText then
+                        []
 
-                        else
-                            updatedText
-                                |> DomText
-                                |> ReplacementDomNode
-                                |> fromDomEdit
-                                |> List.singleton
-
-            DomElementHeader oldElement ->
-                case nodes.updated of
-                    DomText updatedText ->
+                    else
                         updatedText
                             |> DomText
                             |> ReplacementDomNode
                             |> fromDomEdit
                             |> List.singleton
 
-                    DomElementHeader updatedElement ->
-                        { old = oldElement, updated = updatedElement }
-                            |> domElementHeaderDiffMap fromDomEdit
+        DomElementHeader oldElement ->
+            case nodes.updated of
+                DomText updatedText ->
+                    updatedText
+                        |> DomText
+                        |> ReplacementDomNode
+                        |> fromDomEdit
+                        |> List.singleton
+
+                DomElementHeader updatedElement ->
+                    { old = oldElement, updated = updatedElement }
+                        |> domElementHeaderDiffMap fromDomEdit
 
 
 domElementHeaderDiffMap :
@@ -1026,82 +1020,81 @@ domElementHeaderDiffMap :
         ({ old : DomElementHeader future, updated : DomElementHeader future }
          -> List fromDomEdit
         )
-domElementHeaderDiffMap fromDomEdit =
-    \elements ->
-        if elements.old.tag /= elements.updated.tag then
-            elements.updated
-                |> domElementHeaderFutureMap (\_ -> ())
-                |> DomElementHeader
-                |> ReplacementDomNode
+domElementHeaderDiffMap fromDomEdit elements =
+    if elements.old.tag /= elements.updated.tag then
+        elements.updated
+            |> domElementHeaderFutureMap (\_ -> ())
+            |> DomElementHeader
+            |> ReplacementDomNode
+            |> fromDomEdit
+            |> List.singleton
+
+    else
+        [ { old = elements.old.styles, updated = elements.updated.styles }
+            |> sortedKeyValueListEditAndRemoveDiffMap
+                (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
+                { remove = identity, edit = \key value -> { key = key, value = value } }
+        , { old = elements.old.attributes, updated = elements.updated.attributes }
+            |> sortedKeyValueListEditAndRemoveDiffMap
+                (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
+                { remove = identity, edit = \key value -> { key = key, value = value } }
+        , { old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
+            |> sortedKeyValueListEditAndRemoveDiffMap
+                (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
+                { remove = \( namespace, key ) -> { namespace = namespace, key = key }
+                , edit = \( namespace, key ) value -> { namespace = namespace, key = key, value = value }
+                }
+        , { old = elements.old.stringProperties, updated = elements.updated.stringProperties }
+            |> sortedKeyValueListEditAndRemoveDiffMap
+                (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
+                { remove = identity, edit = \key value -> { key = key, value = value } }
+        , { old = elements.old.boolProperties, updated = elements.updated.boolProperties }
+            |> sortedKeyValueListEditAndRemoveDiffMap (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
+                { remove = identity, edit = \key value -> { key = key, value = value } }
+        , if elements.old.scrollToPosition == elements.updated.scrollToPosition then
+            Nothing
+
+          else
+            ReplacementDomElementScrollToPosition elements.updated.scrollToPosition
                 |> fromDomEdit
-                |> List.singleton
+                |> Just
+        , if elements.old.scrollToShow == elements.updated.scrollToShow then
+            Nothing
 
-        else
-            [ { old = elements.old.styles, updated = elements.updated.styles }
-                |> sortedKeyValueListEditAndRemoveDiffMap
-                    (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
-                    { remove = identity, edit = \key value -> { key = key, value = value } }
-            , { old = elements.old.attributes, updated = elements.updated.attributes }
-                |> sortedKeyValueListEditAndRemoveDiffMap
-                    (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
-                    { remove = identity, edit = \key value -> { key = key, value = value } }
-            , { old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
-                |> sortedKeyValueListEditAndRemoveDiffMap
-                    (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
-                    { remove = \( namespace, key ) -> { namespace = namespace, key = key }
-                    , edit = \( namespace, key ) value -> { namespace = namespace, key = key, value = value }
-                    }
-            , { old = elements.old.stringProperties, updated = elements.updated.stringProperties }
-                |> sortedKeyValueListEditAndRemoveDiffMap
-                    (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
-                    { remove = identity, edit = \key value -> { key = key, value = value } }
-            , { old = elements.old.boolProperties, updated = elements.updated.boolProperties }
-                |> sortedKeyValueListEditAndRemoveDiffMap (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
-                    { remove = identity, edit = \key value -> { key = key, value = value } }
-            , if elements.old.scrollToPosition == elements.updated.scrollToPosition then
+          else
+            ReplacementDomElementScrollToShow elements.updated.scrollToShow
+                |> fromDomEdit
+                |> Just
+        , case elements.old.scrollPositionRequest of
+            Just _ ->
                 Nothing
 
-              else
-                ReplacementDomElementScrollToPosition elements.updated.scrollToPosition
-                    |> fromDomEdit
-                    |> Just
-            , if elements.old.scrollToShow == elements.updated.scrollToShow then
-                Nothing
+            Nothing ->
+                case elements.updated.scrollPositionRequest of
+                    Nothing ->
+                        Nothing
 
-              else
-                ReplacementDomElementScrollToShow elements.updated.scrollToShow
-                    |> fromDomEdit
-                    |> Just
-            , case elements.old.scrollPositionRequest of
-                Just _ ->
-                    Nothing
+                    Just _ ->
+                        ReplacementDomElementScrollPositionRequest
+                            |> fromDomEdit
+                            |> Just
+        , let
+            updatedElementEventListensId : SortedKeyValueList String DefaultActionHandling
+            updatedElementEventListensId =
+                elements.updated.eventListens |> SortedKeyValueList.map (\_ v -> v.defaultActionHandling)
+          in
+          if
+            (elements.old.eventListens |> SortedKeyValueList.map (\_ v -> v.defaultActionHandling))
+                == updatedElementEventListensId
+          then
+            Nothing
 
-                Nothing ->
-                    case elements.updated.scrollPositionRequest of
-                        Nothing ->
-                            Nothing
-
-                        Just _ ->
-                            ReplacementDomElementScrollPositionRequest
-                                |> fromDomEdit
-                                |> Just
-            , let
-                updatedElementEventListensId : SortedKeyValueList String DefaultActionHandling
-                updatedElementEventListensId =
-                    elements.updated.eventListens |> SortedKeyValueList.map (\_ v -> v.defaultActionHandling)
-              in
-              if
-                (elements.old.eventListens |> SortedKeyValueList.map (\_ v -> v.defaultActionHandling))
-                    == updatedElementEventListensId
-              then
-                Nothing
-
-              else
-                ReplacementDomElementEventListens updatedElementEventListensId
-                    |> fromDomEdit
-                    |> Just
-            ]
-                |> List.LocalExtra.justsToAnyOrder
+          else
+            ReplacementDomElementEventListens updatedElementEventListensId
+                |> fromDomEdit
+                |> Just
+        ]
+            |> List.LocalExtra.justsToAnyOrder
 
 
 sortedKeyValueListEditAndRemoveDiffMap :
@@ -1113,71 +1106,69 @@ sortedKeyValueListEditAndRemoveDiffMap :
          }
          -> Maybe fromRemoveAndEdit
         )
-sortedKeyValueListEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle =
-    \dicts ->
-        let
-            diff : { remove : List removeSingle, edit : List editSingle }
-            diff =
-                sortedKeyValueListMerge
-                    (\key _ soFar ->
-                        { soFar | remove = soFar.remove |> (::) (asDiffSingle.remove key) }
-                    )
-                    (\key old updated soFar ->
-                        if old == updated then
-                            soFar
+sortedKeyValueListEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle dicts =
+    let
+        diff : { remove : List removeSingle, edit : List editSingle }
+        diff =
+            sortedKeyValueListMerge
+                (\key _ soFar ->
+                    { soFar | remove = asDiffSingle.remove key :: soFar.remove }
+                )
+                (\key old updated soFar ->
+                    if old == updated then
+                        soFar
 
-                        else
-                            { soFar | edit = soFar.edit |> (::) (asDiffSingle.edit key updated) }
-                    )
-                    (\key updated soFar ->
-                        { soFar | edit = soFar.edit |> (::) (asDiffSingle.edit key updated) }
-                    )
-                    (dicts.old |> SortedKeyValueList.toList)
-                    (dicts.updated |> SortedKeyValueList.toList)
-                    { remove = [], edit = [] }
-        in
-        case ( diff.remove, diff.edit ) of
-            ( [], [] ) ->
-                Nothing
+                    else
+                        { soFar | edit = asDiffSingle.edit key updated :: soFar.edit }
+                )
+                (\key updated soFar ->
+                    { soFar | edit = asDiffSingle.edit key updated :: soFar.edit }
+                )
+                (dicts.old |> SortedKeyValueList.toList)
+                (dicts.updated |> SortedKeyValueList.toList)
+                { remove = [], edit = [] }
+    in
+    case ( diff.remove, diff.edit ) of
+        ( [], [] ) ->
+            Nothing
 
-            ( remove0 :: remove1Up, edit ) ->
-                { remove = remove0 :: remove1Up, edit = edit } |> fromRemoveAndEdit |> Just
+        ( remove0 :: remove1Up, edit ) ->
+            { remove = remove0 :: remove1Up, edit = edit } |> fromRemoveAndEdit |> Just
 
-            ( remove, edit0 :: edit0Up ) ->
-                { remove = remove, edit = edit0 :: edit0Up } |> fromRemoveAndEdit |> Just
+        ( remove, edit0 :: edit0Up ) ->
+            { remove = remove, edit = edit0 :: edit0Up } |> fromRemoveAndEdit |> Just
 
 
 audioDiffMap :
     (AudioEdit -> fromAudioEdit)
     -> ({ old : Audio, updated : Audio } -> List fromAudioEdit)
-audioDiffMap fromAudioEdit =
-    \audios ->
-        [ if audios.old.volume == audios.updated.volume then
-            Nothing
+audioDiffMap fromAudioEdit audios =
+    [ if audios.old.volume == audios.updated.volume then
+        Nothing
 
-          else
-            ReplacementAudioVolume audios.updated.volume |> fromAudioEdit |> Just
-        , if audios.old.speed == audios.updated.speed then
-            Nothing
+      else
+        ReplacementAudioVolume audios.updated.volume |> fromAudioEdit |> Just
+    , if audios.old.speed == audios.updated.speed then
+        Nothing
 
-          else
-            ReplacementAudioSpeed audios.updated.speed |> fromAudioEdit |> Just
-        , if audios.old.stereoPan == audios.updated.stereoPan then
-            Nothing
+      else
+        ReplacementAudioSpeed audios.updated.speed |> fromAudioEdit |> Just
+    , if audios.old.stereoPan == audios.updated.stereoPan then
+        Nothing
 
-          else
-            ReplacementAudioStereoPan audios.updated.stereoPan |> fromAudioEdit |> Just
-        , if audios.old.processingLastToFirst == audios.updated.processingLastToFirst then
-            Nothing
+      else
+        ReplacementAudioStereoPan audios.updated.stereoPan |> fromAudioEdit |> Just
+    , if audios.old.processingLastToFirst == audios.updated.processingLastToFirst then
+        Nothing
 
-          else
-            audios.updated.processingLastToFirst
-                |> List.reverse
-                |> ReplacementAudioProcessing
-                |> fromAudioEdit
-                |> Just
-        ]
-            |> List.LocalExtra.justsToAnyOrder
+      else
+        audios.updated.processingLastToFirst
+            |> List.reverse
+            |> ReplacementAudioProcessing
+            |> fromAudioEdit
+            |> Just
+    ]
+        |> List.LocalExtra.justsToAnyOrder
 
 
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
@@ -1269,26 +1260,25 @@ interfacesDiffMap :
          }
          -> List combined
         )
-interfacesDiffMap idAndDiffCombine =
-    \interfaces ->
-        sortedKeyValueListMerge
-            (\id _ soFar ->
-                idAndDiffCombine { id = id, diff = Remove } :: soFar
+interfacesDiffMap idAndDiffCombine interfaces =
+    sortedKeyValueListMerge
+        (\id _ soFar ->
+            idAndDiffCombine { id = id, diff = Remove } :: soFar
+        )
+        (\id old updated soFar ->
+            ({ old = old, updated = updated }
+                |> interfaceSingleEditsMap
+                    (\edit -> idAndDiffCombine { id = id, diff = edit |> Edit })
             )
-            (\id old updated soFar ->
-                ({ old = old, updated = updated }
-                    |> interfaceSingleEditsMap
-                        (\edit -> idAndDiffCombine { id = id, diff = edit |> Edit })
-                )
-                    ++ soFar
-            )
-            (\id onlyNew soFar ->
-                idAndDiffCombine { id = id, diff = onlyNew |> Add }
-                    :: soFar
-            )
-            (interfaces.old |> SortedKeyValueList.toList)
-            (interfaces.updated |> SortedKeyValueList.toList)
-            []
+                ++ soFar
+        )
+        (\id onlyNew soFar ->
+            idAndDiffCombine { id = id, diff = onlyNew |> Add }
+                :: soFar
+        )
+        (interfaces.old |> SortedKeyValueList.toList)
+        (interfaces.updated |> SortedKeyValueList.toList)
+        []
 
 
 toJsToJson : { id : String, diff : InterfaceSingleDiff future_ } -> Json.Encode.Value
@@ -1725,9 +1715,9 @@ editDomDiffToJson =
 
 interfaceSingleToJson : InterfaceSingle future_ -> Json.Encode.Value
 interfaceSingleToJson =
-    \add ->
+    \interfaceSingle ->
         Json.Encode.LocalExtra.variant
-            (case add of
+            (case interfaceSingle of
                 DocumentTitleReplaceBy replacement ->
                     { tag = "DocumentTitleReplaceBy", value = replacement |> Json.Encode.string }
 
