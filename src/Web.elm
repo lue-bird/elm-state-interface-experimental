@@ -1245,12 +1245,6 @@ sortedKeyValueListMerge onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueLi
 
 
 {-| Determine which outgoing effects need to be executed based on the difference between old and updated interfaces
-
-To for example determine the initial effects, use
-
-    { old = SortedKeyValueList.empty, updated = initialInterface }
-        |> interfacesDiffMap identity
-
 -}
 interfacesDiffMap :
     ({ id : String, diff : InterfaceSingleDiff future } -> combined)
@@ -2251,9 +2245,17 @@ programInit appConfig =
         { interface = initialInterface
         , appState = appConfig.initialState
         }
-    , { old = SortedKeyValueList.empty, updated = initialInterface }
-        |> interfacesDiffMap
-            (\diff -> appConfig.ports.toJs (diff |> toJsToJson))
+    , initialInterface
+        |> SortedKeyValueList.toList
+        |> List.foldl
+            (\new soFar ->
+                appConfig.ports.toJs
+                    ({ id = new.key, diff = new.value |> Add }
+                        |> toJsToJson
+                    )
+                    :: soFar
+            )
+            []
         |> Cmd.batch
         |> Cmd.map never
     )
