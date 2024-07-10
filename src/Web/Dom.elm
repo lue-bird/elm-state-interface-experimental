@@ -195,139 +195,114 @@ elementWithMaybeNamespace :
     -> Node future
 elementWithMaybeNamespace maybeNamespace tag modifiers subs =
     let
-        modifiersFlat : List (ModifierSingle future)
+        modifiersFlat :
+            { namespace : Maybe String
+            , tag : String
+            , scrollToPosition : Maybe { fromLeft : Float, fromTop : Float }
+            , scrollToShow : Maybe { x : Web.DomElementVisibilityAlignment, y : Web.DomElementVisibilityAlignment }
+            , scrollPositionRequest : Maybe ({ fromLeft : Float, fromTop : Float } -> future)
+            , eventListens : List { key : String, value : { on : Json.Decode.Value -> future, defaultActionHandling : Web.DefaultActionHandling } }
+            , styles : List { key : String, value : String }
+            , stringProperties : List { key : String, value : String }
+            , boolProperties : List { key : String, value : Bool }
+            , attributesNamespaced : List { key : ( String, String ), value : String }
+            , attributes : List { key : String, value : String }
+            }
         modifiersFlat =
             modifiers
                 |> modifierBatch
-                |> Rope.toList
+                |> Rope.foldr
+                    (\modifier soFar ->
+                        case modifier of
+                            ScrollToPosition position ->
+                                { soFar | scrollToPosition = position |> Just }
+
+                            ScrollToShow alignment ->
+                                { soFar | scrollToShow = alignment |> Just }
+
+                            ScrollPositionRequest positionRequest ->
+                                { soFar | scrollPositionRequest = positionRequest |> Just }
+
+                            Listen listen ->
+                                { soFar
+                                    | eventListens =
+                                        soFar.eventListens
+                                            |> (::)
+                                                { key = listen.eventName
+                                                , value =
+                                                    { on = listen.on
+                                                    , defaultActionHandling = listen.defaultActionHandling
+                                                    }
+                                                }
+                                }
+
+                            Style keyValue ->
+                                { soFar | styles = soFar.styles |> (::) keyValue }
+
+                            StringProperty keyValue ->
+                                { soFar
+                                    | stringProperties =
+                                        soFar.stringProperties |> (::) keyValue
+                                }
+
+                            BoolProperty keyValue ->
+                                { soFar
+                                    | boolProperties =
+                                        soFar.boolProperties |> (::) keyValue
+                                }
+
+                            Attribute keyValue ->
+                                case keyValue.namespace of
+                                    Just namespace ->
+                                        { soFar
+                                            | attributesNamespaced =
+                                                soFar.attributesNamespaced
+                                                    |> (::) { key = ( namespace, keyValue.key ), value = keyValue.value }
+                                        }
+
+                                    Nothing ->
+                                        { soFar
+                                            | attributes =
+                                                soFar.attributes
+                                                    |> (::) { key = keyValue.key, value = keyValue.value }
+                                        }
+                    )
+                    { namespace = maybeNamespace
+                    , tag = tag
+                    , scrollToPosition = Nothing
+                    , scrollToShow = Nothing
+                    , scrollPositionRequest = Nothing
+                    , eventListens = []
+                    , styles = []
+                    , stringProperties = []
+                    , boolProperties = []
+                    , attributes = []
+                    , attributesNamespaced = []
+                    }
     in
     { header =
         { namespace = maybeNamespace
         , tag = tag
-        , scrollToPosition =
-            modifiersFlat
-                |> List.LocalExtra.firstJustMap
-                    (\modifier ->
-                        case modifier of
-                            ScrollToPosition position ->
-                                position |> Just
-
-                            _ ->
-                                Nothing
-                    )
-        , scrollToShow =
-            modifiersFlat
-                |> List.LocalExtra.firstJustMap
-                    (\modifier ->
-                        case modifier of
-                            ScrollToShow alignment ->
-                                alignment |> Just
-
-                            _ ->
-                                Nothing
-                    )
-        , scrollPositionRequest =
-            modifiersFlat
-                |> List.LocalExtra.firstJustMap
-                    (\modifier ->
-                        case modifier of
-                            ScrollPositionRequest positionRequest ->
-                                positionRequest |> Just
-
-                            _ ->
-                                Nothing
-                    )
+        , scrollToPosition = modifiersFlat.scrollToPosition
+        , scrollToShow = modifiersFlat.scrollToShow
+        , scrollPositionRequest = modifiersFlat.scrollPositionRequest
         , eventListens =
-            modifiersFlat
-                |> List.LocalExtra.justsToAnyOrderMap
-                    (\modifier ->
-                        case modifier of
-                            Listen listen ->
-                                { key = listen.eventName
-                                , value =
-                                    { on = listen.on
-                                    , defaultActionHandling = listen.defaultActionHandling
-                                    }
-                                }
-                                    |> Just
-
-                            _ ->
-                                Nothing
-                    )
+            modifiersFlat.eventListens
                 |> SortedKeyValueList.fromList
         , styles =
-            modifiersFlat
-                |> List.LocalExtra.justsToAnyOrderMap
-                    (\modifier ->
-                        case modifier of
-                            Style keyValue ->
-                                keyValue |> Just
-
-                            _ ->
-                                Nothing
-                    )
+            modifiersFlat.styles
                 |> SortedKeyValueList.fromList
         , stringProperties =
-            modifiersFlat
-                |> List.LocalExtra.justsToAnyOrderMap
-                    (\modifier ->
-                        case modifier of
-                            StringProperty keyValue ->
-                                keyValue |> Just
-
-                            _ ->
-                                Nothing
-                    )
+            modifiersFlat.stringProperties
                 |> SortedKeyValueList.fromList
         , boolProperties =
-            modifiersFlat
-                |> List.LocalExtra.justsToAnyOrderMap
-                    (\modifier ->
-                        case modifier of
-                            BoolProperty keyValue ->
-                                keyValue |> Just
-
-                            _ ->
-                                Nothing
-                    )
+            modifiersFlat.boolProperties
                 |> SortedKeyValueList.fromList
         , attributes =
-            modifiersFlat
-                |> List.LocalExtra.justsToAnyOrderMap
-                    (\modifier ->
-                        case modifier of
-                            Attribute keyValue ->
-                                case keyValue.namespace of
-                                    Just _ ->
-                                        Nothing
-
-                                    Nothing ->
-                                        { key = keyValue.key, value = keyValue.value }
-                                            |> Just
-
-                            _ ->
-                                Nothing
-                    )
+            modifiersFlat.attributes
                 |> SortedKeyValueList.fromList
         , attributesNamespaced =
-            modifiersFlat
-                |> List.LocalExtra.justsToAnyOrderMap
-                    (\modifier ->
-                        case modifier of
-                            Attribute keyValue ->
-                                case keyValue.namespace of
-                                    Nothing ->
-                                        Nothing
-
-                                    Just namespace ->
-                                        { key = ( namespace, keyValue.key )
-                                        , value = keyValue.value
-                                        }
-                                            |> Just
-
-                            _ ->
-                                Nothing
-                    )
+            modifiersFlat.attributesNamespaced
                 |> SortedKeyValueList.fromList
         }
     , subs = subs
