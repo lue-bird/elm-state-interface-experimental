@@ -259,7 +259,7 @@ type InterfaceSingle future
     | AudioSourceLoad { url : String, on : Result AudioSourceLoadError AudioSource -> future }
     | AudioPlay Audio
     | DomNodeRender
-        { path :
+        { pathReverse :
             -- from inner parent to outer parent index
             List Int
         , node : DomTextOrElementHeader future
@@ -617,7 +617,7 @@ interfaceSingleFutureMap futureChange =
                 NotificationAskForPermission
 
             DomNodeRender toRender ->
-                { path = toRender.path
+                { pathReverse = toRender.pathReverse
                 , node = toRender.node |> domNodeFutureMap futureChange
                 }
                     |> DomNodeRender
@@ -808,7 +808,7 @@ interfaceSingleEditsMap fromSingeEdit =
                         { old = domElementPreviouslyRendered.node, updated = domElementToRender.node }
                             |> domTextOrElementHeaderDiffMap
                                 (\diff ->
-                                    { path = domElementPreviouslyRendered.path
+                                    { pathReverse = domElementPreviouslyRendered.pathReverse
                                     , replacement = diff
                                     }
                                         |> EditDom
@@ -1366,7 +1366,7 @@ interfaceSingleEditToJson =
                     { tag = "EditDom"
                     , value =
                         Json.Encode.object
-                            [ ( "path", editDomDiff.path |> Json.Encode.list Json.Encode.int )
+                            [ ( "pathReverse", editDomDiff.pathReverse |> Json.Encode.list Json.Encode.int )
                             , ( "replacement", editDomDiff.replacement |> editDomDiffToJson )
                             ]
                     }
@@ -1813,7 +1813,7 @@ interfaceSingleToJson =
                     { tag = "DomNodeRender"
                     , value =
                         Json.Encode.object
-                            [ ( "path", render.path |> Json.Encode.list Json.Encode.int )
+                            [ ( "pathReverse", render.pathReverse |> Json.Encode.list Json.Encode.int )
                             , ( "node", render.node |> domTextOrElementHeaderInfoToJson )
                             ]
                     }
@@ -2111,7 +2111,7 @@ interfaceSingleToStructuredId =
 
                 DomNodeRender path ->
                     { tag = "DomNodeRender"
-                    , value = path.path |> StructuredId.ofList StructuredId.ofInt
+                    , value = path.pathReverse |> StructuredId.ofList StructuredId.ofInt
                     }
 
                 AudioSourceLoad load ->
@@ -3325,7 +3325,7 @@ type InterfaceSingleDiff irrelevantFuture
 describing changes to an existing interface with the same identity
 -}
 type InterfaceSingleEdit
-    = EditDom { path : List Int, replacement : DomEdit }
+    = EditDom { pathReverse : List Int, replacement : DomEdit }
     | EditAudio { url : String, startTime : Time.Posix, replacement : AudioEdit }
     | EditNotification { id : String, message : String, details : String }
 

@@ -47,7 +47,7 @@ nodeFlattenToList interfacesSoFar current nodesRemaining =
     case current.node of
         Text string ->
             flattenRemainingNodesToList
-                (({ path = current.path, node = Web.DomText string }
+                (({ pathReverse = current.path, node = Web.DomText string }
                     |> Web.DomNodeRender
                  )
                     :: interfacesSoFar
@@ -58,7 +58,7 @@ nodeFlattenToList interfacesSoFar current nodesRemaining =
             let
                 updatedInterfaces : List (Web.InterfaceSingle future)
                 updatedInterfaces =
-                    ({ path = current.path, node = Web.DomElementHeader element_.header }
+                    ({ pathReverse = current.path, node = Web.DomElementHeader element_.header }
                         |> Web.DomNodeRender
                     )
                         :: interfacesSoFar

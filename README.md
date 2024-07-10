@@ -6,7 +6,7 @@
 > 
 >   - internal: switch `interfaces` representation from `FastDict.Dict` to sorted assoc-list
 >   - internal: switch `Dict` values to sorted assoc-list or `FastDict.Dict`
-
+>   - internal: change representation of DOM path
 
 ### define an app in a simple, safe and declarative way
 

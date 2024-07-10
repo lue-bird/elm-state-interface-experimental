@@ -123,8 +123,8 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                     warn("tried to play audio from source that isn't loaded. Did you use Web.Audio.sourceLoad?")
                 }
             }
-            case "DomNodeRender": return (config: { path: number[], node: any }) => {
-                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), config.path)
+            case "DomNodeRender": return (config: { pathReverse: number[], node: any }) => {
+                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), config.pathReverse)
                 const newDomNode = createDomNode(id, config.node, oldDomNodeToEdit.childNodes, sendToElm)
                 oldDomNodeToEdit.parentElement?.replaceChild(newDomNode, oldDomNodeToEdit)
                 abortSignal.addEventListener("abort", _event => {
@@ -136,7 +136,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                         appConfigDomELementChildElementOnDelete === null ?
                             null
                             :
-                            domInElementAt(appConfigDomELementChildElementOnDelete, config.path)
+                            domInElementAt(appConfigDomELementChildElementOnDelete, config.pathReverse)
                     if (toRemove !== null) {
                         while (toRemove.nextSibling !== null) {
                             toRemove.nextSibling.remove()
@@ -375,8 +375,8 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     }
     function interfaceEditImplementation(id: string, tag: string, sendToElm: (v: any) => void): ((config: any) => void) {
         switch (tag) {
-            case "EditDom": return (config: { path: number[], replacement: any }) => {
-                editDom(id, config.path, config.replacement, sendToElm)
+            case "EditDom": return (config: { pathReverse: number[], replacement: any }) => {
+                editDom(id, config.pathReverse, config.replacement, sendToElm)
             }
             case "EditAudio": return (config: any) => {
                 editAudio(id, config)
