@@ -2680,7 +2680,7 @@ maybeGamepadJsonDecoder =
                                                 gamepadButtonUnknown
 
                                             Just index ->
-                                                buttons |> listAtIndex index |> Maybe.withDefault gamepadButtonUnknown
+                                                buttons |> List.LocalExtra.atIndex index |> Maybe.withDefault gamepadButtonUnknown
                                 in
                                 { primaryButton = at .primary
                                 , secondaryButton = at .secondary
@@ -2995,20 +2995,6 @@ fastDictInsertSameValueFor keyList value =
             |> List.foldl
                 (\key dictSoFar -> dictSoFar |> FastDict.insert key value)
                 dict
-
-
-listAtIndex : Int -> (List a -> Maybe a)
-listAtIndex index sticks =
-    case sticks of
-        [] ->
-            Nothing
-
-        head :: tail ->
-            if index <= 0 then
-                head |> Just
-
-            else
-                listAtIndex (index - 1) tail
 
 
 httpExpectOnError : HttpExpect future -> (HttpError -> future)

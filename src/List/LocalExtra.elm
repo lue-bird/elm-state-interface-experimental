@@ -1,4 +1,18 @@
-module List.LocalExtra exposing (firstJustMap, foldUpIndexedFrom, justsMapIndexed, justsToAnyOrder)
+module List.LocalExtra exposing (atIndex, firstJustMap, foldUpIndexedFrom, justsMapIndexed, justsToAnyOrder)
+
+
+atIndex : Int -> (List a -> Maybe a)
+atIndex index sticks =
+    case sticks of
+        [] ->
+            Nothing
+
+        head :: tail ->
+            if index <= 0 then
+                head |> Just
+
+            else
+                atIndex (index - 1) tail
 
 
 firstJustMap : (a -> Maybe b) -> List a -> Maybe b
