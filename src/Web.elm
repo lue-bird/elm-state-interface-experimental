@@ -1423,22 +1423,6 @@ domTextOrElementHeaderInfoToJson =
             )
 
 
-domElementEventListensInfoToJson :
-    SortedKeyValueList String DefaultActionHandling
-    -> Json.Encode.Value
-domElementEventListensInfoToJson =
-    \listens ->
-        listens
-            |> SortedKeyValueList.toList
-            |> Json.Encode.list
-                (\entry ->
-                    Json.Encode.object
-                        [ ( "name", entry.key |> Json.Encode.string )
-                        , ( "defaultActionHandling", entry.value |> defaultActionHandlingToJson )
-                        ]
-                )
-
-
 defaultActionHandlingToJson : DefaultActionHandling -> Json.Encode.Value
 defaultActionHandlingToJson =
     \defaultActionHandling ->
@@ -1515,8 +1499,14 @@ domElementHeaderInfoToJson =
               )
             , ( "eventListens"
               , header.eventListens
-                    |> SortedKeyValueList.map (\_ listen -> listen.defaultActionHandling)
-                    |> domElementEventListensInfoToJson
+                    |> SortedKeyValueList.toList
+                    |> Json.Encode.list
+                        (\entry ->
+                            Json.Encode.object
+                                [ ( "name", entry.key |> Json.Encode.string )
+                                , ( "defaultActionHandling", entry.value.defaultActionHandling |> defaultActionHandlingToJson )
+                                ]
+                        )
               )
             ]
 
@@ -1718,7 +1708,18 @@ editDomDiffToJson =
                     { tag = "ScrollPositionRequest", value = Json.Encode.null }
 
                 ReplacementDomElementEventListens listens ->
-                    { tag = "EventListens", value = listens |> domElementEventListensInfoToJson }
+                    { tag = "EventListens"
+                    , value =
+                        listens
+                            |> SortedKeyValueList.toList
+                            |> Json.Encode.list
+                                (\entry ->
+                                    Json.Encode.object
+                                        [ ( "name", entry.key |> Json.Encode.string )
+                                        , ( "defaultActionHandling", entry.value |> defaultActionHandlingToJson )
+                                        ]
+                                )
+                    }
             )
 
 
