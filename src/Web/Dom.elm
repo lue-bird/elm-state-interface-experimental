@@ -34,7 +34,6 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 import Json.Decode
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Rope exposing (Rope)
-import SortedKeyValueList
 import Web
 
 
@@ -170,10 +169,13 @@ domElementHeaderFutureMap futureChange =
                 |> Maybe.map (\request position -> position |> request |> futureChange)
         , eventListens =
             domElementToMap.eventListens
-                |> SortedKeyValueList.map
-                    (\_ listen ->
-                        { on = \event -> listen.on event |> futureChange
-                        , defaultActionHandling = listen.defaultActionHandling
+                |> List.map
+                    (\entry ->
+                        { key = entry.key
+                        , value =
+                            { on = \event -> entry.value.on event |> futureChange
+                            , defaultActionHandling = entry.value.defaultActionHandling
+                            }
                         }
                     )
         }
@@ -285,24 +287,12 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
         , scrollToPosition = modifiersFlat.scrollToPosition
         , scrollToShow = modifiersFlat.scrollToShow
         , scrollPositionRequest = modifiersFlat.scrollPositionRequest
-        , eventListens =
-            modifiersFlat.eventListens
-                |> SortedKeyValueList.fromList
-        , styles =
-            modifiersFlat.styles
-                |> SortedKeyValueList.fromList
-        , stringProperties =
-            modifiersFlat.stringProperties
-                |> SortedKeyValueList.fromList
-        , boolProperties =
-            modifiersFlat.boolProperties
-                |> SortedKeyValueList.fromList
-        , attributes =
-            modifiersFlat.attributes
-                |> SortedKeyValueList.fromList
-        , attributesNamespaced =
-            modifiersFlat.attributesNamespaced
-                |> SortedKeyValueList.fromList
+        , eventListens = modifiersFlat.eventListens
+        , styles = modifiersFlat.styles
+        , stringProperties = modifiersFlat.stringProperties
+        , boolProperties = modifiersFlat.boolProperties
+        , attributes = modifiersFlat.attributes
+        , attributesNamespaced = modifiersFlat.attributesNamespaced
         }
     , subs = subs
     }

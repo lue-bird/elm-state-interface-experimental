@@ -208,7 +208,8 @@ type ProgramState appState
 Would be a terrible fit if we needed fast insert and get.
 -}
 type alias SortedKeyValueList key value =
-    { sortedKeyValueList : List { key : key, value : value } }
+    RecordWithoutConstructorFunction
+        { sortedKeyValueList : List { key : key, value : value } }
 
 
 {-| What's needed to create a state-interface [`program`](#program)
@@ -425,19 +426,22 @@ type alias DomElementHeader future =
     RecordWithoutConstructorFunction
         { namespace : Maybe String
         , tag : String
-        , styles : SortedKeyValueList String String
-        , attributes : SortedKeyValueList String String
-        , attributesNamespaced : SortedKeyValueList ( String, String ) String
-        , stringProperties : SortedKeyValueList String String
-        , boolProperties : SortedKeyValueList String Bool
+        , styles : List { key : String, value : String }
+        , attributes : List { key : String, value : String }
+        , attributesNamespaced : List { key : ( String, String ), value : String }
+        , stringProperties : List { key : String, value : String }
+        , boolProperties : List { key : String, value : Bool }
         , scrollToPosition : Maybe { fromLeft : Float, fromTop : Float }
         , scrollToShow : Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment }
         , scrollPositionRequest : Maybe ({ fromLeft : Float, fromTop : Float } -> future)
         , eventListens :
-            SortedKeyValueList
-                String
-                { on : Json.Decode.Value -> future
-                , defaultActionHandling : DefaultActionHandling
+            List
+                { key :
+                    String
+                , value :
+                    { on : Json.Decode.Value -> future
+                    , defaultActionHandling : DefaultActionHandling
+                    }
                 }
         }
 
@@ -744,10 +748,13 @@ domElementHeaderFutureMap futureChange domElementToMap =
             |> Maybe.map (\request position -> position |> request |> futureChange)
     , eventListens =
         domElementToMap.eventListens
-            |> SortedKeyValueList.map
-                (\_ listen ->
-                    { on = \event -> listen.on event |> futureChange
-                    , defaultActionHandling = listen.defaultActionHandling
+            |> List.map
+                (\entry ->
+                    { key = entry.key
+                    , value =
+                        { on = \event -> entry.value.on event |> futureChange
+                        , defaultActionHandling = entry.value.defaultActionHandling
+                        }
                     }
                 )
     }
@@ -1031,25 +1038,25 @@ domElementHeaderDiffMap fromDomEdit elements =
 
     else
         [ { old = elements.old.styles, updated = elements.updated.styles }
-            |> sortedKeyValueListEditAndRemoveDiffMap
+            |> keyValueListEditAndRemoveDiffMap
                 (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
                 { remove = identity, edit = \key value -> { key = key, value = value } }
         , { old = elements.old.attributes, updated = elements.updated.attributes }
-            |> sortedKeyValueListEditAndRemoveDiffMap
+            |> keyValueListEditAndRemoveDiffMap
                 (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
                 { remove = identity, edit = \key value -> { key = key, value = value } }
         , { old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
-            |> sortedKeyValueListEditAndRemoveDiffMap
+            |> keyValueListEditAndRemoveDiffMap
                 (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
                 { remove = \( namespace, key ) -> { namespace = namespace, key = key }
                 , edit = \( namespace, key ) value -> { namespace = namespace, key = key, value = value }
                 }
         , { old = elements.old.stringProperties, updated = elements.updated.stringProperties }
-            |> sortedKeyValueListEditAndRemoveDiffMap
+            |> keyValueListEditAndRemoveDiffMap
                 (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
                 { remove = identity, edit = \key value -> { key = key, value = value } }
         , { old = elements.old.boolProperties, updated = elements.updated.boolProperties }
-            |> sortedKeyValueListEditAndRemoveDiffMap (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
+            |> keyValueListEditAndRemoveDiffMap (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
                 { remove = identity, edit = \key value -> { key = key, value = value } }
         , if elements.old.scrollToPosition == elements.updated.scrollToPosition then
             Nothing
@@ -1079,12 +1086,13 @@ domElementHeaderDiffMap fromDomEdit elements =
                             |> fromDomEdit
                             |> Just
         , let
-            updatedElementEventListensId : SortedKeyValueList String DefaultActionHandling
+            updatedElementEventListensId : List { key : String, value : DefaultActionHandling }
             updatedElementEventListensId =
-                elements.updated.eventListens |> SortedKeyValueList.map (\_ v -> v.defaultActionHandling)
+                elements.updated.eventListens
+                    |> List.map (\entry -> { key = entry.key, value = entry.value.defaultActionHandling })
           in
           if
-            (elements.old.eventListens |> SortedKeyValueList.map (\_ v -> v.defaultActionHandling))
+            (elements.old.eventListens |> List.map (\entry -> { key = entry.key, value = entry.value.defaultActionHandling }))
                 == updatedElementEventListensId
           then
             Nothing
@@ -1097,6 +1105,27 @@ domElementHeaderDiffMap fromDomEdit elements =
             |> List.LocalExtra.justs
 
 
+keyValueListEditAndRemoveDiffMap :
+    ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
+    -> { remove : comparableKey -> removeSingle, edit : comparableKey -> value -> editSingle }
+    ->
+        ({ old : List { key : comparableKey, value : value }
+         , updated : List { key : comparableKey, value : value }
+         }
+         -> Maybe fromRemoveAndEdit
+        )
+keyValueListEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle toDiff =
+    if toDiff.old == toDiff.updated then
+        Nothing
+
+    else
+        sortedKeyValueListEditAndRemoveDiffMap fromRemoveAndEdit
+            asDiffSingle
+            { old = toDiff.old |> SortedKeyValueList.fromList
+            , updated = toDiff.updated |> SortedKeyValueList.fromList
+            }
+
+
 sortedKeyValueListEditAndRemoveDiffMap :
     ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
     -> { remove : comparableKey -> removeSingle, edit : comparableKey -> value -> editSingle }
@@ -1106,7 +1135,7 @@ sortedKeyValueListEditAndRemoveDiffMap :
          }
          -> Maybe fromRemoveAndEdit
         )
-sortedKeyValueListEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle dicts =
+sortedKeyValueListEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle sortedKeyValueLists =
     let
         diff : { remove : List removeSingle, edit : List editSingle }
         diff =
@@ -1124,8 +1153,8 @@ sortedKeyValueListEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle dicts =
                 (\key updated soFar ->
                     { soFar | edit = asDiffSingle.edit key updated :: soFar.edit }
                 )
-                (dicts.old |> SortedKeyValueList.toList)
-                (dicts.updated |> SortedKeyValueList.toList)
+                (sortedKeyValueLists.old |> SortedKeyValueList.toList)
+                (sortedKeyValueLists.updated |> SortedKeyValueList.toList)
                 { remove = [], edit = [] }
     in
     case ( diff.remove, diff.edit ) of
@@ -1452,7 +1481,6 @@ domElementHeaderInfoToJson =
               )
             , ( "eventListens"
               , header.eventListens
-                    |> SortedKeyValueList.toList
                     |> Json.Encode.list
                         (\entry ->
                             Json.Encode.object
@@ -1464,11 +1492,10 @@ domElementHeaderInfoToJson =
             ]
 
 
-domElementAttributesNamespacedToJson : SortedKeyValueList ( String, String ) String -> Json.Encode.Value
+domElementAttributesNamespacedToJson : List { key : ( String, String ), value : String } -> Json.Encode.Value
 domElementAttributesNamespacedToJson =
     \attributes ->
         attributes
-            |> SortedKeyValueList.toList
             |> Json.Encode.list
                 (\entry ->
                     let
@@ -1483,11 +1510,10 @@ domElementAttributesNamespacedToJson =
                 )
 
 
-domElementAttributesToJson : SortedKeyValueList String String -> Json.Encode.Value
+domElementAttributesToJson : List { key : String, value : String } -> Json.Encode.Value
 domElementAttributesToJson =
     \attributes ->
         attributes
-            |> SortedKeyValueList.toList
             |> Json.Encode.list
                 (\entry ->
                     Json.Encode.object
@@ -1497,11 +1523,10 @@ domElementAttributesToJson =
                 )
 
 
-domElementStylesToJson : SortedKeyValueList String String -> Json.Encode.Value
+domElementStylesToJson : List { key : String, value : String } -> Json.Encode.Value
 domElementStylesToJson =
     \styles ->
         styles
-            |> SortedKeyValueList.toList
             |> Json.Encode.list
                 (\entry ->
                     Json.Encode.object
@@ -1511,11 +1536,10 @@ domElementStylesToJson =
                 )
 
 
-domElementBoolPropertiesToJson : SortedKeyValueList String Bool -> Json.Encode.Value
+domElementBoolPropertiesToJson : List { key : String, value : Bool } -> Json.Encode.Value
 domElementBoolPropertiesToJson =
     \boolProperties ->
         boolProperties
-            |> SortedKeyValueList.toList
             |> Json.Encode.list
                 (\entry ->
                     Json.Encode.object
@@ -1525,11 +1549,10 @@ domElementBoolPropertiesToJson =
                 )
 
 
-domElementStringPropertiesToJson : SortedKeyValueList String String -> Json.Encode.Value
+domElementStringPropertiesToJson : List { key : String, value : String } -> Json.Encode.Value
 domElementStringPropertiesToJson =
     \stringProperties ->
         stringProperties
-            |> SortedKeyValueList.toList
             |> Json.Encode.list
                 (\entry ->
                     Json.Encode.object
@@ -1664,7 +1687,6 @@ editDomDiffToJson =
                     { tag = "EventListens"
                     , value =
                         listens
-                            |> SortedKeyValueList.toList
                             |> Json.Encode.list
                                 (\entry ->
                                     Json.Encode.object
@@ -2351,7 +2373,17 @@ interfaceSingleFutureJsonDecoder =
                                             (Json.Decode.string
                                                 |> Json.Decode.andThen
                                                     (\specificEventName ->
-                                                        case domElement.eventListens |> SortedKeyValueList.get specificEventName of
+                                                        case
+                                                            domElement.eventListens
+                                                                |> List.LocalExtra.firstJustMap
+                                                                    (\entry ->
+                                                                        if entry.key == specificEventName then
+                                                                            Just entry.value
+
+                                                                        else
+                                                                            Nothing
+                                                                    )
+                                                        of
                                                             Nothing ->
                                                                 Json.Decode.fail "received event of a kind that isn't listened for"
 
@@ -3390,7 +3422,7 @@ type DomEdit
     | ReplacementDomElementScrollToPosition (Maybe { fromLeft : Float, fromTop : Float })
     | ReplacementDomElementScrollToShow (Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment })
     | ReplacementDomElementScrollPositionRequest
-    | ReplacementDomElementEventListens (SortedKeyValueList String DefaultActionHandling)
+    | ReplacementDomElementEventListens (List { key : String, value : DefaultActionHandling })
 
 
 {-| Create a [`Program`](#Program):

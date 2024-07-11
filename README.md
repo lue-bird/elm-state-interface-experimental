@@ -4,9 +4,13 @@
 >
 > Changes so far compared to the stable [elm-state-interface](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest):
 > 
+> in 1.0.0
 >   - internal: switch `interfaces` representation from `FastDict.Dict` to sorted assoc-list
 >   - internal: switch `Dict` values to sorted assoc-list or `FastDict.Dict`
 >   - internal: change representation of DOM path
+> 
+> in 2.0.0
+>   - internal: shortcut DOM element header modifiers diff if unsorted list is equivalent
 
 ### define an app in a simple, safe and declarative way
 
