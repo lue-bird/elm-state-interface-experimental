@@ -1244,37 +1244,6 @@ sortedKeyValueListMerge onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueLi
                                 (onlyB bLowest.key bLowest.value initialFolded)
 
 
-{-| Determine which outgoing effects need to be executed based on the difference between old and updated interfaces
--}
-interfacesDiffMap :
-    ({ id : String, diff : InterfaceSingleDiff future } -> combined)
-    ->
-        ({ old : SortedKeyValueList String (InterfaceSingle future)
-         , updated : SortedKeyValueList String (InterfaceSingle future)
-         }
-         -> List combined
-        )
-interfacesDiffMap idAndDiffCombine interfaces =
-    sortedKeyValueListMerge
-        (\id _ soFar ->
-            idAndDiffCombine { id = id, diff = Remove } :: soFar
-        )
-        (\id old updated soFar ->
-            ({ old = old, updated = updated }
-                |> interfaceSingleEditsMap
-                    (\edit -> idAndDiffCombine { id = id, diff = edit |> Edit })
-            )
-                ++ soFar
-        )
-        (\id onlyNew soFar ->
-            idAndDiffCombine { id = id, diff = onlyNew |> Add }
-                :: soFar
-        )
-        (interfaces.old |> SortedKeyValueList.toList)
-        (interfaces.updated |> SortedKeyValueList.toList)
-        []
-
-
 toJsToJson : { id : String, diff : InterfaceSingleDiff future_ } -> Json.Encode.Value
 toJsToJson =
     \toJs ->
@@ -2247,15 +2216,13 @@ programInit appConfig =
         }
     , initialInterface
         |> SortedKeyValueList.toList
-        |> List.foldl
-            (\new soFar ->
+        |> List.LocalExtra.mapAnyOrder
+            (\new ->
                 appConfig.ports.toJs
                     ({ id = new.key, diff = new.value |> Add }
                         |> toJsToJson
                     )
-                    :: soFar
             )
-            []
         |> Cmd.batch
         |> Cmd.map never
     )
@@ -2375,37 +2342,39 @@ interfaceSingleFutureJsonDecoder =
                         Nothing
 
                     DomElementHeader domElement ->
-                        Json.Decode.oneOf
-                            (Json.Decode.LocalExtra.variant "EventListen"
-                                (Json.Decode.map2 (\eventListen event -> eventListen.on event)
-                                    (Json.Decode.field "name"
-                                        (Json.Decode.string
-                                            |> Json.Decode.andThen
-                                                (\specificEventName ->
-                                                    case domElement.eventListens |> SortedKeyValueList.get specificEventName of
-                                                        Nothing ->
-                                                            Json.Decode.fail "received event of a kind that isn't listened for"
+                        let
+                            eventListenDecoder : Json.Decode.Decoder future
+                            eventListenDecoder =
+                                Json.Decode.LocalExtra.variant "EventListen"
+                                    (Json.Decode.map2 (\eventListen event -> eventListen.on event)
+                                        (Json.Decode.field "name"
+                                            (Json.Decode.string
+                                                |> Json.Decode.andThen
+                                                    (\specificEventName ->
+                                                        case domElement.eventListens |> SortedKeyValueList.get specificEventName of
+                                                            Nothing ->
+                                                                Json.Decode.fail "received event of a kind that isn't listened for"
 
-                                                        Just eventListen ->
-                                                            eventListen |> Json.Decode.succeed
-                                                )
+                                                            Just eventListen ->
+                                                                eventListen |> Json.Decode.succeed
+                                                    )
+                                            )
                                         )
+                                        (Json.Decode.field "event" Json.Decode.value)
                                     )
-                                    (Json.Decode.field "event" Json.Decode.value)
-                                )
-                                |> List.singleton
-                                |> (case domElement.scrollPositionRequest of
-                                        Nothing ->
-                                            identity
+                        in
+                        (case domElement.scrollPositionRequest of
+                            Nothing ->
+                                eventListenDecoder
 
-                                        Just request ->
-                                            (::)
-                                                (Json.Decode.LocalExtra.variant "ScrollPositionRequest"
-                                                    domElementScrollPositionJsonDecoder
-                                                    |> Json.Decode.map request
-                                                )
-                                   )
-                            )
+                            Just request ->
+                                Json.Decode.oneOf
+                                    [ eventListenDecoder
+                                    , Json.Decode.LocalExtra.variant "ScrollPositionRequest"
+                                        domElementScrollPositionJsonDecoder
+                                        |> Json.Decode.map request
+                                    ]
+                        )
                             |> Just
 
             NotificationAskForPermission ->
@@ -3079,7 +3048,8 @@ httpMetadataJsonDecoder =
             (Json.Decode.map
                 (\headerTuples ->
                     headerTuples
-                        |> List.map (\( key, value ) -> { key = key, value = value })
+                        |> List.LocalExtra.mapAnyOrder
+                            (\( key, value ) -> { key = key, value = value })
                         |> SortedKeyValueList.fromList
                 )
                 (Json.Decode.keyValuePairs Json.Decode.string)
@@ -3252,6 +3222,38 @@ programUpdate appConfig =
                         |> Cmd.batch
                         |> Cmd.map never
                     )
+
+
+{-| Determine which outgoing effects need to be executed based on the difference between old and updated interfaces
+-}
+interfacesDiffMap :
+    ({ id : String, diff : InterfaceSingleDiff future } -> combined)
+    ->
+        ({ old : SortedKeyValueList String (InterfaceSingle future)
+         , updated : SortedKeyValueList String (InterfaceSingle future)
+         }
+         -> List combined
+        )
+interfacesDiffMap idAndDiffCombine interfaces =
+    sortedKeyValueListMerge
+        (\id _ soFar ->
+            idAndDiffCombine { id = id, diff = Remove } :: soFar
+        )
+        (\id old updated soFar ->
+            List.LocalExtra.appendFast
+                ({ old = old, updated = updated }
+                    |> interfaceSingleEditsMap
+                        (\edit -> idAndDiffCombine { id = id, diff = edit |> Edit })
+                )
+                soFar
+        )
+        (\id onlyNew soFar ->
+            idAndDiffCombine { id = id, diff = onlyNew |> Add }
+                :: soFar
+        )
+        (interfaces.old |> SortedKeyValueList.toList)
+        (interfaces.updated |> SortedKeyValueList.toList)
+        []
 
 
 {-| A Request can fail in a couple ways:

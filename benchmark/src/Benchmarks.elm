@@ -14,99 +14,110 @@ import Web.Svg
 benchmarks : Benchmark.Benchmark
 benchmarks =
     Benchmark.describe "StructuredId"
-        [ {- Benchmark.Alternative.rank "List justs any order"
-                 (\justs -> justs exampleListOfJustStrings)
-                 [ ( "List.filterMap", listJustsUsingListFilterMap )
-                 , ( "foldl", listJustsToAnyOrderUsingFoldl )
-                 ]
-             , Benchmark.Alternative.rank "String order"
-                 (\stringOrder ->
-                     let
-                         a =
-                             (List.range 100 200 |> List.map Char.fromCode |> String.fromList) ++ (Char.fromCode 123 |> String.fromChar)
+        [ Benchmark.Alternative.rank "List justs any order"
+            (\justs -> justs exampleListOfJustStrings)
+            [ ( "List.filterMap", listJustsUsingListFilterMap )
+            , ( "foldl", listJustsToAnyOrderUsingFoldl )
+            ]
+        , Benchmark.Alternative.rank "String order"
+            (\stringOrder ->
+                let
+                    a =
+                        (List.range 100 200 |> List.map Char.fromCode |> String.fromList) ++ (Char.fromCode 123 |> String.fromChar)
 
-                         b =
-                             (List.range 100 200 |> List.map Char.fromCode |> String.fromList) ++ (Char.fromCode 100 |> String.fromChar)
-                     in
-                     stringOrder a b
-                 )
-                 [ ( "Basics.compare", Basics.compare )
-                 , ( "Basics.compare with ++ \"\"", basicsCompareWithAppendEmpty )
-                 , ( "< and > with ++ \"\"", basicsLessOrGreaterWithAppendEmpty )
-                 , ( "Basics.compare by List Char", basicsCompareByListChar )
-                 , ( "Basics.compare by List Char < or >", orderByListCharLessOrGreater )
-                 , ( "Basics.compare by List Char code < or >", orderByListCharCodeLessOrGreater )
-                 ]
-             , Benchmark.Alternative.rank "Int -> String"
-                 (\toListOfString -> List.map toListOfString exampleListOfInts)
-                 [ ( "String.fromInt", String.fromInt )
-                 , ( "Json.Encode.int |> Json.Encode.encode 0", intJsonEncode0 )
-                 , ( "String.fromInt |> Json.Encode.string |> Json.Encode.encode 0", stringFromIntJsonEncode0 )
-                 ]
-             , Benchmark.Alternative.rank "Float -> String"
-                 (\floatToString -> List.map floatToString exampleListOfFloats)
-                 [ ( "String.fromFloat", String.fromFloat )
-                 , ( "Json.Encode.float |> Json.Encode.encode 0", floatJsonEncode0 )
-                 , ( "String.fromFloat |> Json.Encode.string |> Json.Encode.encode 0", stringFromFloatJsonEncode0 )
-                 ]
-             , Benchmark.Alternative.rank "tagged -> String"
-                 (\taggedToString -> List.map (\tag -> taggedToString { tag = tag, value = Json.Encode.null }) exampleListOfStrings)
-                 [ ( "Json.Encode.list Basics.identity [ Json.Encode.string  ,  ]", taggedToJsonStringUsingList )
-                 , ( "Json.Encode.object [ (  ,  ) ]", taggedToJsonStringUsingObject )
-                 , ( "Json.Encode.dict Basics.identity Basics.identity (Dict.singleton     )", taggedToJsonStringUsingDict )
-                 ]
-             ,
-          -}
-          Benchmark.Alternative.rank "index Int -> json String"
+                    b =
+                        (List.range 100 200 |> List.map Char.fromCode |> String.fromList) ++ (Char.fromCode 100 |> String.fromChar)
+                in
+                stringOrder a b
+            )
+            [ ( "Basics.compare", Basics.compare )
+            , ( "Basics.compare with ++ \"\"", basicsCompareWithAppendEmpty )
+            , ( "< and > with ++ \"\"", basicsLessOrGreaterWithAppendEmpty )
+            , ( "Basics.compare by List Char", basicsCompareByListChar )
+            , ( "Basics.compare by List Char < or >", orderByListCharLessOrGreater )
+            , ( "Basics.compare by List Char code < or >", orderByListCharCodeLessOrGreater )
+            ]
+        , Benchmark.Alternative.rank "Int -> String"
+            (\toListOfString -> List.map toListOfString exampleListOfInts)
+            [ ( "String.fromInt", String.fromInt )
+            , ( "Json.Encode.int |> Json.Encode.encode 0", intJsonEncode0 )
+            , ( "String.fromInt |> Json.Encode.string |> Json.Encode.encode 0", stringFromIntJsonEncode0 )
+            ]
+        , Benchmark.Alternative.rank "Float -> String"
+            (\floatToString -> List.map floatToString exampleListOfFloats)
+            [ ( "String.fromFloat", String.fromFloat )
+            , ( "Json.Encode.float |> Json.Encode.encode 0", floatJsonEncode0 )
+            , ( "String.fromFloat |> Json.Encode.string |> Json.Encode.encode 0", stringFromFloatJsonEncode0 )
+            ]
+        , Benchmark.Alternative.rank "tagged -> String"
+            (\taggedToString -> List.map (\tag -> taggedToString { tag = tag, value = Json.Encode.null }) exampleListOfStrings)
+            [ ( "Json.Encode.list Basics.identity [ Json.Encode.string  ,  ]", taggedToJsonStringUsingList )
+            , ( "Json.Encode.object [ (  ,  ) ]", taggedToJsonStringUsingObject )
+            , ( "Json.Encode.dict Basics.identity Basics.identity (Dict.singleton     )", taggedToJsonStringUsingDict )
+            ]
+        , Benchmark.Alternative.rank "index Int -> json String"
             (\indexIntToString -> List.map indexIntToString exampleListOfIndexInts)
             [ ( "Json.Encode.int |> Json.Encode.encode 0", intJsonEncode0 )
             , ( "String.fromInt |> Json.Encode.string |> Json.Encode.encode 0", stringFromIntJsonEncode0 )
             , ( "base36 |> Json.Encode.string |> Json.Encode.encode 0", base36IndexIntToJsonString )
             ]
-
-        {- , Benchmark.Alternative.rank "List index Int -> json String"
-               (\listOfStringToString -> listOfStringToString exampleListOfIndexInts)
-               [ ( "map String.fromInt |> join |> Json.Encode.string", listOfIntToJsonStringUsingMapJoin )
-               , ( "foldl |> Json.Encode.string", listOfIntToJsonStringUsingFoldl )
-               , ( "Json.Encode.list Json.Encode.int", listOfIntToJsonStringUsingJsonEncodeList )
-               , ( "map to chars from code string |> Json.Encode.string", listOfIntToJsonStringUsingMapToCharsFromCodeString )
-               , ( "foldl to chars from code string |> Json.Encode.string", listOfIntToJsonStringUsingFoldlToCharsFromCodeString )
-               , ( "combine in pairs as Int |> Json.Encode.list Json.Encode.int", listOfIntToJsonStringUsingCombineInPairsAsIntToJsonEncodeList )
-               , ( "combine in triples as Int |> Json.Encode.list Json.Encode.int", listOfIntToJsonStringUsingCombineInTriplesAsIntToJsonEncodeList )
-               ]
-
-           , Benchmark.Alternative.rank "List String -> String"
-                  (\listOfStringToString -> listOfStringToString exampleListOfStrings)
-                  [ ( "map |> join", listOfStringToStringUsingMapJoin )
-                  , ( "foldr appending right", listOfStringToStringUsingFoldrAppendingRight )
-                  , ( "foldl appending right", listOfStringToStringUsingFoldlAppendingRight )
-                  , ( "foldr appending left", listOfStringToStringUsingFoldrAppendingLeft )
-                  , ( "foldl appending left", listOfStringToStringUsingFoldlAppendingLeft )
-                  , ( "json encode 0", listOfStringToStringUsingJsonEncode0 )
-                  , ( "json encode 1", listOfStringToStringUsingJsonEncode1 )
-                  , ( "json encode 2", listOfStringToStringUsingJsonEncode2 )
-                  , ( "json encode 3", listOfStringToStringUsingJsonEncode3 )
-                  , ( "json encode 4", listOfStringToStringUsingJsonEncode4 )
-                  ]
-              , Benchmark.Alternative.rank "StructuredId -> String"
-                  (\toListOfString -> toListOfString exampleStructuredId)
-                  [ ( "rope", toStringUsingRope )
-                  , ( "json encode all the way", toStringUsingJsonEncodeAllTheWay )
-                  ]
-              , Benchmark.Alternative.rank "dom render"
-                  (\domRender -> domRender exampleDom)
-                  [ ( "nested recursion given path", domRenderUsingNestedRecursionWithPath )
-                  , ( "nested recursion with subs map, final List.map", domRenderUsingNestedRecursionWithSubsMapAndFinalListMap )
-                  , ( "TCO", domRenderUsingTCO )
-                  , ( "TCO but paths reversed", domRenderUsingTCOButReversedPath )
-                  ]
-              , Benchmark.Alternative.rank "List map indexed, resulting order doesn't matter"
-                  (\mapIndexed -> mapIndexed Tuple.pair exampleListOfStrings)
-                  [ ( "foldl", listMapIndexedNotGuaranteeingOrder )
-                  , ( "map2 with range (used by List.indexedMap)", List.indexedMap )
-                  ]
-        -}
+        , Benchmark.Alternative.rank "List index Int -> json String"
+            (\listOfStringToString -> listOfStringToString exampleListOfIndexInts)
+            [ ( "map String.fromInt |> join |> Json.Encode.string", listOfIntToJsonStringUsingMapJoin )
+            , ( "foldl |> Json.Encode.string", listOfIntToJsonStringUsingFoldl )
+            , ( "Json.Encode.list Json.Encode.int", listOfIntToJsonStringUsingJsonEncodeList )
+            , ( "map to chars from code string |> Json.Encode.string", listOfIntToJsonStringUsingMapToCharsFromCodeString )
+            , ( "foldl to chars from code string |> Json.Encode.string", listOfIntToJsonStringUsingFoldlToCharsFromCodeString )
+            , ( "combine in pairs as Int |> Json.Encode.list Json.Encode.int", listOfIntToJsonStringUsingCombineInPairsAsIntToJsonEncodeList )
+            , ( "combine in triples as Int |> Json.Encode.list Json.Encode.int", listOfIntToJsonStringUsingCombineInTriplesAsIntToJsonEncodeList )
+            ]
+        , Benchmark.Alternative.rank "List String -> String"
+            (\listOfStringToString -> listOfStringToString exampleListOfStrings)
+            [ ( "map |> join", listOfStringToStringUsingMapJoin )
+            , ( "foldr appending right", listOfStringToStringUsingFoldrAppendingRight )
+            , ( "foldl appending right", listOfStringToStringUsingFoldlAppendingRight )
+            , ( "foldr appending left", listOfStringToStringUsingFoldrAppendingLeft )
+            , ( "foldl appending left", listOfStringToStringUsingFoldlAppendingLeft )
+            , ( "json encode 0", listOfStringToStringUsingJsonEncode0 )
+            , ( "json encode 1", listOfStringToStringUsingJsonEncode1 )
+            , ( "json encode 2", listOfStringToStringUsingJsonEncode2 )
+            , ( "json encode 3", listOfStringToStringUsingJsonEncode3 )
+            , ( "json encode 4", listOfStringToStringUsingJsonEncode4 )
+            ]
+        , Benchmark.Alternative.rank "StructuredId -> String"
+            (\toListOfString -> toListOfString exampleStructuredId)
+            [ ( "rope", toStringUsingRope )
+            , ( "json encode all the way", toStringUsingJsonEncodeAllTheWay )
+            ]
+        , Benchmark.Alternative.rank "dom render"
+            (\domRender -> domRender exampleDom)
+            [ ( "nested recursion given pathReverse", domRenderUsingNestedRecursionWithPath )
+            , ( "nested recursion with subs map, final List.map", domRenderUsingNestedRecursionWithSubsMapAndFinalListMap )
+            , ( "TCO", domRenderUsingTCO )
+            , ( "TCO but paths reversed", domRenderUsingTCOButReversedPath )
+            ]
+        , Benchmark.Alternative.rank "List map indexed, resulting order doesn't matter"
+            (\mapIndexed -> mapIndexed Tuple.pair exampleListOfStrings)
+            [ ( "foldl", listMapIndexedNotGuaranteeingOrder )
+            , ( "map2 with range (used by List.indexedMap)", List.indexedMap )
+            ]
+        , Benchmark.Alternative.rank "List append"
+            (\append -> append exampleListOfStrings exampleListOfStrings)
+            [ ( "recursive", listAppendFast )
+            , ( "(++) (uses foldr ::)", (++) )
+            , ( "List.append (uses foldr ::)", List.append )
+            ]
         ]
+
+
+listAppendFast : List a -> List a -> List a
+listAppendFast listA listB =
+    case listA of
+        [] ->
+            listB
+
+        x :: xs ->
+            listAppendFast xs (x :: listB)
 
 
 listOfIntToJsonStringUsingMapJoin : List Int -> String
@@ -631,12 +642,12 @@ domRenderUsingTCOButReversedPath :
     Web.Dom.Node future
     -> Web.Interface future
 domRenderUsingTCOButReversedPath =
-    \node -> nodeFlattenToListUsingTCOButReversedPath [] { path = [], node = node } [] |> Rope.fromList
+    \node -> nodeFlattenToListUsingTCOButReversedPath [] { pathReverse = [], node = node } [] |> Rope.fromList
 
 
 flattenRemainingNodesToListUsingTCOButReversedPath :
     List (Web.InterfaceSingle future)
-    -> List { path : List Int, node : Web.Dom.Node future }
+    -> List { pathReverse : List Int, node : Web.Dom.Node future }
     -> List (Web.InterfaceSingle future)
 flattenRemainingNodesToListUsingTCOButReversedPath updatedInterfaces nodesRemaining =
     case nodesRemaining of
@@ -649,14 +660,14 @@ flattenRemainingNodesToListUsingTCOButReversedPath updatedInterfaces nodesRemain
 
 nodeFlattenToListUsingTCOButReversedPath :
     List (Web.InterfaceSingle future)
-    -> { path : List Int, node : Web.Dom.Node future }
-    -> List { path : List Int, node : Web.Dom.Node future }
+    -> { pathReverse : List Int, node : Web.Dom.Node future }
+    -> List { pathReverse : List Int, node : Web.Dom.Node future }
     -> List (Web.InterfaceSingle future)
 nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining =
     case current.node of
         Web.Dom.Text string ->
             flattenRemainingNodesToListUsingTCOButReversedPath
-                (({ path = current.path, node = Web.DomText string }
+                (({ pathReverse = current.pathReverse, node = Web.DomText string }
                     |> Web.DomNodeRender
                  )
                     :: interfacesSoFar
@@ -667,7 +678,7 @@ nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining 
             let
                 updatedInterfaces : List (Web.InterfaceSingle future)
                 updatedInterfaces =
-                    ({ path = current.path, node = Web.DomElementHeader element_.header }
+                    ({ pathReverse = current.pathReverse, node = Web.DomElementHeader element_.header }
                         |> Web.DomNodeRender
                     )
                         :: interfacesSoFar
@@ -678,14 +689,14 @@ nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining 
 
                 sub0 :: sub1Up ->
                     let
-                        updatedRemaining : { index : Int, mapped : List { path : List Int, node : Web.Dom.Node future } }
+                        updatedRemaining : { index : Int, mapped : List { pathReverse : List Int, node : Web.Dom.Node future } }
                         updatedRemaining =
                             sub1Up
                                 |> List.foldl
                                     (\sub soFar ->
                                         { index = soFar.index + 1
                                         , mapped =
-                                            { path = soFar.index :: current.path
+                                            { pathReverse = soFar.index :: current.pathReverse
                                             , node = sub
                                             }
                                                 :: soFar.mapped
@@ -695,7 +706,7 @@ nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining 
                     in
                     nodeFlattenToListUsingTCOButReversedPath
                         updatedInterfaces
-                        { path = 0 :: current.path, node = sub0 }
+                        { pathReverse = 0 :: current.pathReverse, node = sub0 }
                         updatedRemaining.mapped
 
 
@@ -703,12 +714,12 @@ domRenderUsingTCO :
     Web.Dom.Node future
     -> Web.Interface future
 domRenderUsingTCO =
-    \node -> nodeFlattenToListUsingTCO [] { path = [], node = node } [] |> Rope.fromList
+    \node -> nodeFlattenToListUsingTCO [] { pathReverse = [], node = node } [] |> Rope.fromList
 
 
 flattenRemainingNodesToListUsingTCO :
     List (Web.InterfaceSingle future)
-    -> List { path : List Int, node : Web.Dom.Node future }
+    -> List { pathReverse : List Int, node : Web.Dom.Node future }
     -> List (Web.InterfaceSingle future)
 flattenRemainingNodesToListUsingTCO updatedInterfaces nodesRemaining =
     case nodesRemaining of
@@ -721,14 +732,14 @@ flattenRemainingNodesToListUsingTCO updatedInterfaces nodesRemaining =
 
 nodeFlattenToListUsingTCO :
     List (Web.InterfaceSingle future)
-    -> { path : List Int, node : Web.Dom.Node future }
-    -> List { path : List Int, node : Web.Dom.Node future }
+    -> { pathReverse : List Int, node : Web.Dom.Node future }
+    -> List { pathReverse : List Int, node : Web.Dom.Node future }
     -> List (Web.InterfaceSingle future)
 nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
     case current.node of
         Web.Dom.Text string ->
             flattenRemainingNodesToListUsingTCO
-                (({ path = List.reverse current.path, node = Web.DomText string }
+                (({ pathReverse = List.reverse current.pathReverse, node = Web.DomText string }
                     |> Web.DomNodeRender
                  )
                     :: interfacesSoFar
@@ -739,7 +750,7 @@ nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
             let
                 updatedInterfaces : List (Web.InterfaceSingle future)
                 updatedInterfaces =
-                    ({ path = List.reverse current.path, node = Web.DomElementHeader element_.header }
+                    ({ pathReverse = List.reverse current.pathReverse, node = Web.DomElementHeader element_.header }
                         |> Web.DomNodeRender
                     )
                         :: interfacesSoFar
@@ -750,14 +761,14 @@ nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
 
                 sub0 :: sub1Up ->
                     let
-                        updatedRemaining : { index : Int, mapped : List { path : List Int, node : Web.Dom.Node future } }
+                        updatedRemaining : { index : Int, mapped : List { pathReverse : List Int, node : Web.Dom.Node future } }
                         updatedRemaining =
                             sub1Up
                                 |> List.foldl
                                     (\sub soFar ->
                                         { index = soFar.index + 1
                                         , mapped =
-                                            { path = soFar.index :: current.path
+                                            { pathReverse = soFar.index :: current.pathReverse
                                             , node = sub
                                             }
                                                 :: soFar.mapped
@@ -767,7 +778,7 @@ nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
                     in
                     nodeFlattenToListUsingTCO
                         updatedInterfaces
-                        { path = 0 :: current.path, node = sub0 }
+                        { pathReverse = 0 :: current.pathReverse, node = sub0 }
                         updatedRemaining.mapped
 
 
@@ -781,17 +792,17 @@ nodeFlattenToRopeUsingNestedRecursionWithPath :
     List Int
     -> Web.Dom.Node future
     -> Rope (Web.InterfaceSingle future)
-nodeFlattenToRopeUsingNestedRecursionWithPath path =
+nodeFlattenToRopeUsingNestedRecursionWithPath pathReverse =
     \node ->
         case node of
             Web.Dom.Text string ->
-                { path = List.reverse path, node = Web.DomText string }
+                { pathReverse = List.reverse pathReverse, node = Web.DomText string }
                     |> Web.DomNodeRender
                     |> Rope.singleton
 
             Web.Dom.Element element_ ->
                 Rope.prepend
-                    ({ path = List.reverse path, node = Web.DomElementHeader element_.header }
+                    ({ pathReverse = List.reverse pathReverse, node = Web.DomElementHeader element_.header }
                         |> Web.DomNodeRender
                     )
                     (List.foldl
@@ -799,7 +810,7 @@ nodeFlattenToRopeUsingNestedRecursionWithPath path =
                             { subIndex = soFar.subIndex + 1
                             , rope =
                                 Rope.appendTo soFar.rope
-                                    (nodeFlattenToRopeUsingNestedRecursionWithPath (soFar.subIndex :: path) sub)
+                                    (nodeFlattenToRopeUsingNestedRecursionWithPath (soFar.subIndex :: pathReverse) sub)
                             }
                         )
                         { subIndex = 0, rope = Rope.empty }
@@ -816,28 +827,28 @@ domRenderUsingNestedRecursionWithSubsMapAndFinalListMap =
             |> Rope.fromList
 
 
-nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap : Web.Dom.Node future -> List { path : List Int, node : Web.DomTextOrElementHeader future }
+nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap : Web.Dom.Node future -> List { pathReverse : List Int, node : Web.DomTextOrElementHeader future }
 nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap =
     \node -> node |> nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap |> Rope.toList
 
 
-nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap : Web.Dom.Node future -> Rope { path : List Int, node : Web.DomTextOrElementHeader future }
+nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap : Web.Dom.Node future -> Rope { pathReverse : List Int, node : Web.DomTextOrElementHeader future }
 nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap =
     \node ->
         case node of
             Web.Dom.Text string ->
-                { path = [], node = Web.DomText string } |> Rope.singleton
+                { pathReverse = [], node = Web.DomText string } |> Rope.singleton
 
             Web.Dom.Element element_ ->
                 Rope.prepend
-                    { path = [], node = Web.DomElementHeader element_.header }
+                    { pathReverse = [], node = Web.DomElementHeader element_.header }
                     (List.foldl
                         (\sub soFar ->
                             { subIndex = soFar.subIndex + 1
                             , rope =
                                 Rope.appendTo
                                     soFar.rope
-                                    (Rope.map (\layerPart -> { layerPart | path = soFar.subIndex :: layerPart.path })
+                                    (Rope.map (\layerPart -> { layerPart | pathReverse = soFar.subIndex :: layerPart.pathReverse })
                                         (nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap sub)
                                     )
                             }

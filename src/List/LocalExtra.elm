@@ -1,4 +1,14 @@
-module List.LocalExtra exposing (atIndex, firstJustMap, foldUpIndexedFrom, justsMapIndexed, justsToAnyOrder)
+module List.LocalExtra exposing (appendFast, atIndex, firstJustMap, foldUpIndexedFrom, justsMapIndexed, justsToAnyOrder, mapAnyOrder)
+
+
+appendFast : List a -> List a -> List a
+appendFast listA listB =
+    case listA of
+        [] ->
+            listB
+
+        x :: xs ->
+            appendFast xs (x :: listB)
 
 
 atIndex : Int -> (List a -> Maybe a)
@@ -34,6 +44,16 @@ firstJustMap elementToMaybeFound list =
                     Just found
 
 
+mapAnyOrder : (a -> b) -> (List a -> List b)
+mapAnyOrder elementChange list =
+    list
+        |> List.foldl
+            (\element soFar ->
+                elementChange element :: soFar
+            )
+            []
+
+
 justsToAnyOrder : List (Maybe value) -> List value
 justsToAnyOrder =
     \list ->
@@ -51,39 +71,37 @@ justsToAnyOrder =
 
 
 justsMapIndexed : (Int -> element -> Maybe value) -> (List element -> List value)
-justsMapIndexed elementToMaybe =
-    \list ->
-        list
-            |> List.foldr
-                (\element soFar ->
-                    { index = soFar.index - 1
-                    , justs =
-                        case element |> elementToMaybe soFar.index of
-                            Nothing ->
-                                soFar.justs
+justsMapIndexed elementToMaybe list =
+    list
+        |> List.foldr
+            (\element soFar ->
+                { index = soFar.index - 1
+                , justs =
+                    case element |> elementToMaybe soFar.index of
+                        Nothing ->
+                            soFar.justs
 
-                            Just just ->
-                                just :: soFar.justs
-                    }
-                )
-                { index = (list |> List.length) - 1
-                , justs = []
+                        Just just ->
+                            just :: soFar.justs
                 }
-            |> .justs
+            )
+            { index = (list |> List.length) - 1
+            , justs = []
+            }
+        |> .justs
 
 
 foldUpIndexedFrom :
     folded
     -> (Int -> element -> (folded -> folded))
     -> (List element -> folded)
-foldUpIndexedFrom initialFolded reduce =
-    \list ->
-        list
-            |> List.foldl
-                (\element soFar ->
-                    { index = soFar.index + 1
-                    , folded = soFar.folded |> reduce soFar.index element
-                    }
-                )
-                { index = 0, folded = initialFolded }
-            |> .folded
+foldUpIndexedFrom initialFolded reduce list =
+    list
+        |> List.foldl
+            (\element soFar ->
+                { index = soFar.index + 1
+                , folded = soFar.folded |> reduce soFar.index element
+                }
+            )
+            { index = 0, folded = initialFolded }
+        |> .folded
