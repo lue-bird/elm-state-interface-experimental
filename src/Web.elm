@@ -1094,7 +1094,7 @@ domElementHeaderDiffMap fromDomEdit elements =
                 |> fromDomEdit
                 |> Just
         ]
-            |> List.LocalExtra.justsToAnyOrder
+            |> List.LocalExtra.justs
 
 
 sortedKeyValueListEditAndRemoveDiffMap :
@@ -1168,7 +1168,7 @@ audioDiffMap fromAudioEdit audios =
             |> fromAudioEdit
             |> Just
     ]
-        |> List.LocalExtra.justsToAnyOrder
+        |> List.LocalExtra.justs
 
 
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
@@ -2216,7 +2216,7 @@ programInit appConfig =
         }
     , initialInterface
         |> SortedKeyValueList.toList
-        |> List.LocalExtra.mapAnyOrder
+        |> List.LocalExtra.mapFast
             (\new ->
                 appConfig.ports.toJs
                     ({ id = new.key, diff = new.value |> Add }
@@ -3048,7 +3048,7 @@ httpMetadataJsonDecoder =
             (Json.Decode.map
                 (\headerTuples ->
                     headerTuples
-                        |> List.LocalExtra.mapAnyOrder
+                        |> List.LocalExtra.mapFast
                             (\( key, value ) -> { key = key, value = value })
                         |> SortedKeyValueList.fromList
                 )
