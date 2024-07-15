@@ -1,4 +1,4 @@
-module List.LocalExtra exposing (appendFast, atIndex, firstJustMap, foldUpIndexedFrom, justs, justsMapIndexed, mapFast)
+module List.LocalExtra exposing (appendFast, atIndex, firstJustMap, foldUpIndexedFrom, justs, justsMapIndexed, mapAnyOrder)
 
 
 appendFast : List a -> List a -> List a
@@ -44,19 +44,19 @@ firstJustMap elementToMaybeFound list =
                     Just found
 
 
-mapFast : (a -> b) -> (List a -> List b)
-mapFast elementChange list =
-    list |> mapFastOnto [] elementChange
+mapAnyOrder : (a -> b) -> (List a -> List b)
+mapAnyOrder elementChange list =
+    list |> mapAnyOrderOnto [] elementChange
 
 
-mapFastOnto : List b -> (a -> b) -> (List a -> List b)
-mapFastOnto soFar elementChange list =
+mapAnyOrderOnto : List b -> (a -> b) -> (List a -> List b)
+mapAnyOrderOnto soFar elementChange list =
     case list of
         [] ->
             soFar
 
         head :: tail ->
-            mapFastOnto (elementChange head :: soFar)
+            mapAnyOrderOnto (elementChange head :: soFar)
                 elementChange
                 tail
 

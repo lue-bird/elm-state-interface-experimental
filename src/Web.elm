@@ -134,6 +134,7 @@ import List.LocalExtra
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Result.LocalExtra
 import Rope exposing (Rope)
+import Rope.LocalExtra
 import SortedKeyValueList
 import Speed exposing (Speed)
 import StructuredId exposing (StructuredId)
@@ -549,7 +550,7 @@ interfaceFutureMap : (future -> mappedFuture) -> (Interface future -> Interface 
 interfaceFutureMap futureChange =
     \interface ->
         interface
-            |> Rope.map
+            |> Rope.LocalExtra.mapFast
                 (\interfaceSingle ->
                     interfaceSingle |> interfaceSingleFutureMap futureChange
                 )
@@ -2216,7 +2217,7 @@ programInit appConfig =
         }
     , initialInterface
         |> SortedKeyValueList.toList
-        |> List.LocalExtra.mapFast
+        |> List.LocalExtra.mapAnyOrder
             (\new ->
                 appConfig.ports.toJs
                     ({ id = new.key, diff = new.value |> Add }
@@ -3048,7 +3049,7 @@ httpMetadataJsonDecoder =
             (Json.Decode.map
                 (\headerTuples ->
                     headerTuples
-                        |> List.LocalExtra.mapFast
+                        |> List.LocalExtra.mapAnyOrder
                             (\( key, value ) -> { key = key, value = value })
                         |> SortedKeyValueList.fromList
                 )

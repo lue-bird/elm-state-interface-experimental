@@ -32,8 +32,10 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 -}
 
 import Json.Decode
+import List.LocalExtra
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Rope exposing (Rope)
+import Rope.LocalExtra
 import SortedKeyValueList
 import Web
 
@@ -210,7 +212,7 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
         modifiersFlat =
             modifiers
                 |> modifierBatch
-                |> Rope.foldr
+                |> Rope.foldl
                     (\modifier soFar ->
                         case modifier of
                             ScrollToPosition position ->
@@ -225,29 +227,28 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
                             Listen listen ->
                                 { soFar
                                     | eventListens =
-                                        soFar.eventListens
-                                            |> (::)
-                                                { key = listen.eventName
-                                                , value =
-                                                    { on = listen.on
-                                                    , defaultActionHandling = listen.defaultActionHandling
-                                                    }
-                                                }
+                                        { key = listen.eventName
+                                        , value =
+                                            { on = listen.on
+                                            , defaultActionHandling = listen.defaultActionHandling
+                                            }
+                                        }
+                                            :: soFar.eventListens
                                 }
 
                             Style keyValue ->
-                                { soFar | styles = soFar.styles |> (::) keyValue }
+                                { soFar | styles = keyValue :: soFar.styles }
 
                             StringProperty keyValue ->
                                 { soFar
                                     | stringProperties =
-                                        soFar.stringProperties |> (::) keyValue
+                                        keyValue :: soFar.stringProperties
                                 }
 
                             BoolProperty keyValue ->
                                 { soFar
                                     | boolProperties =
-                                        soFar.boolProperties |> (::) keyValue
+                                        keyValue :: soFar.boolProperties
                                 }
 
                             Attribute keyValue ->
@@ -255,15 +256,15 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
                                     Just namespace ->
                                         { soFar
                                             | attributesNamespaced =
-                                                soFar.attributesNamespaced
-                                                    |> (::) { key = ( namespace, keyValue.key ), value = keyValue.value }
+                                                { key = ( namespace, keyValue.key ), value = keyValue.value }
+                                                    :: soFar.attributesNamespaced
                                         }
 
                                     Nothing ->
                                         { soFar
                                             | attributes =
-                                                soFar.attributes
-                                                    |> (::) { key = keyValue.key, value = keyValue.value }
+                                                { key = keyValue.key, value = keyValue.value }
+                                                    :: soFar.attributes
                                         }
                     )
                     { namespace = maybeNamespace
@@ -286,23 +287,17 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
         , scrollToShow = modifiersFlat.scrollToShow
         , scrollPositionRequest = modifiersFlat.scrollPositionRequest
         , eventListens =
-            modifiersFlat.eventListens
-                |> SortedKeyValueList.fromList
+            modifiersFlat.eventListens |> SortedKeyValueList.fromList
         , styles =
-            modifiersFlat.styles
-                |> SortedKeyValueList.fromList
+            modifiersFlat.styles |> SortedKeyValueList.fromList
         , stringProperties =
-            modifiersFlat.stringProperties
-                |> SortedKeyValueList.fromList
+            modifiersFlat.stringProperties |> SortedKeyValueList.fromList
         , boolProperties =
-            modifiersFlat.boolProperties
-                |> SortedKeyValueList.fromList
+            modifiersFlat.boolProperties |> SortedKeyValueList.fromList
         , attributes =
-            modifiersFlat.attributes
-                |> SortedKeyValueList.fromList
+            modifiersFlat.attributes |> SortedKeyValueList.fromList
         , attributesNamespaced =
-            modifiersFlat.attributesNamespaced
-                |> SortedKeyValueList.fromList
+            modifiersFlat.attributesNamespaced |> SortedKeyValueList.fromList
         }
     , subs = subs
     }
@@ -526,7 +521,11 @@ modifierFutureMap :
     -> (Modifier future -> Modifier mappedFuture)
 modifierFutureMap futureChange =
     \modifier ->
-        modifier |> Rope.map (\modifierSingle -> modifierSingle |> modifierSingleMap futureChange)
+        modifier
+            |> Rope.LocalExtra.mapFast
+                (\modifierSingle ->
+                    modifierSingle |> modifierSingleMap futureChange
+                )
 
 
 modifierSingleMap :
