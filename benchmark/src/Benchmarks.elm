@@ -14,12 +14,7 @@ import Web.Svg
 benchmarks : Benchmark.Benchmark
 benchmarks =
     Benchmark.describe "StructuredId"
-        [ Benchmark.Alternative.rank "List justs any order"
-            (\justs -> justs exampleListOfJustStrings)
-            [ ( "List.filterMap", listJustsUsingListFilterMap )
-            , ( "foldl", listJustsToAnyOrderUsingFoldl )
-            ]
-        , Benchmark.Alternative.rank "String order"
+        [ Benchmark.Alternative.rank "String order"
             (\stringOrder ->
                 let
                     a =
@@ -33,6 +28,7 @@ benchmarks =
             [ ( "Basics.compare", Basics.compare )
             , ( "Basics.compare with ++ \"\"", basicsCompareWithAppendEmpty )
             , ( "< and > with ++ \"\"", basicsLessOrGreaterWithAppendEmpty )
+            , ( "Basics.compare by recursive String.uncons Char code < or >", basicsCompareByRecursiveStringUnconsChar )
             , ( "Basics.compare by List Char", basicsCompareByListChar )
             , ( "Basics.compare by List Char < or >", orderByListCharLessOrGreater )
             , ( "Basics.compare by List Char code < or >", orderByListCharCodeLessOrGreater )
@@ -96,6 +92,11 @@ benchmarks =
             , ( "TCO", domRenderUsingTCO )
             , ( "TCO but paths reversed", domRenderUsingTCOButReversedPath )
             ]
+        , Benchmark.Alternative.rank "List justs any order"
+            (\justs -> justs exampleListOfJustStrings)
+            [ ( "List.filterMap", listJustsUsingListFilterMap )
+            , ( "foldl", listJustsToAnyOrderUsingFoldl )
+            ]
         , Benchmark.Alternative.rank "List map indexed, resulting order doesn't matter"
             (\mapIndexed -> mapIndexed Tuple.pair exampleListOfStrings)
             [ ( "foldl", listMapIndexedNotGuaranteeingOrder )
@@ -107,7 +108,17 @@ benchmarks =
             , ( "(++) (uses foldr ::)", (++) )
             , ( "List.append (uses foldr ::)", List.append )
             ]
+        , Benchmark.Alternative.rank "Rope singleton"
+            (\ropeSingleton -> List.map ropeSingleton exampleListOfStrings)
+            [ ( "Rope.fromList [ a ]", Rope.singleton )
+            , ( "Rope.fromList (List.singleton a)", ropeFromListSingleton )
+            ]
         ]
+
+
+ropeFromListSingleton : a -> Rope a
+ropeFromListSingleton onlyElement =
+    Rope.fromList (List.singleton onlyElement)
 
 
 listAppendFast : List a -> List a -> List a
@@ -413,6 +424,41 @@ basicsLessOrGreaterWithAppendEmpty a b =
 basicsCompareByListChar : String -> String -> Order
 basicsCompareByListChar a b =
     Basics.compare (a |> String.toList) (b |> String.toList)
+
+
+basicsCompareByRecursiveStringUnconsChar : String -> String -> Order
+basicsCompareByRecursiveStringUnconsChar a b =
+    case a |> String.uncons of
+        Nothing ->
+            if b |> String.isEmpty then
+                EQ
+
+            else
+                LT
+
+        Just ( aHead, aTail ) ->
+            case b |> String.uncons of
+                Nothing ->
+                    GT
+
+                Just ( bHead, bTail ) ->
+                    let
+                        aHeadCode : Int
+                        aHeadCode =
+                            aHead |> Char.toCode
+
+                        bHeadCode : Int
+                        bHeadCode =
+                            bHead |> Char.toCode
+                    in
+                    if aHeadCode + 0 < bHeadCode + 0 then
+                        LT
+
+                    else if aHeadCode + 0 > bHeadCode + 0 then
+                        GT
+
+                    else
+                        basicsCompareByRecursiveStringUnconsChar aTail bTail
 
 
 orderByListCharLessOrGreater : String -> String -> Order
