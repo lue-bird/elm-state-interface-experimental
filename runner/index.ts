@@ -575,14 +575,14 @@ function editDomModifiers(
 
 function getOrAddMeta(name: string): HTMLMetaElement {
     const maybeExistingMeta: HTMLMetaElement | undefined =
-        Array.from(document.getElementsByTagName("meta"))
+        Array.from(window.document.head.getElementsByTagName("meta"))
             .find(meta => meta.name === name)
     if (maybeExistingMeta !== undefined) {
         return maybeExistingMeta
     } else {
-        var meta = window.document.createElement("meta")
+        const meta = window.document.createElement("meta")
         meta.name = name
-        window.document.getElementsByTagName('"head"')[0]?.appendChild(meta)
+        window.document.head.appendChild(meta)
         return meta
     }
 }
@@ -733,12 +733,12 @@ function domElementAddEventListens(
 // so freaky.
 
 const RE_script = /^script$/i
-const RE_on_formAction = /^(on|formAction$)/i;
-const RE_js = /^\s*j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:/i;
-const RE_js_html = /^\s*(j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:|d\s*a\s*t\s*a\s*:\s*t\s*e\s*x\s*t\s*\/\s*h\s*t\s*m\s*l\s*(,|;))/i;
+const RE_on_formAction = /^(on|formAction$)/i
+const RE_js = /^\s*j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:/i
+const RE_js_html = /^\s*(j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:|d\s*a\s*t\s*a\s*:\s*t\s*e\s*x\s*t\s*\/\s*h\s*t\s*m\s*l\s*(,|;))/i
 
 function noScript(tag: string) {
-    return RE_script.test(tag) ? 'p' : tag
+    return RE_script.test(tag) ? "p" : tag
 }
 function noOnOrFormAction(key: string) {
     return RE_on_formAction.test(key) ? "data-" + key : key
@@ -746,7 +746,7 @@ function noOnOrFormAction(key: string) {
 
 
 function fileDownloadBytes(config: { mimeType: string, name: string, content: number[] }) {
-    const temporaryAnchorDomElement: HTMLAnchorElement = window.document.createElement('a')
+    const temporaryAnchorDomElement: HTMLAnchorElement = window.document.createElement("a")
     const blob = new Blob(
         [new Uint8Array(config.content)],
         { type: config.mimeType }
@@ -754,7 +754,7 @@ function fileDownloadBytes(config: { mimeType: string, name: string, content: nu
     const objectUrl = URL.createObjectURL(blob)
     temporaryAnchorDomElement.href = objectUrl
     temporaryAnchorDomElement.download = config.name
-    const event = new MouseEvent('click', {
+    const event = new MouseEvent("click", {
         view: window,
         bubbles: true,
         cancelable: true
@@ -878,7 +878,9 @@ function audioSourceLoad(url: string, sendToElm: (v: any) => void, abortSignal: 
                 tag: "Success", value: { durationInSeconds: buffer.length / buffer.sampleRate }
             })
         })
-        .catch(error => { sendToElm({ tag: "Error", value: error?.message !== undefined ? error.message : "NetworkError" }) })
+        .catch(error => {
+            sendToElm({ tag: "Error", value: error?.message !== undefined ? error.message : "NetworkError" })
+        })
 }
 
 function audioParameterTimelineApplyTo(audioParam: AudioParam, timeline: AudioParameterTimeline) {
@@ -980,14 +982,17 @@ type AudioEdit =
     | { tag: "Volume", value: AudioParameterTimeline }
     | { tag: "Speed", value: AudioParameterTimeline }
     | { tag: "StereoPan", value: AudioParameterTimeline }
-    | { tag: "Processing", value: AudioProcessingInfo[] };
+    | { tag: "Processing", value: AudioProcessingInfo[] }
 
 
 function editAudio(
     id: string,
     config: {
-        url: string, startTime: number, replacement: AudioEdit
-    }) {
+        url: string,
+        startTime: number,
+        replacement: AudioEdit
+    }
+) {
     const audioPlayingToEdit = audioPlaying.get(id)
     if (audioPlayingToEdit !== undefined) {
         switch (config.replacement.tag) {
