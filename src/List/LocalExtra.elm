@@ -1,4 +1,4 @@
-module List.LocalExtra exposing (appendFast, atIndex, firstJustMap, foldUpIndexedFrom, justs, justsMapIndexed, mapAnyOrder)
+module List.LocalExtra exposing (appendFast, atIndex, firstJustMap, foldUpIndexedFrom, justsAnyOrder, justsMapIndexed, mapAnyOrder)
 
 
 appendFast : List a -> List a -> List a
@@ -61,24 +61,27 @@ mapAnyOrderOnto soFar elementChange list =
                 tail
 
 
-justs : List (Maybe value) -> List value
-justs =
-    \list -> justsOnto [] list
+justsAnyOrder : List (Maybe value) -> List value
+justsAnyOrder list =
+    justsAnyOrderOnto [] list
 
 
-justsOnto : List a -> (List (Maybe a) -> List a)
-justsOnto soFar list =
+justsAnyOrderOnto : List value -> List (Maybe value) -> List value
+justsAnyOrderOnto soFar list =
     case list of
         [] ->
             soFar
 
-        head :: tail ->
-            case head of
-                Nothing ->
-                    justsOnto soFar tail
+        headMaybe :: tail ->
+            justsAnyOrderOnto
+                (case headMaybe of
+                    Nothing ->
+                        soFar
 
-                Just value ->
-                    justsOnto (value :: soFar) tail
+                    Just value ->
+                        value :: soFar
+                )
+                tail
 
 
 justsMapIndexed : (Int -> element -> Maybe value) -> (List element -> List value)

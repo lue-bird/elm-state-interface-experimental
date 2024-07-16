@@ -1095,7 +1095,7 @@ domElementHeaderDiffMap fromDomEdit elements =
                 |> fromDomEdit
                 |> Just
         ]
-            |> List.LocalExtra.justs
+            |> List.LocalExtra.justsAnyOrder
 
 
 sortedKeyValueListEditAndRemoveDiffMap :
@@ -1169,7 +1169,7 @@ audioDiffMap fromAudioEdit audios =
             |> fromAudioEdit
             |> Just
     ]
-        |> List.LocalExtra.justs
+        |> List.LocalExtra.justsAnyOrder
 
 
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up

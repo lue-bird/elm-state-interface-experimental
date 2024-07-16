@@ -92,11 +92,6 @@ benchmarks =
             , ( "TCO", domRenderUsingTCO )
             , ( "TCO but paths reversed", domRenderUsingTCOButReversedPath )
             ]
-        , Benchmark.Alternative.rank "List justs any order"
-            (\justs -> justs exampleListOfJustStrings)
-            [ ( "List.filterMap", listJustsUsingListFilterMap )
-            , ( "foldl", listJustsToAnyOrderUsingFoldl )
-            ]
         , Benchmark.Alternative.rank "List map indexed, resulting order doesn't matter"
             (\mapIndexed -> mapIndexed Tuple.pair exampleListOfStrings)
             [ ( "foldl", listMapIndexedNotGuaranteeingOrder )
@@ -113,7 +108,100 @@ benchmarks =
             [ ( "Rope.fromList [ a ]", Rope.singleton )
             , ( "Rope.fromList (List.singleton a)", ropeFromListSingleton )
             ]
+        , Benchmark.Alternative.rank "List distinct"
+            (\listDistinct -> listDistinct exampleListOfStrings)
+            [ ( "List.member", listDistinctUsingListMember )
+            , ( "List.sort", listDistinctUsingListSort )
+            ]
+        , Benchmark.Alternative.rank "String first char"
+            (\stringFirstChar -> List.map stringFirstChar exampleShortStrings)
+            [ ( "String.toList", stringFirstCharUsingStringToList )
+            , ( "String.uncons", stringFirstCharUsingStringUncons )
+            , ( "String.left 1 |> String.toList", stringFirstCharUsingStringLeft1ToList )
+            ]
+        , Benchmark.Alternative.rank "List justs map any order"
+            (\justsMap -> justsMap Basics.identity exampleListOfJustStrings)
+            [ ( "List.filterMap", List.filterMap )
+            , ( "List.foldl", listJustsToAnyOrderUsingFoldl )
+            , ( "List.foldr", listJustsUsingFoldr )
+            , ( "recursion", listJustsToAnyOrderUsingRecursion )
+            , ( "recursion |> List.reverse", listJustsUsingRecursion )
+            ]
         ]
+
+
+stringFirstCharUsingStringUncons : String -> Result String Char
+stringFirstCharUsingStringUncons string =
+    case String.toList string of
+        [] ->
+            Err "expected any character"
+
+        c :: _ ->
+            Ok c
+
+
+stringFirstCharUsingStringToList : String -> Result String Char
+stringFirstCharUsingStringToList string =
+    case String.uncons string of
+        Nothing ->
+            Err "expected any character"
+
+        Just ( c, _ ) ->
+            Ok c
+
+
+stringFirstCharUsingStringLeft1ToList : String -> Result String Char
+stringFirstCharUsingStringLeft1ToList string =
+    case string |> String.left 1 |> String.toList of
+        [] ->
+            Err "expected any character"
+
+        c :: _ ->
+            Ok c
+
+
+exampleShortStrings : List String
+exampleShortStrings =
+    [ "", "12", "\n\nim", List.range 1 200 |> List.map Char.fromCode |> String.fromList, "", "a" ]
+
+
+listDistinctUsingListSort : List comparable -> List comparable
+listDistinctUsingListSort listToRemoveDuplicatesIn =
+    case listToRemoveDuplicatesIn |> List.sort of
+        [] ->
+            []
+
+        head :: tail ->
+            tail
+                |> List.foldr
+                    (\element soFar ->
+                        if element == soFar.previous then
+                            { previous = element, unique = soFar.unique }
+
+                        else
+                            { previous = element, unique = element :: soFar.unique }
+                    )
+                    { previous = head, unique = [ head ] }
+                |> .unique
+
+
+listDistinctUsingListMember : List a -> List a
+listDistinctUsingListMember list =
+    listDistinctUsingListMemberHelp [] list []
+
+
+listDistinctUsingListMemberHelp : List a -> List a -> List a -> List a
+listDistinctUsingListMemberHelp existing remaining accumulator =
+    case remaining of
+        [] ->
+            accumulator
+
+        first :: rest ->
+            if List.member first existing then
+                listDistinctUsingListMemberHelp existing rest accumulator
+
+            else
+                listDistinctUsingListMemberHelp (first :: existing) rest (first :: accumulator)
 
 
 ropeFromListSingleton : a -> Rope a
@@ -388,20 +476,63 @@ listJustsUsingListFilterMap =
     \list -> list |> List.filterMap identity
 
 
-listJustsToAnyOrderUsingFoldl : List (Maybe value) -> List value
-listJustsToAnyOrderUsingFoldl =
-    \list ->
-        list
-            |> List.foldl
-                (\maybe soFar ->
-                    case maybe of
-                        Nothing ->
-                            soFar
+listJustsToAnyOrderUsingFoldl : (element -> Maybe value) -> List element -> List value
+listJustsToAnyOrderUsingFoldl elementToMaybe list =
+    list
+        |> List.foldl
+            (\element soFar ->
+                case elementToMaybe element of
+                    Nothing ->
+                        soFar
 
-                        Just value ->
-                            value :: soFar
+                    Just value ->
+                        value :: soFar
+            )
+            []
+
+
+listJustsUsingFoldr : (element -> Maybe value) -> List element -> List value
+listJustsUsingFoldr elementToMaybe list =
+    list
+        |> List.foldr
+            (\element soFar ->
+                case elementToMaybe element of
+                    Nothing ->
+                        soFar
+
+                    Just value ->
+                        value :: soFar
+            )
+            []
+
+
+listJustsUsingRecursion : (element -> Maybe value) -> List element -> List value
+listJustsUsingRecursion elementToMaybe list =
+    listJustsToReverseOrderUsingRecursionFrom [] elementToMaybe list |> List.reverse
+
+
+listJustsToAnyOrderUsingRecursion : (element -> Maybe value) -> List element -> List value
+listJustsToAnyOrderUsingRecursion elementToMaybe list =
+    listJustsToReverseOrderUsingRecursionFrom [] elementToMaybe list
+
+
+listJustsToReverseOrderUsingRecursionFrom : List value -> (element -> Maybe value) -> List element -> List value
+listJustsToReverseOrderUsingRecursionFrom soFar elementToMaybe list =
+    case list of
+        [] ->
+            soFar
+
+        head :: tail ->
+            listJustsToReverseOrderUsingRecursionFrom
+                (case elementToMaybe head of
+                    Nothing ->
+                        soFar
+
+                    Just value ->
+                        value :: soFar
                 )
-                []
+                elementToMaybe
+                tail
 
 
 basicsCompareWithAppendEmpty : String -> String -> Order
