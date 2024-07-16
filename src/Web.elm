@@ -11,7 +11,7 @@ module Web exposing
     , WindowVisibility(..)
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..)
-    , SortedKeyValueList, sortedKeyValueListMerge
+    , SortedKeyValueList
     , interfaceSingleEdits, InterfaceSingleEdit(..), AudioEdit(..), DomEdit(..)
     )
 
@@ -109,7 +109,7 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 
 @docs ProgramState, ProgramEvent, InterfaceSingle, DomTextOrElementHeader
 
-@docs SortedKeyValueList, sortedKeyValueListMerge
+@docs SortedKeyValueList
 
 @docs interfaceSingleEdits, InterfaceSingleEdit, AudioEdit, DomEdit
 
@@ -1111,7 +1111,7 @@ sortedKeyValueListEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle dicts =
     let
         diff : { remove : List removeSingle, edit : List editSingle }
         diff =
-            sortedKeyValueListMerge
+            SortedKeyValueList.merge
                 (\key _ soFar ->
                     { soFar | remove = asDiffSingle.remove key :: soFar.remove }
                 )
@@ -1179,70 +1179,6 @@ interfaceSingleEdits :
     -> List InterfaceSingleEdit
 interfaceSingleEdits =
     \interfaces -> interfaces |> interfaceSingleEditsMap Basics.identity
-
-
-{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
-The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
-
-To simulate diffing of interfaces, use
-
-    Web.sortedKeyValueListMerge
-        (\id toAdd -> ..add toAdd..)
-        (\id old updated -> ..edit (interfaceSingleEdits { old, updated })..)
-        (id toRemove -> ..remove toRemove..)
-        updatedInterfaces
-        oldInterfaces
-        ..what you fold into..
-
--}
-sortedKeyValueListMerge :
-    (comparableKey -> a -> folded -> folded)
-    -> (comparableKey -> a -> b -> folded -> folded)
-    -> (comparableKey -> b -> folded -> folded)
-    -> List { key : comparableKey, value : a }
-    -> List { key : comparableKey, value : b }
-    -> folded
-    -> folded
-sortedKeyValueListMerge onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
-    case aSortedKeyValueList of
-        [] ->
-            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry.key entry.value soFar) initialFolded
-
-        aLowest :: aWithoutLowest ->
-            case bSortedKeyValueList of
-                [] ->
-                    aWithoutLowest
-                        |> List.foldl (\entry soFar -> onlyA entry.key entry.value soFar)
-                            (onlyA aLowest.key aLowest.value initialFolded)
-
-                bLowest :: bWithoutLowest ->
-                    case compare aLowest.key bLowest.key of
-                        EQ ->
-                            sortedKeyValueListMerge
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bWithoutLowest
-                                (bothAB aLowest.key aLowest.value bLowest.value initialFolded)
-
-                        LT ->
-                            sortedKeyValueListMerge
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bSortedKeyValueList
-                                (onlyA aLowest.key aLowest.value initialFolded)
-
-                        GT ->
-                            sortedKeyValueListMerge
-                                onlyA
-                                bothAB
-                                onlyB
-                                aSortedKeyValueList
-                                bWithoutLowest
-                                (onlyB bLowest.key bLowest.value initialFolded)
 
 
 toJsToJson : { id : String, diff : InterfaceSingleDiff future_ } -> Json.Encode.Value
@@ -3236,7 +3172,7 @@ interfacesDiffMap :
          -> List combined
         )
 interfacesDiffMap idAndDiffCombine interfaces =
-    sortedKeyValueListMerge
+    SortedKeyValueList.merge
         (\id _ soFar ->
             idAndDiffCombine { id = id, diff = Remove } :: soFar
         )

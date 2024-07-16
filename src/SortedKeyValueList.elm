@@ -1,4 +1,4 @@
-module SortedKeyValueList exposing (SortedKeyValueList, fromList, get, map, toList)
+module SortedKeyValueList exposing (SortedKeyValueList, fromList, get, map, merge, toList)
 
 {-| Alternative to FastDict.Dict optimized for fast merge and fast creation.
 Would be a terrible fit if we needed fast insert and get.
@@ -52,3 +52,56 @@ get keyToFind sortedKeyValueList =
                 else
                     Nothing
             )
+
+
+{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
+The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
+-}
+merge :
+    (comparableKey -> a -> folded -> folded)
+    -> (comparableKey -> a -> b -> folded -> folded)
+    -> (comparableKey -> b -> folded -> folded)
+    -> List { key : comparableKey, value : a }
+    -> List { key : comparableKey, value : b }
+    -> folded
+    -> folded
+merge onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
+    case aSortedKeyValueList of
+        [] ->
+            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry.key entry.value soFar) initialFolded
+
+        aLowest :: aWithoutLowest ->
+            case bSortedKeyValueList of
+                [] ->
+                    aWithoutLowest
+                        |> List.foldl (\entry soFar -> onlyA entry.key entry.value soFar)
+                            (onlyA aLowest.key aLowest.value initialFolded)
+
+                bLowest :: bWithoutLowest ->
+                    case compare aLowest.key bLowest.key of
+                        EQ ->
+                            merge
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bWithoutLowest
+                                (bothAB aLowest.key aLowest.value bLowest.value initialFolded)
+
+                        LT ->
+                            merge
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bSortedKeyValueList
+                                (onlyA aLowest.key aLowest.value initialFolded)
+
+                        GT ->
+                            merge
+                                onlyA
+                                bothAB
+                                onlyB
+                                aSortedKeyValueList
+                                bWithoutLowest
+                                (onlyB bLowest.key bLowest.value initialFolded)
