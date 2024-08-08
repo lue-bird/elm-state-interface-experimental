@@ -3492,8 +3492,8 @@ program :
 program appConfig =
     Platform.worker
         { init = \() -> programInit appConfig
-        , update = programUpdate appConfig
-        , subscriptions = programSubscriptions appConfig
+        , update = \event state -> programUpdate appConfig event state
+        , subscriptions = \state -> programSubscriptions appConfig state
         }
 
 
