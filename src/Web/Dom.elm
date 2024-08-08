@@ -32,7 +32,6 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 -}
 
 import Json.Decode
-import List.LocalExtra
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Rope exposing (Rope)
 import Rope.LocalExtra
@@ -206,7 +205,7 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
             , styles : List { key : String, value : String }
             , stringProperties : List { key : String, value : String }
             , boolProperties : List { key : String, value : Bool }
-            , attributesNamespaced : List { key : ( String, String ), value : String }
+            , attributesNamespaced : List { key : { namespace : String, key : String }, value : String }
             , attributes : List { key : String, value : String }
             }
         modifiersFlat =
@@ -256,7 +255,9 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
                                     Just namespace ->
                                         { soFar
                                             | attributesNamespaced =
-                                                { key = ( namespace, keyValue.key ), value = keyValue.value }
+                                                { key = { namespace = namespace, key = keyValue.key }
+                                                , value = keyValue.value
+                                                }
                                                     :: soFar.attributesNamespaced
                                         }
 
@@ -297,11 +298,16 @@ elementWithMaybeNamespace maybeNamespace tag modifiers subs =
         , attributes =
             modifiersFlat.attributes |> SortedKeyValueList.fromList
         , attributesNamespaced =
-            modifiersFlat.attributesNamespaced |> SortedKeyValueList.fromList
+            modifiersFlat.attributesNamespaced |> SortedKeyValueList.fromListBy namespacedKeyToComparable
         }
     , subs = subs
     }
         |> Element
+
+
+namespacedKeyToComparable : { namespace : String, key : String } -> String
+namespacedKeyToComparable =
+    \namespacedKey -> namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
 
 
 {-| Create a DOM element with a given tag, [`Modifier`](#Modifier)s and sub-[node](Web-Dom#Node)s.

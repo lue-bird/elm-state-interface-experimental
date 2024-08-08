@@ -1,4 +1,4 @@
-module SortedKeyValueList exposing (SortedKeyValueList, fromList, get, map, merge, toList)
+module SortedKeyValueList exposing (SortedKeyValueList, fromList, fromListBy, get, map, mergeBy, toList)
 
 {-| Alternative to FastDict.Dict optimized for fast merge and fast creation.
 Would be a terrible fit if we needed fast insert and get.
@@ -21,6 +21,20 @@ map elementChange sortedKeyValueList =
                 (\entry ->
                     { key = entry.key, value = elementChange entry.key entry.value }
                 )
+    }
+
+
+{-| Sort a given list of { key, value } elements
+by a given comparable-ized representation of the key
+to create a [`SortedKeyValueList`](#SortedKeyValueList)
+-}
+fromListBy :
+    (key -> comparable_)
+    -> (List { value : value, key : key } -> SortedKeyValueList key value)
+fromListBy keyToComparable unsortedList =
+    { sortedKeyValueList =
+        unsortedList
+            |> List.sortBy (\entry -> entry.key |> keyToComparable)
     }
 
 
@@ -57,15 +71,16 @@ get keyToFind sortedKeyValueList =
 {-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
 The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
 -}
-merge :
-    (comparableKey -> a -> folded -> folded)
-    -> (comparableKey -> a -> b -> folded -> folded)
-    -> (comparableKey -> b -> folded -> folded)
-    -> List { key : comparableKey, value : a }
-    -> List { key : comparableKey, value : b }
+mergeBy :
+    (key -> comparable_)
+    -> (key -> a -> folded -> folded)
+    -> (key -> a -> b -> folded -> folded)
+    -> (key -> b -> folded -> folded)
+    -> List { key : key, value : a }
+    -> List { key : key, value : b }
     -> folded
     -> folded
-merge onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
+mergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
     case aSortedKeyValueList of
         [] ->
             bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry.key entry.value soFar) initialFolded
@@ -78,9 +93,9 @@ merge onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
                             (onlyA aLowest.key aLowest.value initialFolded)
 
                 bLowest :: bWithoutLowest ->
-                    case compare aLowest.key bLowest.key of
+                    case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
                         EQ ->
-                            merge
+                            mergeBy keyToComparable
                                 onlyA
                                 bothAB
                                 onlyB
@@ -89,7 +104,7 @@ merge onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
                                 (bothAB aLowest.key aLowest.value bLowest.value initialFolded)
 
                         LT ->
-                            merge
+                            mergeBy keyToComparable
                                 onlyA
                                 bothAB
                                 onlyB
@@ -98,7 +113,7 @@ merge onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
                                 (onlyA aLowest.key aLowest.value initialFolded)
 
                         GT ->
-                            merge
+                            mergeBy keyToComparable
                                 onlyA
                                 bothAB
                                 onlyB

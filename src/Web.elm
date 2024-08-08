@@ -428,7 +428,7 @@ type alias DomElementHeader future =
         , tag : String
         , styles : SortedKeyValueList String String
         , attributes : SortedKeyValueList String String
-        , attributesNamespaced : SortedKeyValueList ( String, String ) String
+        , attributesNamespaced : SortedKeyValueList { namespace : String, key : String } String
         , stringProperties : SortedKeyValueList String String
         , boolProperties : SortedKeyValueList String Bool
         , scrollToPosition : Maybe { fromLeft : Float, fromTop : Float }
@@ -1032,25 +1032,26 @@ domElementHeaderDiffMap fromDomEdit elements =
 
     else
         [ { old = elements.old.styles, updated = elements.updated.styles }
-            |> sortedKeyValueListEditAndRemoveDiffMap
+            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                 (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
                 { remove = identity, edit = \key value -> { key = key, value = value } }
         , { old = elements.old.attributes, updated = elements.updated.attributes }
-            |> sortedKeyValueListEditAndRemoveDiffMap
+            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                 (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
                 { remove = identity, edit = \key value -> { key = key, value = value } }
         , { old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
-            |> sortedKeyValueListEditAndRemoveDiffMap
+            |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
                 (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
-                { remove = \( namespace, key ) -> { namespace = namespace, key = key }
-                , edit = \( namespace, key ) value -> { namespace = namespace, key = key, value = value }
+                { remove = \k -> { namespace = k.namespace, key = k.key }
+                , edit = \k value -> { namespace = k.namespace, key = k.key, value = value }
                 }
         , { old = elements.old.stringProperties, updated = elements.updated.stringProperties }
-            |> sortedKeyValueListEditAndRemoveDiffMap
+            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                 (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
                 { remove = identity, edit = \key value -> { key = key, value = value } }
         , { old = elements.old.boolProperties, updated = elements.updated.boolProperties }
-            |> sortedKeyValueListEditAndRemoveDiffMap (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
+            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
                 { remove = identity, edit = \key value -> { key = key, value = value } }
         , if elements.old.scrollToPosition == elements.updated.scrollToPosition then
             Nothing
@@ -1098,46 +1099,60 @@ domElementHeaderDiffMap fromDomEdit elements =
             |> List.LocalExtra.justsAnyOrder
 
 
-sortedKeyValueListEditAndRemoveDiffMap :
-    ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
-    -> { remove : comparableKey -> removeSingle, edit : comparableKey -> value -> editSingle }
+namespacedKeyToComparable : { namespace : String, key : String } -> String
+namespacedKeyToComparable =
+    \namespacedKey -> namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
+
+
+sortedKeyValueListEditAndRemoveDiffMapBy :
+    (key -> comparable_)
+    -> ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
+    -> { remove : key -> removeSingle, edit : key -> value -> editSingle }
     ->
-        ({ old : SortedKeyValueList comparableKey value
-         , updated : SortedKeyValueList comparableKey value
+        ({ old : SortedKeyValueList key value
+         , updated : SortedKeyValueList key value
          }
          -> Maybe fromRemoveAndEdit
         )
-sortedKeyValueListEditAndRemoveDiffMap fromRemoveAndEdit asDiffSingle dicts =
+sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDiffSingle dicts =
     let
         diff : { remove : List removeSingle, edit : List editSingle }
         diff =
-            SortedKeyValueList.merge
+            SortedKeyValueList.mergeBy keyToComparable
                 (\key _ soFar ->
-                    { soFar | remove = asDiffSingle.remove key :: soFar.remove }
+                    { edit = soFar.edit
+                    , remove = asDiffSingle.remove key :: soFar.remove
+                    }
                 )
                 (\key old updated soFar ->
                     if old == updated then
                         soFar
 
                     else
-                        { soFar | edit = asDiffSingle.edit key updated :: soFar.edit }
+                        { remove = soFar.remove
+                        , edit = asDiffSingle.edit key updated :: soFar.edit
+                        }
                 )
                 (\key updated soFar ->
-                    { soFar | edit = asDiffSingle.edit key updated :: soFar.edit }
+                    { remove = soFar.remove
+                    , edit = asDiffSingle.edit key updated :: soFar.edit
+                    }
                 )
                 (dicts.old |> SortedKeyValueList.toList)
                 (dicts.updated |> SortedKeyValueList.toList)
                 { remove = [], edit = [] }
     in
-    case ( diff.remove, diff.edit ) of
-        ( [], [] ) ->
-            Nothing
+    case diff.remove of
+        [] ->
+            case diff.edit of
+                [] ->
+                    Nothing
 
-        ( remove0 :: remove1Up, edit ) ->
-            { remove = remove0 :: remove1Up, edit = edit } |> fromRemoveAndEdit |> Just
+                (_ :: _) as editsFilled ->
+                    { remove = [], edit = editsFilled } |> fromEditAndRemove |> Just
 
-        ( remove, edit0 :: edit0Up ) ->
-            { remove = remove, edit = edit0 :: edit0Up } |> fromRemoveAndEdit |> Just
+        (_ :: _) as removeFilled ->
+            { remove = removeFilled, edit = diff.edit } |> fromEditAndRemove |> Just
 
 
 audioDiffMap :
@@ -1401,20 +1416,20 @@ domElementHeaderInfoToJson =
             ]
 
 
-domElementAttributesNamespacedToJson : SortedKeyValueList ( String, String ) String -> Json.Encode.Value
+domElementAttributesNamespacedToJson :
+    SortedKeyValueList
+        { namespace : String, key : String }
+        String
+    -> Json.Encode.Value
 domElementAttributesNamespacedToJson =
     \attributes ->
         attributes
             |> SortedKeyValueList.toList
             |> Json.Encode.list
                 (\entry ->
-                    let
-                        ( namespace, key ) =
-                            entry.key
-                    in
                     Json.Encode.object
-                        [ ( "namespace", namespace |> Json.Encode.string )
-                        , ( "key", key |> Json.Encode.string )
+                        [ ( "namespace", entry.key.namespace |> Json.Encode.string )
+                        , ( "key", entry.key.key |> Json.Encode.string )
                         , ( "value", entry.value |> Json.Encode.string )
                         ]
                 )
@@ -3172,7 +3187,7 @@ interfacesDiffMap :
          -> List combined
         )
 interfacesDiffMap idAndDiffCombine interfaces =
-    SortedKeyValueList.merge
+    SortedKeyValueList.mergeBy Basics.identity
         (\id _ soFar ->
             idAndDiffCombine { id = id, diff = Remove } :: soFar
         )
