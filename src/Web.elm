@@ -830,10 +830,10 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         NotificationShow _ ->
             case interfaces.updated of
                 NotificationShow toShow ->
-                    { id = toShow.id, message = toShow.message, details = toShow.details }
+                    [ { id = toShow.id, message = toShow.message, details = toShow.details }
                         |> EditNotification
                         |> fromSingeEdit
-                        |> List.singleton
+                    ]
 
                 _ ->
                     []
@@ -982,32 +982,32 @@ domTextOrElementHeaderDiffMap fromDomEdit nodes =
         DomText oldText ->
             case nodes.updated of
                 DomElementHeader updatedElement ->
-                    updatedElement
+                    [ updatedElement
                         |> domElementHeaderFutureMap (\_ -> ())
                         |> DomElementHeader
                         |> ReplacementDomNode
                         |> fromDomEdit
-                        |> List.singleton
+                    ]
 
                 DomText updatedText ->
                     if oldText == updatedText then
                         []
 
                     else
-                        updatedText
+                        [ updatedText
                             |> DomText
                             |> ReplacementDomNode
                             |> fromDomEdit
-                            |> List.singleton
+                        ]
 
         DomElementHeader oldElement ->
             case nodes.updated of
                 DomText updatedText ->
-                    updatedText
+                    [ updatedText
                         |> DomText
                         |> ReplacementDomNode
                         |> fromDomEdit
-                        |> List.singleton
+                    ]
 
                 DomElementHeader updatedElement ->
                     { old = oldElement, updated = updatedElement }
@@ -1022,12 +1022,12 @@ domElementHeaderDiffMap :
         )
 domElementHeaderDiffMap fromDomEdit elements =
     if elements.old.tag /= elements.updated.tag then
-        elements.updated
+        [ elements.updated
             |> domElementHeaderFutureMap (\_ -> ())
             |> DomElementHeader
             |> ReplacementDomNode
             |> fromDomEdit
-            |> List.singleton
+        ]
 
     else
         [ { old = elements.old.styles, updated = elements.updated.styles }
