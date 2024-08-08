@@ -11,7 +11,7 @@ module Web exposing
     , WindowVisibility(..)
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..)
-    , SortedKeyValueList
+    , SortedKeyValueList(..)
     , interfaceSingleEdits, InterfaceSingleEdit(..), AudioEdit(..), DomEdit(..)
     )
 
@@ -135,7 +135,6 @@ import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFuncti
 import Result.LocalExtra
 import Rope exposing (Rope)
 import Rope.LocalExtra
-import SortedKeyValueList
 import Speed exposing (Speed)
 import StructuredId exposing (StructuredId)
 import Time
@@ -208,9 +207,8 @@ type ProgramState appState
 {-| Alternative to `Dict` optimized for fast merge and fast creation.
 Would be a terrible fit if we needed fast insert and get.
 -}
-type alias SortedKeyValueList key value =
-    -- TODO move module+type completely into Web
-    SortedKeyValueList.SortedKeyValueList key value
+type SortedKeyValueList key value
+    = SortedKeyValueList (List { key : key, value : value })
 
 
 {-| What's needed to create a state-interface [`program`](#program)
@@ -745,7 +743,7 @@ domElementHeaderFutureMap futureChange domElementToMap =
             |> Maybe.map (\request position -> position |> request |> futureChange)
     , eventListens =
         domElementToMap.eventListens
-            |> SortedKeyValueList.map
+            |> sortedKeyValueListMap
                 (\listen ->
                     { on = \event -> listen.value.on event |> futureChange
                     , defaultActionHandling = listen.value.defaultActionHandling
@@ -1097,12 +1095,23 @@ domElementHeaderDiffMap fromDomEdit elements =
                 )
             |> List.LocalExtra.consJust
                 (let
-                    updatedElementEventListensId : SortedKeyValueList String DefaultActionHandling
+                    updatedElementEventListensId : List { key : String, value : DefaultActionHandling }
                     updatedElementEventListensId =
-                        elements.updated.eventListens |> SortedKeyValueList.mapAnyOrder (\entry -> entry.value.defaultActionHandling)
+                        elements.updated.eventListens
+                            |> sortedKeyValueListToList
+                            |> List.LocalExtra.mapAnyOrder
+                                (\entry ->
+                                    { key = entry.key, value = entry.value.defaultActionHandling }
+                                )
                  in
                  if
-                    (elements.old.eventListens |> SortedKeyValueList.mapAnyOrder (\entry -> entry.value.defaultActionHandling))
+                    (elements.old.eventListens
+                        |> sortedKeyValueListToList
+                        |> List.LocalExtra.mapAnyOrder
+                            (\entry ->
+                                { key = entry.key, value = entry.value.defaultActionHandling }
+                            )
+                    )
                         == updatedElementEventListensId
                  then
                     Nothing
@@ -1133,7 +1142,7 @@ sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDif
     let
         diff : { remove : List removeSingle, edit : List editSingle }
         diff =
-            SortedKeyValueList.mergeBy keyToComparable
+            sortedKeyValueListMergeBy keyToComparable
                 (\removed soFar ->
                     { edit = soFar.edit
                     , remove = asDiffSingle.remove removed.key :: soFar.remove
@@ -1153,8 +1162,8 @@ sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDif
                     , edit = asDiffSingle.edit updated :: soFar.edit
                     }
                 )
-                (dicts.old |> SortedKeyValueList.toList)
-                (dicts.updated |> SortedKeyValueList.toList)
+                (dicts.old |> sortedKeyValueListToList)
+                (dicts.updated |> sortedKeyValueListToList)
                 { remove = [], edit = [] }
     in
     case diff.remove of
@@ -1424,7 +1433,7 @@ domElementHeaderInfoToJson =
               )
             , ( "eventListens"
               , header.eventListens
-                    |> SortedKeyValueList.toList
+                    |> sortedKeyValueListToList
                     |> Json.Encode.list
                         (\entry ->
                             Json.Encode.object
@@ -1444,7 +1453,7 @@ domElementAttributesNamespacedToJson :
 domElementAttributesNamespacedToJson =
     \attributes ->
         attributes
-            |> SortedKeyValueList.toList
+            |> sortedKeyValueListToList
             |> Json.Encode.list
                 (\entry ->
                     Json.Encode.object
@@ -1459,7 +1468,7 @@ domElementAttributesToJson : SortedKeyValueList String String -> Json.Encode.Val
 domElementAttributesToJson =
     \attributes ->
         attributes
-            |> SortedKeyValueList.toList
+            |> sortedKeyValueListToList
             |> Json.Encode.list
                 (\entry ->
                     Json.Encode.object
@@ -1473,7 +1482,7 @@ domElementStylesToJson : SortedKeyValueList String String -> Json.Encode.Value
 domElementStylesToJson =
     \styles ->
         styles
-            |> SortedKeyValueList.toList
+            |> sortedKeyValueListToList
             |> Json.Encode.list
                 (\entry ->
                     Json.Encode.object
@@ -1487,7 +1496,7 @@ domElementBoolPropertiesToJson : SortedKeyValueList String Bool -> Json.Encode.V
 domElementBoolPropertiesToJson =
     \boolProperties ->
         boolProperties
-            |> SortedKeyValueList.toList
+            |> sortedKeyValueListToList
             |> Json.Encode.list
                 (\entry ->
                     Json.Encode.object
@@ -1501,7 +1510,7 @@ domElementStringPropertiesToJson : SortedKeyValueList String String -> Json.Enco
 domElementStringPropertiesToJson =
     \stringProperties ->
         stringProperties
-            |> SortedKeyValueList.toList
+            |> sortedKeyValueListToList
             |> Json.Encode.list
                 (\entry ->
                     Json.Encode.object
@@ -1636,7 +1645,6 @@ editDomDiffToJson =
                     { tag = "EventListens"
                     , value =
                         listens
-                            |> SortedKeyValueList.toList
                             |> Json.Encode.list
                                 (\entry ->
                                     Json.Encode.object
@@ -2168,7 +2176,7 @@ interfacesFromRope =
                         )
                         []
         in
-        flattened |> SortedKeyValueList.fromList
+        flattened |> sortedKeyValueListFromList
 
 
 {-| The "init" part for an embedded program
@@ -2187,7 +2195,7 @@ programInit appConfig =
         , appState = appConfig.initialState
         }
     , initialInterface
-        |> SortedKeyValueList.toList
+        |> sortedKeyValueListToList
         |> List.LocalExtra.mapAnyOrder
             (\new ->
                 appConfig.ports.toJs
@@ -2211,7 +2219,7 @@ programSubscriptions appConfig (State state) =
                     (Json.Decode.field "id" Json.Decode.string
                         |> Json.Decode.andThen
                             (\originalInterfaceId ->
-                                case state.interface |> SortedKeyValueList.get originalInterfaceId of
+                                case state.interface |> sortedKeyValueListGet originalInterfaceId of
                                     Just interfaceSingleAcceptingFuture ->
                                         case interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder of
                                             Just eventDataDecoder ->
@@ -2322,7 +2330,7 @@ interfaceSingleFutureJsonDecoder =
                                             (Json.Decode.string
                                                 |> Json.Decode.andThen
                                                     (\specificEventName ->
-                                                        case domElement.eventListens |> SortedKeyValueList.get specificEventName of
+                                                        case domElement.eventListens |> sortedKeyValueListGet specificEventName of
                                                             Nothing ->
                                                                 Json.Decode.fail "received event of a kind that isn't listened for"
 
@@ -3018,7 +3026,7 @@ httpMetadataJsonDecoder =
                     headerTuples
                         |> List.LocalExtra.mapAnyOrder
                             (\( key, value ) -> { key = key, value = value })
-                        |> SortedKeyValueList.fromList
+                        |> sortedKeyValueListFromList
                 )
                 (Json.Decode.keyValuePairs Json.Decode.string)
             )
@@ -3204,7 +3212,7 @@ interfacesDiffMap :
          -> List combined
         )
 interfacesDiffMap idAndDiffCombine interfaces =
-    SortedKeyValueList.mergeBy Basics.identity
+    sortedKeyValueListMergeBy Basics.identity
         (\removed soFar ->
             idAndDiffCombine { id = removed.key, diff = Remove } :: soFar
         )
@@ -3220,9 +3228,106 @@ interfacesDiffMap idAndDiffCombine interfaces =
             idAndDiffCombine { id = onlyNew.key, diff = onlyNew.value |> Add }
                 :: soFar
         )
-        (interfaces.old |> SortedKeyValueList.toList)
-        (interfaces.updated |> SortedKeyValueList.toList)
+        (interfaces.old |> sortedKeyValueListToList)
+        (interfaces.updated |> sortedKeyValueListToList)
         []
+
+
+sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
+sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
+    sortedKeyValueList
+
+
+{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
+The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
+-}
+sortedKeyValueListMergeBy :
+    (key -> comparable_)
+    -> ({ key : key, value : a } -> folded -> folded)
+    -> (a -> { key : key, value : b } -> folded -> folded)
+    -> ({ key : key, value : b } -> folded -> folded)
+    -> List { key : key, value : a }
+    -> List { key : key, value : b }
+    -> folded
+    -> folded
+sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
+    case aSortedKeyValueList of
+        [] ->
+            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry soFar) initialFolded
+
+        aLowest :: aWithoutLowest ->
+            case bSortedKeyValueList of
+                [] ->
+                    aWithoutLowest
+                        |> List.foldl (\entry soFar -> onlyA entry soFar)
+                            (onlyA aLowest initialFolded)
+
+                bLowest :: bWithoutLowest ->
+                    case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
+                        EQ ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bWithoutLowest
+                                (bothAB aLowest.value bLowest initialFolded)
+
+                        LT ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bSortedKeyValueList
+                                (onlyA aLowest initialFolded)
+
+                        GT ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aSortedKeyValueList
+                                bWithoutLowest
+                                (onlyB bLowest initialFolded)
+
+
+{-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](#SortedKeyValueList)
+-}
+sortedKeyValueListFromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
+sortedKeyValueListFromList =
+    \unsortedList ->
+        SortedKeyValueList (unsortedList |> List.sortBy .key)
+
+
+sortedKeyValueListMap :
+    ({ key : key, value : value } -> newValue)
+    -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
+sortedKeyValueListMap elementChange (SortedKeyValueList sortedKeyValueList) =
+    SortedKeyValueList
+        (sortedKeyValueList
+            |> List.map
+                (\entry ->
+                    { key = entry.key, value = elementChange entry }
+                )
+        )
+
+
+{-| The fact that this can only be implemented linearly might seem shocking.
+In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
+-}
+sortedKeyValueListGet : key -> SortedKeyValueList key value -> Maybe value
+sortedKeyValueListGet keyToFind sortedKeyValueList =
+    sortedKeyValueList
+        |> sortedKeyValueListToList
+        |> List.LocalExtra.firstJustMap
+            (\entry ->
+                if entry.key == keyToFind then
+                    Just entry.value
+
+                else
+                    Nothing
+            )
 
 
 {-| A Request can fail in a couple ways:
@@ -3359,7 +3464,7 @@ type DomEdit
     | ReplacementDomElementScrollToPosition (Maybe { fromLeft : Float, fromTop : Float })
     | ReplacementDomElementScrollToShow (Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment })
     | ReplacementDomElementScrollPositionRequest
-    | ReplacementDomElementEventListens (SortedKeyValueList String DefaultActionHandling)
+    | ReplacementDomElementEventListens (List { key : String, value : DefaultActionHandling })
 
 
 {-| Create a [`Program`](#Program):
