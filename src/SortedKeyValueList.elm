@@ -12,14 +12,14 @@ type alias SortedKeyValueList key value =
 
 
 map :
-    (key -> value -> newValue)
+    ({ key : key, value : value } -> newValue)
     -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
 map elementChange sortedKeyValueList =
     { sortedKeyValueList =
         sortedKeyValueList.sortedKeyValueList
             |> List.map
                 (\entry ->
-                    { key = entry.key, value = elementChange entry.key entry.value }
+                    { key = entry.key, value = elementChange entry }
                 )
     }
 
@@ -73,9 +73,9 @@ The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/
 -}
 mergeBy :
     (key -> comparable_)
-    -> (key -> a -> folded -> folded)
-    -> (key -> a -> b -> folded -> folded)
-    -> (key -> b -> folded -> folded)
+    -> ({ key : key, value : a } -> folded -> folded)
+    -> (a -> { key : key, value : b } -> folded -> folded)
+    -> ({ key : key, value : b } -> folded -> folded)
     -> List { key : key, value : a }
     -> List { key : key, value : b }
     -> folded
@@ -83,14 +83,14 @@ mergeBy :
 mergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
     case aSortedKeyValueList of
         [] ->
-            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry.key entry.value soFar) initialFolded
+            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry soFar) initialFolded
 
         aLowest :: aWithoutLowest ->
             case bSortedKeyValueList of
                 [] ->
                     aWithoutLowest
-                        |> List.foldl (\entry soFar -> onlyA entry.key entry.value soFar)
-                            (onlyA aLowest.key aLowest.value initialFolded)
+                        |> List.foldl (\entry soFar -> onlyA entry soFar)
+                            (onlyA aLowest initialFolded)
 
                 bLowest :: bWithoutLowest ->
                     case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
@@ -101,7 +101,7 @@ mergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueLi
                                 onlyB
                                 aWithoutLowest
                                 bWithoutLowest
-                                (bothAB aLowest.key aLowest.value bLowest.value initialFolded)
+                                (bothAB aLowest.value bLowest initialFolded)
 
                         LT ->
                             mergeBy keyToComparable
@@ -110,7 +110,7 @@ mergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueLi
                                 onlyB
                                 aWithoutLowest
                                 bSortedKeyValueList
-                                (onlyA aLowest.key aLowest.value initialFolded)
+                                (onlyA aLowest initialFolded)
 
                         GT ->
                             mergeBy keyToComparable
@@ -119,4 +119,4 @@ mergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueLi
                                 onlyB
                                 aSortedKeyValueList
                                 bWithoutLowest
-                                (onlyB bLowest.key bLowest.value initialFolded)
+                                (onlyB bLowest initialFolded)

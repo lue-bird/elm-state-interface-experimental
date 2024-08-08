@@ -169,9 +169,9 @@ domElementHeaderFutureMap futureChange domElementToMap =
     , eventListens =
         domElementToMap.eventListens
             |> SortedKeyValueList.map
-                (\_ listen ->
-                    { on = \event -> listen.on event |> futureChange
-                    , defaultActionHandling = listen.defaultActionHandling
+                (\listen ->
+                    { on = \event -> listen.value.on event |> futureChange
+                    , defaultActionHandling = listen.value.defaultActionHandling
                     }
                 )
     }
