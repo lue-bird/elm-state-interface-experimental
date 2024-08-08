@@ -7,34 +7,34 @@ Would be a terrible fit if we needed fast insert and get.
 import List.LocalExtra
 
 
-type alias SortedKeyValueList key value =
-    { sortedKeyValueList : List { key : key, value : value } }
+type SortedKeyValueList key value
+    = SortedKeyValueList (List { key : key, value : value })
 
 
 map :
     ({ key : key, value : value } -> newValue)
     -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
-map elementChange sortedKeyValueList =
-    { sortedKeyValueList =
-        sortedKeyValueList.sortedKeyValueList
+map elementChange (SortedKeyValueList sortedKeyValueList) =
+    SortedKeyValueList
+        (sortedKeyValueList
             |> List.map
                 (\entry ->
                     { key = entry.key, value = elementChange entry }
                 )
-    }
+        )
 
 
 mapAnyOrder :
     ({ key : key, value : value } -> newValue)
     -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
-mapAnyOrder elementChange sortedKeyValueList =
-    { sortedKeyValueList =
-        sortedKeyValueList.sortedKeyValueList
+mapAnyOrder elementChange (SortedKeyValueList sortedKeyValueList) =
+    SortedKeyValueList
+        (sortedKeyValueList
             |> List.LocalExtra.mapAnyOrder
                 (\entry ->
                     { key = entry.key, value = elementChange entry }
                 )
-    }
+        )
 
 
 {-| Sort a given list of { key, value } elements
@@ -45,10 +45,10 @@ fromListBy :
     (key -> comparable_)
     -> (List { value : value, key : key } -> SortedKeyValueList key value)
 fromListBy keyToComparable unsortedList =
-    { sortedKeyValueList =
-        unsortedList
+    SortedKeyValueList
+        (unsortedList
             |> List.sortBy (\entry -> entry.key |> keyToComparable)
-    }
+        )
 
 
 {-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](#SortedKeyValueList)
@@ -56,12 +56,12 @@ fromListBy keyToComparable unsortedList =
 fromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
 fromList =
     \unsortedList ->
-        { sortedKeyValueList = unsortedList |> List.sortBy .key }
+        SortedKeyValueList (unsortedList |> List.sortBy .key)
 
 
 toList : SortedKeyValueList key value -> List { key : key, value : value }
-toList sortedKeyValueList =
-    sortedKeyValueList.sortedKeyValueList
+toList (SortedKeyValueList sortedKeyValueList) =
+    sortedKeyValueList
 
 
 {-| The fact that this can only be implemented linearly might seem shocking.

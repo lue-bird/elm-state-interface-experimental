@@ -209,7 +209,8 @@ type ProgramState appState
 Would be a terrible fit if we needed fast insert and get.
 -}
 type alias SortedKeyValueList key value =
-    { sortedKeyValueList : List { key : key, value : value } }
+    -- TODO move module+type completely into Web
+    SortedKeyValueList.SortedKeyValueList key value
 
 
 {-| What's needed to create a state-interface [`program`](#program)
