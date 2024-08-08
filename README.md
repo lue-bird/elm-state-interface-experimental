@@ -164,7 +164,7 @@ app =
     }
 ```
 
-it can be nice to separate behaviour from the interface by explicitly listing all the possible things we expect to see on the outside
+it can be nice to separate behavior from the interface by explicitly listing all the possible things we expect to see on the outside
 
 ```elm
 import Web
