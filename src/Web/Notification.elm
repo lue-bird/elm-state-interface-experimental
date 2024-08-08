@@ -87,7 +87,7 @@ when the toggle is set.
 -}
 askForPermission : Web.Interface future_
 askForPermission =
-    Web.NotificationAskForPermission
+    Web.NotificationAskForPermission ()
         |> Rope.singleton
 
 

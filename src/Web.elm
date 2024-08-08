@@ -251,7 +251,7 @@ type InterfaceSingle future
     | NavigationPushUrl AppUrl
     | NavigationGo Int
     | NavigationLoad String
-    | NavigationReload
+    | NavigationReload ()
     | NavigationUrlRequest (AppUrl -> future)
     | FileDownloadUnsignedInt8s { mimeType : String, name : String, content : List Int }
     | ClipboardReplaceBy String
@@ -264,7 +264,7 @@ type InterfaceSingle future
             List Int
         , node : DomTextOrElementHeader future
         }
-    | NotificationAskForPermission
+    | NotificationAskForPermission ()
     | NotificationShow { id : String, message : String, details : String, on : NotificationClicked -> future }
     | HttpRequest (HttpRequest future)
     | TimePosixRequest (Time.Posix -> future)
@@ -590,8 +590,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         NavigationLoad url ->
             NavigationLoad url
 
-        NavigationReload ->
-            NavigationReload
+        NavigationReload () ->
+            navigationReload
 
         FileDownloadUnsignedInt8s download ->
             FileDownloadUnsignedInt8s download
@@ -611,8 +611,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         LocalStorageSet localStorageItem ->
             LocalStorageSet localStorageItem
 
-        NotificationAskForPermission ->
-            NotificationAskForPermission
+        NotificationAskForPermission () ->
+            notificationAskForPermission
 
         DomNodeRender toRender ->
             { pathReverse = toRender.pathReverse
@@ -725,6 +725,16 @@ interfaceSingleFutureMap futureChange interfaceSingle =
 
         GamepadsChangeListen toFuture ->
             (\event -> event |> toFuture |> futureChange) |> GamepadsChangeListen
+
+
+navigationReload : InterfaceSingle future_
+navigationReload =
+    NavigationReload ()
+
+
+notificationAskForPermission : InterfaceSingle future_
+notificationAskForPermission =
+    NotificationAskForPermission ()
 
 
 domElementHeaderFutureMap : (future -> mappedFuture) -> (DomElementHeader future -> DomElementHeader mappedFuture)
@@ -873,7 +883,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         NavigationLoad _ ->
             []
 
-        NavigationReload ->
+        NavigationReload () ->
             []
 
         NavigationUrlRequest _ ->
@@ -891,7 +901,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         AudioSourceLoad _ ->
             []
 
-        NotificationAskForPermission ->
+        NotificationAskForPermission () ->
             []
 
         HttpRequest _ ->
@@ -1089,7 +1099,7 @@ domElementHeaderDiffMap fromDomEdit elements =
                                 Nothing
 
                             Just _ ->
-                                ReplacementDomElementScrollPositionRequest
+                                replacementDomElementScrollPositionRequest
                                     |> fromDomEdit
                                     |> Just
                 )
@@ -1121,6 +1131,11 @@ domElementHeaderDiffMap fromDomEdit elements =
                         |> fromDomEdit
                         |> Just
                 )
+
+
+replacementDomElementScrollPositionRequest : DomEdit
+replacementDomElementScrollPositionRequest =
+    ReplacementDomElementScrollPositionRequest ()
 
 
 namespacedKeyToComparable : { namespace : String, key : String } -> String
@@ -1245,7 +1260,7 @@ interfaceSingleDiffToJson =
                 Edit edit ->
                     { tag = "Edit", value = edit |> interfaceSingleEditToJson }
 
-                Remove ->
+                Remove () ->
                     { tag = "Remove", value = Json.Encode.null }
             )
 
@@ -1638,7 +1653,7 @@ editDomDiffToJson =
                     , value = alignment |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
                     }
 
-                ReplacementDomElementScrollPositionRequest ->
+                ReplacementDomElementScrollPositionRequest () ->
                     { tag = "ScrollPositionRequest", value = Json.Encode.null }
 
                 ReplacementDomElementEventListens listens ->
@@ -1694,7 +1709,7 @@ interfaceSingleToJson =
                 NavigationLoad url ->
                     { tag = "NavigationLoad", value = url |> Json.Encode.string }
 
-                NavigationReload ->
+                NavigationReload () ->
                     { tag = "NavigationReload", value = Json.Encode.null }
 
                 FileDownloadUnsignedInt8s config ->
@@ -1740,7 +1755,7 @@ interfaceSingleToJson =
                             ]
                     }
 
-                NotificationAskForPermission ->
+                NotificationAskForPermission () ->
                     { tag = "NotificationAskForPermission", value = Json.Encode.null }
 
                 DomNodeRender render ->
@@ -1994,7 +2009,7 @@ interfaceSingleToStructuredId =
                 NavigationLoad url ->
                     { tag = "NavigationLoad", value = url |> StructuredId.ofString }
 
-                NavigationReload ->
+                NavigationReload () ->
                     { tag = "NavigationReload", value = StructuredId.ofUnit }
 
                 FileDownloadUnsignedInt8s config ->
@@ -2040,7 +2055,7 @@ interfaceSingleToStructuredId =
                             ]
                     }
 
-                NotificationAskForPermission ->
+                NotificationAskForPermission () ->
                     { tag = "NotificationAskForPermission", value = StructuredId.ofUnit }
 
                 DomNodeRender path ->
@@ -2279,7 +2294,7 @@ interfaceSingleFutureJsonDecoder =
             NavigationLoad _ ->
                 Nothing
 
-            NavigationReload ->
+            NavigationReload () ->
                 Nothing
 
             NavigationUrlRequest toFuture ->
@@ -2355,7 +2370,7 @@ interfaceSingleFutureJsonDecoder =
                         )
                             |> Just
 
-            NotificationAskForPermission ->
+            NotificationAskForPermission () ->
                 Nothing
 
             NotificationShow show ->
@@ -3184,8 +3199,7 @@ programUpdate appConfig event state =
             let
                 (State oldState) =
                     state
-            in
-            let
+
                 updatedInterface : SortedKeyValueList String (InterfaceSingle state)
                 updatedInterface =
                     updatedAppState |> appConfig.interface |> interfacesFromRope
@@ -3211,7 +3225,7 @@ interfacesDiffMap :
 interfacesDiffMap idAndDiffCombine interfaces =
     sortedKeyValueListMergeBy Basics.identity
         (\removed soFar ->
-            idAndDiffCombine { id = removed.key, diff = Remove } :: soFar
+            idAndDiffCombine { id = removed.key, diff = remove } :: soFar
         )
         (\old updated soFar ->
             List.LocalExtra.appendFast
@@ -3228,6 +3242,11 @@ interfacesDiffMap idAndDiffCombine interfaces =
         (interfaces.old |> sortedKeyValueListToList)
         (interfaces.updated |> sortedKeyValueListToList)
         []
+
+
+remove : InterfaceSingleDiff irrelevantFuture_
+remove =
+    Remove ()
 
 
 sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
@@ -3370,7 +3389,7 @@ type alias HttpMetadata =
 type InterfaceSingleDiff irrelevantFuture
     = Add (InterfaceSingle irrelevantFuture)
     | Edit InterfaceSingleEdit
-    | Remove
+    | Remove ()
 
 
 {-| Individual message to js to sync up with the latest interface type,
@@ -3460,7 +3479,7 @@ type DomEdit
     | ReplacementDomElementBoolProperties { edit : List { key : String, value : Bool }, remove : List String }
     | ReplacementDomElementScrollToPosition (Maybe { fromLeft : Float, fromTop : Float })
     | ReplacementDomElementScrollToShow (Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment })
-    | ReplacementDomElementScrollPositionRequest
+    | ReplacementDomElementScrollPositionRequest ()
     | ReplacementDomElementEventListens (List { key : String, value : DefaultActionHandling })
 
 

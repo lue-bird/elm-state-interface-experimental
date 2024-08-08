@@ -116,7 +116,7 @@ Replacement for [`Browser.Navigation.reload`](https://dark.elm.dmy.fr/packages/e
 -}
 reload : Web.Interface future_
 reload =
-    Web.NavigationReload
+    Web.NavigationReload ()
         |> Rope.singleton
 
 
