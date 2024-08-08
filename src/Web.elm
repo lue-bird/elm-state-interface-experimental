@@ -218,7 +218,7 @@ type alias ProgramConfig state =
         { initialState : state
         , interface : state -> Interface state
         , ports :
-            { toJs : Json.Encode.Value -> Cmd Never
+            { toJs : Json.Encode.Value -> Cmd (ProgramEvent state)
             , fromJs : (Json.Encode.Value -> ProgramEvent state) -> Sub (ProgramEvent state)
             }
         }
@@ -2204,7 +2204,6 @@ programInit appConfig =
                     )
             )
         |> Cmd.batch
-        |> Cmd.map never
     )
 
 
@@ -3179,7 +3178,6 @@ programUpdate appConfig event state =
               }
                 |> toJsToJson
                 |> appConfig.ports.toJs
-                |> Cmd.map never
             )
 
         JsEventEnabledConstructionOfNewAppState updatedAppState ->
@@ -3197,7 +3195,6 @@ programUpdate appConfig event state =
                 |> interfacesDiffMap
                     (\diff -> appConfig.ports.toJs (diff |> toJsToJson))
                 |> Cmd.batch
-                |> Cmd.map never
             )
 
 
@@ -3487,7 +3484,7 @@ program :
     { initialState : state
     , interface : state -> Interface state
     , ports :
-        { toJs : Json.Encode.Value -> Cmd Never
+        { toJs : Json.Encode.Value -> Cmd (ProgramEvent state)
         , fromJs : (Json.Encode.Value -> ProgramEvent state) -> Sub (ProgramEvent state)
         }
     }
