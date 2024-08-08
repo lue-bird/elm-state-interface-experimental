@@ -45,9 +45,8 @@ You do not have to worry about order.
 
 -}
 through : Time.Posix -> Float -> (Web.AudioParameterTimeline -> Web.AudioParameterTimeline)
-through keyFrameMoment keyFrameValue =
-    \soFar ->
-        { startValue = soFar.startValue
-        , keyFrames =
-            { time = keyFrameMoment, value = keyFrameValue } :: soFar.keyFrames
-        }
+through keyFrameMoment keyFrameValue audioParameterTimelineSoFar =
+    { startValue = audioParameterTimelineSoFar.startValue
+    , keyFrames =
+        { time = keyFrameMoment, value = keyFrameValue } :: audioParameterTimelineSoFar.keyFrames
+    }

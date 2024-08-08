@@ -133,51 +133,48 @@ with
 
 -}
 futureMap : (future -> mappedFuture) -> (Node future -> Node mappedFuture)
-futureMap futureChange =
-    \domElementToMap ->
-        case domElementToMap of
-            Text string ->
-                Text string
+futureMap futureChange domElementToMap =
+    case domElementToMap of
+        Text string ->
+            Text string
 
-            Element domElement ->
-                domElement |> elementFutureMap futureChange |> Element
+        Element domElement ->
+            domElement |> elementFutureMap futureChange |> Element
 
 
 elementFutureMap : (future -> mappedFuture) -> (Element future -> Element mappedFuture)
-elementFutureMap futureChange =
-    \domElementToMap ->
-        { header = domElementToMap.header |> domElementHeaderFutureMap futureChange
-        , subs =
-            domElementToMap.subs |> List.map (\node -> node |> futureMap futureChange)
-        }
+elementFutureMap futureChange domElementToMap =
+    { header = domElementToMap.header |> domElementHeaderFutureMap futureChange
+    , subs =
+        domElementToMap.subs |> List.map (\node -> node |> futureMap futureChange)
+    }
 
 
 domElementHeaderFutureMap :
     (future -> mappedFuture)
     -> (Web.DomElementHeader future -> Web.DomElementHeader mappedFuture)
-domElementHeaderFutureMap futureChange =
-    \domElementToMap ->
-        { namespace = domElementToMap.namespace
-        , tag = domElementToMap.tag
-        , styles = domElementToMap.styles
-        , attributes = domElementToMap.attributes
-        , attributesNamespaced = domElementToMap.attributesNamespaced
-        , stringProperties = domElementToMap.stringProperties
-        , boolProperties = domElementToMap.boolProperties
-        , scrollToPosition = domElementToMap.scrollToPosition
-        , scrollToShow = domElementToMap.scrollToShow
-        , scrollPositionRequest =
-            domElementToMap.scrollPositionRequest
-                |> Maybe.map (\request position -> position |> request |> futureChange)
-        , eventListens =
-            domElementToMap.eventListens
-                |> SortedKeyValueList.map
-                    (\_ listen ->
-                        { on = \event -> listen.on event |> futureChange
-                        , defaultActionHandling = listen.defaultActionHandling
-                        }
-                    )
-        }
+domElementHeaderFutureMap futureChange domElementToMap =
+    { namespace = domElementToMap.namespace
+    , tag = domElementToMap.tag
+    , styles = domElementToMap.styles
+    , attributes = domElementToMap.attributes
+    , attributesNamespaced = domElementToMap.attributesNamespaced
+    , stringProperties = domElementToMap.stringProperties
+    , boolProperties = domElementToMap.boolProperties
+    , scrollToPosition = domElementToMap.scrollToPosition
+    , scrollToShow = domElementToMap.scrollToShow
+    , scrollPositionRequest =
+        domElementToMap.scrollPositionRequest
+            |> Maybe.map (\request position -> position |> request |> futureChange)
+    , eventListens =
+        domElementToMap.eventListens
+            |> SortedKeyValueList.map
+                (\_ listen ->
+                    { on = \event -> listen.on event |> futureChange
+                    , defaultActionHandling = listen.defaultActionHandling
+                    }
+                )
+    }
 
 
 {-| Plain text [DOM `Node`](#Node)
@@ -525,48 +522,46 @@ listenToPreventingDefaultAction eventName =
 modifierFutureMap :
     (future -> mappedFuture)
     -> (Modifier future -> Modifier mappedFuture)
-modifierFutureMap futureChange =
-    \modifier ->
-        modifier
-            |> Rope.LocalExtra.mapFast
-                (\modifierSingle ->
-                    modifierSingle |> modifierSingleMap futureChange
-                )
+modifierFutureMap futureChange modifier =
+    modifier
+        |> Rope.LocalExtra.mapFast
+            (\modifierSingle ->
+                modifierSingle |> modifierSingleMap futureChange
+            )
 
 
 modifierSingleMap :
     (future -> mappedFuture)
     -> (ModifierSingle future -> ModifierSingle mappedFuture)
-modifierSingleMap futureChange =
-    \modifier ->
-        case modifier of
-            Attribute keyValue ->
-                keyValue |> Attribute
+modifierSingleMap futureChange modifier =
+    case modifier of
+        Attribute keyValue ->
+            keyValue |> Attribute
 
-            Style keyValue ->
-                keyValue |> Style
+        Style keyValue ->
+            keyValue |> Style
 
-            StringProperty keyValue ->
-                keyValue |> StringProperty
+        StringProperty keyValue ->
+            keyValue |> StringProperty
 
-            BoolProperty keyValue ->
-                keyValue |> BoolProperty
+        BoolProperty keyValue ->
+            keyValue |> BoolProperty
 
-            ScrollToPosition position ->
-                position |> ScrollToPosition
+        ScrollToPosition position ->
+            position |> ScrollToPosition
 
-            ScrollToShow alignment ->
-                alignment |> ScrollToShow
+        ScrollToShow alignment ->
+            alignment |> ScrollToShow
 
-            ScrollPositionRequest request ->
-                (\future -> future |> request |> futureChange) |> ScrollPositionRequest
+        ScrollPositionRequest request ->
+            (\future -> future |> request |> futureChange) |> ScrollPositionRequest
 
-            Listen listen ->
-                { eventName = listen.eventName
-                , on = \json -> listen.on json |> futureChange
-                , defaultActionHandling = listen.defaultActionHandling
-                }
-                    |> Listen
+        Listen listen ->
+            { eventName = listen.eventName
+            , on = \json -> listen.on json |> futureChange
+            , defaultActionHandling = listen.defaultActionHandling
+            }
+                |> Listen
 
 
 {-| Getting the current scroll position from the left and top.

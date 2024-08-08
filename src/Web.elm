@@ -547,13 +547,12 @@ to a broader representation for the parent interface
 
 -}
 interfaceFutureMap : (future -> mappedFuture) -> (Interface future -> Interface mappedFuture)
-interfaceFutureMap futureChange =
-    \interface ->
-        interface
-            |> Rope.LocalExtra.mapFast
-                (\interfaceSingle ->
-                    interfaceSingle |> interfaceSingleFutureMap futureChange
-                )
+interfaceFutureMap futureChange interface =
+    interface
+        |> Rope.LocalExtra.mapFast
+            (\interfaceSingle ->
+                interfaceSingle |> interfaceSingleFutureMap futureChange
+            )
 
 
 interfaceSingleFutureMap : (future -> mappedFuture) -> (InterfaceSingle future -> InterfaceSingle mappedFuture)
@@ -2183,31 +2182,30 @@ programInit appConfig =
 {-| The "subscriptions" part for an embedded program
 -}
 programSubscriptions : ProgramConfig state -> (ProgramState state -> Sub (ProgramEvent state))
-programSubscriptions appConfig =
-    \(State state) ->
-        appConfig.ports.fromJs
-            (\interfaceJson ->
-                interfaceJson
-                    |> Json.Decode.decodeValue
-                        (Json.Decode.field "id" Json.Decode.string
-                            |> Json.Decode.andThen
-                                (\originalInterfaceId ->
-                                    case state.interface |> SortedKeyValueList.get originalInterfaceId of
-                                        Just interfaceSingleAcceptingFuture ->
-                                            case interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder of
-                                                Just eventDataDecoder ->
-                                                    Json.Decode.field "eventData" eventDataDecoder
+programSubscriptions appConfig (State state) =
+    appConfig.ports.fromJs
+        (\interfaceJson ->
+            interfaceJson
+                |> Json.Decode.decodeValue
+                    (Json.Decode.field "id" Json.Decode.string
+                        |> Json.Decode.andThen
+                            (\originalInterfaceId ->
+                                case state.interface |> SortedKeyValueList.get originalInterfaceId of
+                                    Just interfaceSingleAcceptingFuture ->
+                                        case interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder of
+                                            Just eventDataDecoder ->
+                                                Json.Decode.field "eventData" eventDataDecoder
 
-                                                Nothing ->
-                                                    "interface did not expect any events" |> Json.Decode.fail
+                                            Nothing ->
+                                                "interface did not expect any events" |> Json.Decode.fail
 
-                                        Nothing ->
-                                            "no associated interface found" |> Json.Decode.fail
-                                )
-                            |> Json.Decode.map JsEventEnabledConstructionOfNewAppState
-                        )
-                    |> Result.LocalExtra.valueOrOnError JsEventFailedToDecode
-            )
+                                    Nothing ->
+                                        "no associated interface found" |> Json.Decode.fail
+                            )
+                        |> Json.Decode.map JsEventEnabledConstructionOfNewAppState
+                    )
+                |> Result.LocalExtra.valueOrOnError JsEventFailedToDecode
+        )
 
 
 {-| [json `Decoder`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Decode#Decoder)
@@ -2706,10 +2704,9 @@ gamepadButtonJsonDecoder =
 
 
 listPadToAtLeast : Int -> a -> (List a -> List a)
-listPadToAtLeast newMinimumSize paddingElement =
-    \list ->
-        list
-            ++ List.repeat (newMinimumSize - (list |> List.length)) paddingElement
+listPadToAtLeast newMinimumSize paddingElement list =
+    list
+        ++ List.repeat (newMinimumSize - (list |> List.length)) paddingElement
 
 
 {-| using
@@ -2912,26 +2909,24 @@ fastDictInsertSameValueFor :
     List comparableKey
     -> value
     -> (FastDict.Dict comparableKey value -> FastDict.Dict comparableKey value)
-fastDictInsertSameValueFor keyList value =
-    \dict ->
-        keyList
-            |> List.foldl
-                (\key dictSoFar -> dictSoFar |> FastDict.insert key value)
-                dict
+fastDictInsertSameValueFor keyList value dict =
+    keyList
+        |> List.foldl
+            (\key dictSoFar -> dictSoFar |> FastDict.insert key value)
+            dict
 
 
 httpExpectOnError : HttpExpect future -> (HttpError -> future)
-httpExpectOnError =
-    \httpExpect ->
-        case httpExpect of
-            HttpExpectString toFuture ->
-                \e -> e |> Err |> toFuture
+httpExpectOnError httpExpect e =
+    case httpExpect of
+        HttpExpectString toFuture ->
+            e |> Err |> toFuture
 
-            HttpExpectBytes toFuture ->
-                \e -> e |> Err |> toFuture
+        HttpExpectBytes toFuture ->
+            e |> Err |> toFuture
 
-            HttpExpectWhatever toFuture ->
-                \e -> e |> Err |> toFuture
+        HttpExpectWhatever toFuture ->
+            e |> Err |> toFuture
 
 
 httpSuccessResponseJsonDecoder : HttpExpect future -> Json.Decode.Decoder future
@@ -3135,45 +3130,46 @@ type alias GamepadButtonMap =
 {-| The "update" part for an embedded program
 -}
 programUpdate : ProgramConfig state -> (ProgramEvent state -> ProgramState state -> ( ProgramState state, Cmd (ProgramEvent state) ))
-programUpdate appConfig =
-    \event ->
-        case event of
-            JsEventFailedToDecode jsonError ->
-                \state ->
-                    ( state
-                    , let
-                        notifyOfBugInterface : InterfaceSingle never_
-                        notifyOfBugInterface =
-                            ([ "bug: js event failed to decode: "
-                             , jsonError |> Json.Decode.errorToString
-                             , ". Please open an issue on github.com/lue-bird/elm-state-interface-experimental"
-                             ]
-                                |> String.concat
-                            )
-                                |> ConsoleError
-                      in
-                      { id = notifyOfBugInterface |> interfaceSingleToStructuredId |> StructuredId.toString
-                      , diff = notifyOfBugInterface |> Add
-                      }
-                        |> toJsToJson
-                        |> appConfig.ports.toJs
-                        |> Cmd.map never
+programUpdate appConfig event state =
+    case event of
+        JsEventFailedToDecode jsonError ->
+            ( state
+            , let
+                notifyOfBugInterface : InterfaceSingle never_
+                notifyOfBugInterface =
+                    ([ "bug: js event failed to decode: "
+                     , jsonError |> Json.Decode.errorToString
+                     , ". Please open an issue on github.com/lue-bird/elm-state-interface-experimental"
+                     ]
+                        |> String.concat
                     )
+                        |> ConsoleError
+              in
+              { id = notifyOfBugInterface |> interfaceSingleToStructuredId |> StructuredId.toString
+              , diff = notifyOfBugInterface |> Add
+              }
+                |> toJsToJson
+                |> appConfig.ports.toJs
+                |> Cmd.map never
+            )
 
-            JsEventEnabledConstructionOfNewAppState updatedAppState ->
-                \(State oldState) ->
-                    let
-                        updatedInterface : SortedKeyValueList String (InterfaceSingle state)
-                        updatedInterface =
-                            updatedAppState |> appConfig.interface |> interfacesFromRope
-                    in
-                    ( State { interface = updatedInterface, appState = updatedAppState }
-                    , { old = oldState.interface, updated = updatedInterface }
-                        |> interfacesDiffMap
-                            (\diff -> appConfig.ports.toJs (diff |> toJsToJson))
-                        |> Cmd.batch
-                        |> Cmd.map never
-                    )
+        JsEventEnabledConstructionOfNewAppState updatedAppState ->
+            let
+                (State oldState) =
+                    state
+            in
+            let
+                updatedInterface : SortedKeyValueList String (InterfaceSingle state)
+                updatedInterface =
+                    updatedAppState |> appConfig.interface |> interfacesFromRope
+            in
+            ( State { interface = updatedInterface, appState = updatedAppState }
+            , { old = oldState.interface, updated = updatedInterface }
+                |> interfacesDiffMap
+                    (\diff -> appConfig.ports.toJs (diff |> toJsToJson))
+                |> Cmd.batch
+                |> Cmd.map never
+            )
 
 
 {-| Determine which outgoing effects need to be executed based on the difference between old and updated interfaces

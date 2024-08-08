@@ -64,22 +64,20 @@ ofVariant =
 
 
 ofMaybe : (value -> StructuredId) -> (Maybe value -> StructuredId)
-ofMaybe valueToStructuredId =
-    \maybe ->
-        ofVariant
-            (case maybe of
-                Nothing ->
-                    { tag = "Nothing", value = ofUnit }
+ofMaybe valueToStructuredId maybe =
+    ofVariant
+        (case maybe of
+            Nothing ->
+                { tag = "Nothing", value = ofUnit }
 
-                Just value ->
-                    { tag = "Just", value = value |> valueToStructuredId }
-            )
+            Just value ->
+                { tag = "Just", value = value |> valueToStructuredId }
+        )
 
 
 ofList : (element -> StructuredId) -> (List element -> StructuredId)
-ofList elementToStructuredId =
-    \structuredIds ->
-        structuredIds |> Json.Encode.list elementToStructuredId
+ofList elementToStructuredId structuredIds =
+    structuredIds |> Json.Encode.list elementToStructuredId
 
 
 toString : StructuredId -> String

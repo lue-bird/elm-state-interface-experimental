@@ -160,13 +160,12 @@ get options =
 
 -}
 addHeaders : List ( String, String ) -> (Web.HttpRequest future -> Web.HttpRequest future)
-addHeaders headers =
-    \httpRequest ->
-        { httpRequest
-            | headers =
-                (headers |> List.map (\( name, value ) -> { name = name, value = value }))
-                    ++ httpRequest.headers
-        }
+addHeaders headers httpRequest =
+    { httpRequest
+        | headers =
+            (headers |> List.map (\( name, value ) -> { name = name, value = value }))
+                ++ httpRequest.headers
+    }
 
 
 {-| Create a `POST` [`HttpRequest`](Web#HttpRequest).

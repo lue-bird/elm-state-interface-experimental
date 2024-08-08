@@ -65,14 +65,13 @@ import Web.Audio.Parameter.Internal
 
 -}
 stereoPan : Web.AudioParameterTimeline -> (Web.Audio -> Web.Audio)
-stereoPan signedPercentageTimeline =
-    \a ->
-        { a
-            | stereoPan =
-                a.stereoPan
-                    |> Web.Audio.Parameter.Internal.scaleAlongParameter a.startTime
-                        signedPercentageTimeline
-        }
+stereoPan signedPercentageTimeline audio =
+    { audio
+        | stereoPan =
+            audio.stereoPan
+                |> Web.Audio.Parameter.Internal.scaleAlongParameter audio.startTime
+                    signedPercentageTimeline
+    }
 
 
 {-| Scale the playback rate by a given factor. This will also affect pitch.
@@ -90,14 +89,13 @@ Help appreciated!
 
 -}
 speedScaleBy : Web.AudioParameterTimeline -> (Web.Audio -> Web.Audio)
-speedScaleBy speedScaleFactorTimeline =
-    \a ->
-        { a
-            | speed =
-                a.speed
-                    |> Web.Audio.Parameter.Internal.scaleAlongParameter a.startTime
-                        speedScaleFactorTimeline
-        }
+speedScaleBy speedScaleFactorTimeline audio =
+    { audio
+        | speed =
+            audio.speed
+                |> Web.Audio.Parameter.Internal.scaleAlongParameter audio.startTime
+                    speedScaleFactorTimeline
+    }
 
 
 {-| Scale how loud it is.
@@ -105,20 +103,20 @@ speedScaleBy speedScaleFactorTimeline =
 If the the volume is less than 0, 0 will be used instead.
 -}
 volumeScaleBy : Web.AudioParameterTimeline -> (Web.Audio -> Web.Audio)
-volumeScaleBy volumeScaleFactor =
-    \a ->
-        { a
-            | volume =
-                a.volume
-                    |> Web.Audio.Parameter.Internal.scaleAlongParameter a.startTime
-                        volumeScaleFactor
-        }
+volumeScaleBy volumeScaleFactor audio =
+    { audio
+        | volume =
+            audio.volume
+                |> Web.Audio.Parameter.Internal.scaleAlongParameter audio.startTime
+                    volumeScaleFactor
+    }
 
 
 addProcessing : Web.AudioProcessing -> (Web.Audio -> Web.Audio)
-addProcessing newLastProcessing =
-    \a ->
-        { a | processingLastToFirst = a.processingLastToFirst |> (::) newLastProcessing }
+addProcessing newLastProcessing audio =
+    { audio
+        | processingLastToFirst = audio.processingLastToFirst |> (::) newLastProcessing
+    }
 
 
 {-| Usually used to apply reverb and or echo.
@@ -130,8 +128,8 @@ If you know more nice ones, don't hesitate to open an issue or a PR.
 
 -}
 addLinearConvolutionWith : Web.AudioSource -> (Web.Audio -> Web.Audio)
-addLinearConvolutionWith bufferAudioSource =
-    \a -> a |> addProcessing (Web.AudioLinearConvolution { sourceUrl = bufferAudioSource.url })
+addLinearConvolutionWith bufferAudioSource audio =
+    audio |> addProcessing (Web.AudioLinearConvolution { sourceUrl = bufferAudioSource.url })
 
 
 {-| Frequencies below a given cutoff [parameter](Web#AudioParameterTimeline) pass through;
@@ -141,8 +139,8 @@ Has a 12dB/octave rolloff and no peak at the cutoff.
 
 -}
 addLowpassUntilFrequency : Web.AudioParameterTimeline -> (Web.Audio -> Web.Audio)
-addLowpassUntilFrequency cutoffFrequency =
-    \a -> a |> addProcessing (Web.AudioLowpass { cutoffFrequency = cutoffFrequency })
+addLowpassUntilFrequency cutoffFrequency audio =
+    audio |> addProcessing (Web.AudioLowpass { cutoffFrequency = cutoffFrequency })
 
 
 {-| Frequencies below a given cutoff [parameter](Web#AudioParameterTimeline) are attenuated;
@@ -152,8 +150,8 @@ Has a 12dB/octave rolloff and no peak at the cutoff.
 
 -}
 addHighpassFromFrequency : Web.AudioParameterTimeline -> (Web.Audio -> Web.Audio)
-addHighpassFromFrequency cutoffFrequency =
-    \a -> a |> addProcessing (Web.AudioHighpass { cutoffFrequency = cutoffFrequency })
+addHighpassFromFrequency cutoffFrequency audio =
+    audio |> addProcessing (Web.AudioHighpass { cutoffFrequency = cutoffFrequency })
 
 
 {-| Create [`Audio`](Web#Audio) from an given loaded [source](Web#AudioSource)
