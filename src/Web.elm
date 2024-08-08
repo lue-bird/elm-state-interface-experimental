@@ -990,7 +990,7 @@ domTextOrElementHeaderDiffMap fromDomEdit nodes =
                     ]
 
                 DomText updatedText ->
-                    if oldText == updatedText then
+                    if oldText == updatedText ++ "" then
                         []
 
                     else
@@ -1098,10 +1098,10 @@ domElementHeaderDiffMap fromDomEdit elements =
                 (let
                     updatedElementEventListensId : SortedKeyValueList String DefaultActionHandling
                     updatedElementEventListensId =
-                        elements.updated.eventListens |> SortedKeyValueList.map (\entry -> entry.value.defaultActionHandling)
+                        elements.updated.eventListens |> SortedKeyValueList.mapAnyOrder (\entry -> entry.value.defaultActionHandling)
                  in
                  if
-                    (elements.old.eventListens |> SortedKeyValueList.map (\entry -> entry.value.defaultActionHandling))
+                    (elements.old.eventListens |> SortedKeyValueList.mapAnyOrder (\entry -> entry.value.defaultActionHandling))
                         == updatedElementEventListensId
                  then
                     Nothing

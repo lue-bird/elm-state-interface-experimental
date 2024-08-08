@@ -1,4 +1,4 @@
-module SortedKeyValueList exposing (SortedKeyValueList, fromList, fromListBy, get, map, mergeBy, toList)
+module SortedKeyValueList exposing (SortedKeyValueList, fromList, fromListBy, get, map, mapAnyOrder, mergeBy, toList)
 
 {-| Alternative to FastDict.Dict optimized for fast merge and fast creation.
 Would be a terrible fit if we needed fast insert and get.
@@ -18,6 +18,19 @@ map elementChange sortedKeyValueList =
     { sortedKeyValueList =
         sortedKeyValueList.sortedKeyValueList
             |> List.map
+                (\entry ->
+                    { key = entry.key, value = elementChange entry }
+                )
+    }
+
+
+mapAnyOrder :
+    ({ key : key, value : value } -> newValue)
+    -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
+mapAnyOrder elementChange sortedKeyValueList =
+    { sortedKeyValueList =
+        sortedKeyValueList.sortedKeyValueList
+            |> List.LocalExtra.mapAnyOrder
                 (\entry ->
                     { key = entry.key, value = elementChange entry }
                 )
