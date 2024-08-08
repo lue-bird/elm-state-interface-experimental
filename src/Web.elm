@@ -1030,72 +1030,87 @@ domElementHeaderDiffMap fromDomEdit elements =
         ]
 
     else
-        [ { old = elements.old.styles, updated = elements.updated.styles }
+        { old = elements.old.styles, updated = elements.updated.styles }
             |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                 (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
                 { remove = identity, edit = Basics.identity }
-        , { old = elements.old.attributes, updated = elements.updated.attributes }
-            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
-                { remove = identity, edit = Basics.identity }
-        , { old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
-            |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
-                (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
-                { remove = \k -> { namespace = k.namespace, key = k.key }
-                , edit = \entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value }
-                }
-        , { old = elements.old.stringProperties, updated = elements.updated.stringProperties }
-            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
-                { remove = identity, edit = Basics.identity }
-        , { old = elements.old.boolProperties, updated = elements.updated.boolProperties }
-            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
-                { remove = identity, edit = Basics.identity }
-        , if elements.old.scrollToPosition == elements.updated.scrollToPosition then
-            Nothing
+            |> List.LocalExtra.fromMaybe
+            |> List.LocalExtra.consJust
+                ({ old = elements.old.attributes, updated = elements.updated.attributes }
+                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                        (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
+                        { remove = identity, edit = Basics.identity }
+                )
+            |> List.LocalExtra.consJust
+                ({ old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
+                    |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
+                        (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
+                        { remove = \k -> { namespace = k.namespace, key = k.key }
+                        , edit = \entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value }
+                        }
+                )
+            |> List.LocalExtra.consJust
+                ({ old = elements.old.stringProperties, updated = elements.updated.stringProperties }
+                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                        (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
+                        { remove = identity, edit = Basics.identity }
+                )
+            |> List.LocalExtra.consJust
+                ({ old = elements.old.boolProperties, updated = elements.updated.boolProperties }
+                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                        (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
+                        { remove = identity, edit = Basics.identity }
+                )
+            |> List.LocalExtra.consJust
+                (if elements.old.scrollToPosition == elements.updated.scrollToPosition then
+                    Nothing
 
-          else
-            ReplacementDomElementScrollToPosition elements.updated.scrollToPosition
-                |> fromDomEdit
-                |> Just
-        , if elements.old.scrollToShow == elements.updated.scrollToShow then
-            Nothing
+                 else
+                    ReplacementDomElementScrollToPosition elements.updated.scrollToPosition
+                        |> fromDomEdit
+                        |> Just
+                )
+            |> List.LocalExtra.consJust
+                (if elements.old.scrollToShow == elements.updated.scrollToShow then
+                    Nothing
 
-          else
-            ReplacementDomElementScrollToShow elements.updated.scrollToShow
-                |> fromDomEdit
-                |> Just
-        , case elements.old.scrollPositionRequest of
-            Just _ ->
-                Nothing
-
-            Nothing ->
-                case elements.updated.scrollPositionRequest of
-                    Nothing ->
+                 else
+                    ReplacementDomElementScrollToShow elements.updated.scrollToShow
+                        |> fromDomEdit
+                        |> Just
+                )
+            |> List.LocalExtra.consJust
+                (case elements.old.scrollPositionRequest of
+                    Just _ ->
                         Nothing
 
-                    Just _ ->
-                        ReplacementDomElementScrollPositionRequest
-                            |> fromDomEdit
-                            |> Just
-        , let
-            updatedElementEventListensId : SortedKeyValueList String DefaultActionHandling
-            updatedElementEventListensId =
-                elements.updated.eventListens |> SortedKeyValueList.map (\entry -> entry.value.defaultActionHandling)
-          in
-          if
-            (elements.old.eventListens |> SortedKeyValueList.map (\entry -> entry.value.defaultActionHandling))
-                == updatedElementEventListensId
-          then
-            Nothing
+                    Nothing ->
+                        case elements.updated.scrollPositionRequest of
+                            Nothing ->
+                                Nothing
 
-          else
-            ReplacementDomElementEventListens updatedElementEventListensId
-                |> fromDomEdit
-                |> Just
-        ]
-            |> List.LocalExtra.justsAnyOrder
+                            Just _ ->
+                                ReplacementDomElementScrollPositionRequest
+                                    |> fromDomEdit
+                                    |> Just
+                )
+            |> List.LocalExtra.consJust
+                (let
+                    updatedElementEventListensId : SortedKeyValueList String DefaultActionHandling
+                    updatedElementEventListensId =
+                        elements.updated.eventListens |> SortedKeyValueList.map (\entry -> entry.value.defaultActionHandling)
+                 in
+                 if
+                    (elements.old.eventListens |> SortedKeyValueList.map (\entry -> entry.value.defaultActionHandling))
+                        == updatedElementEventListensId
+                 then
+                    Nothing
+
+                 else
+                    ReplacementDomElementEventListens updatedElementEventListensId
+                        |> fromDomEdit
+                        |> Just
+                )
 
 
 namespacedKeyToComparable : { namespace : String, key : String } -> String
@@ -1158,32 +1173,37 @@ audioDiffMap :
     (AudioEdit -> fromAudioEdit)
     -> ({ old : Audio, updated : Audio } -> List fromAudioEdit)
 audioDiffMap fromAudioEdit audios =
-    [ if audios.old.volume == audios.updated.volume then
-        Nothing
+    (if audios.old.volume == audios.updated.volume then
+        []
 
-      else
-        ReplacementAudioVolume audios.updated.volume |> fromAudioEdit |> Just
-    , if audios.old.speed == audios.updated.speed then
-        Nothing
+     else
+        [ ReplacementAudioVolume audios.updated.volume |> fromAudioEdit ]
+    )
+        |> List.LocalExtra.consJust
+            (if audios.old.speed == audios.updated.speed then
+                Nothing
 
-      else
-        ReplacementAudioSpeed audios.updated.speed |> fromAudioEdit |> Just
-    , if audios.old.stereoPan == audios.updated.stereoPan then
-        Nothing
+             else
+                ReplacementAudioSpeed audios.updated.speed |> fromAudioEdit |> Just
+            )
+        |> List.LocalExtra.consJust
+            (if audios.old.stereoPan == audios.updated.stereoPan then
+                Nothing
 
-      else
-        ReplacementAudioStereoPan audios.updated.stereoPan |> fromAudioEdit |> Just
-    , if audios.old.processingLastToFirst == audios.updated.processingLastToFirst then
-        Nothing
+             else
+                ReplacementAudioStereoPan audios.updated.stereoPan |> fromAudioEdit |> Just
+            )
+        |> List.LocalExtra.consJust
+            (if audios.old.processingLastToFirst == audios.updated.processingLastToFirst then
+                Nothing
 
-      else
-        audios.updated.processingLastToFirst
-            |> List.reverse
-            |> ReplacementAudioProcessing
-            |> fromAudioEdit
-            |> Just
-    ]
-        |> List.LocalExtra.justsAnyOrder
+             else
+                audios.updated.processingLastToFirst
+                    |> List.reverse
+                    |> ReplacementAudioProcessing
+                    |> fromAudioEdit
+                    |> Just
+            )
 
 
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
