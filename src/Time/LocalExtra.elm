@@ -6,9 +6,8 @@ import Time
 
 
 posixToStructureId : Time.Posix -> StructuredId
-posixToStructureId =
-    \timePosix ->
-        timePosix |> Time.posixToMillis |> StructuredId.ofInt
+posixToStructureId timePosix =
+    timePosix |> Time.posixToMillis |> StructuredId.ofInt
 
 
 posixJsonDecoder : Json.Decode.Decoder Time.Posix

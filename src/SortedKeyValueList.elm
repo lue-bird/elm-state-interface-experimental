@@ -37,6 +37,5 @@ fromListBy keyToComparable unsortedList =
 {-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](Web#SortedKeyValueList)
 -}
 fromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
-fromList =
-    \unsortedList ->
-        SortedKeyValueList (unsortedList |> List.sortBy .key)
+fromList unsortedList =
+    SortedKeyValueList (unsortedList |> List.sortBy .key)

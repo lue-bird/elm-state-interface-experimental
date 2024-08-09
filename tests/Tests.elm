@@ -64,14 +64,13 @@ treeFuzzAtDepth depth =
 
 
 exampleTreeToStructuredId : ExampleTree -> StructuredId
-exampleTreeToStructuredId =
-    \tree ->
-        case tree of
-            Leaf int ->
-                int |> StructuredId.ofInt
+exampleTreeToStructuredId tree =
+    case tree of
+        Leaf int ->
+            int |> StructuredId.ofInt
 
-            Branch forest ->
-                forest |> StructuredId.ofList exampleTreeToStructuredId
+        Branch forest ->
+            forest |> StructuredId.ofList exampleTreeToStructuredId
 
 
 type ExampleTree

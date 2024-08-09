@@ -21,15 +21,14 @@ jsonDecoder =
 
 
 fromString : String -> Maybe AppUrl
-fromString =
-    \appUrlString ->
-        if appUrlString |> String.startsWith "/" then
-            ("https://dummy.com" ++ appUrlString)
-                |> Url.fromString
-                |> Maybe.map AppUrl.fromUrl
+fromString appUrlString =
+    if appUrlString |> String.startsWith "/" then
+        ("https://dummy.com" ++ appUrlString)
+            |> Url.fromString
+            |> Maybe.map AppUrl.fromUrl
 
-        else
-            Nothing
+    else
+        Nothing
 
 
 toStructuredId : AppUrl -> StructuredId

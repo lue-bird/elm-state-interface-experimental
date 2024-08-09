@@ -94,10 +94,9 @@ nodeFlattenToList interfacesSoFar current nodesRemaining =
 {-| An [`Interface`](Web#Interface) for displaying a given [`Web.Dom.Node`](Web-Dom#Node)
 -}
 render : Node future -> Web.Interface future
-render =
-    \domNode ->
-        nodeFlattenToList [] { path = [], node = domNode } []
-            |> Rope.fromList
+render domNode =
+    nodeFlattenToList [] { path = [], node = domNode } []
+        |> Rope.fromList
 
 
 flattenRemainingNodesToList :
@@ -395,8 +394,8 @@ type alias Modifier future =
 {-| Combine multiple [`Modifier`](#Modifier)s into one.
 -}
 modifierBatch : List (Modifier future) -> Modifier future
-modifierBatch =
-    \modifiers -> modifiers |> Rope.fromList |> Rope.concat
+modifierBatch modifiers =
+    modifiers |> Rope.fromList |> Rope.concat
 
 
 {-| Doing nothing as a [`Modifier`](#Modifier). These two examples are equivalent:

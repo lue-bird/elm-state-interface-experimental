@@ -36,19 +36,17 @@ ofUnit =
 
 ofString : String -> StructuredId
 ofString =
-    \string ->
-        string |> Json.Encode.string
+    Json.Encode.string
 
 
 ofInt : Int -> StructuredId
 ofInt =
-    \int -> int |> Json.Encode.int
+    Json.Encode.int
 
 
 ofParts : List StructuredId -> StructuredId
-ofParts =
-    \fieldValueStructureIds ->
-        fieldValueStructureIds |> Json.Encode.list identity
+ofParts fieldValueStructureIds =
+    fieldValueStructureIds |> Json.Encode.list identity
 
 
 {-|
@@ -58,9 +56,8 @@ ofParts =
 
 -}
 ofVariant : { tag : String, value : StructuredId } -> StructuredId
-ofVariant =
-    \variant ->
-        [ variant.tag |> ofString, variant.value ] |> ofParts
+ofVariant variant =
+    [ variant.tag |> ofString, variant.value ] |> ofParts
 
 
 ofMaybe : (value -> StructuredId) -> (Maybe value -> StructuredId)
@@ -81,12 +78,10 @@ ofList elementToStructuredId structuredIds =
 
 
 toString : StructuredId -> String
-toString =
-    \structuredId ->
-        structuredId |> toJson |> Json.Encode.encode 0
+toString structuredId =
+    structuredId |> toJson |> Json.Encode.encode 0
 
 
 toJson : StructuredId -> Json.Encode.Value
-toJson =
-    \structuredId ->
-        structuredId
+toJson structuredId =
+    structuredId

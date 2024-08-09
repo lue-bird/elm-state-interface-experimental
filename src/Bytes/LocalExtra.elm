@@ -6,13 +6,12 @@ import Bytes.Encode
 
 
 toUnsignedInt8List : Bytes -> List Int
-toUnsignedInt8List =
-    \bytes ->
-        bytes
-            |> Bytes.Decode.decode
-                (unsignedInt8ListBytesDecoder (bytes |> Bytes.width))
-            |> -- above decoder should never fail
-               Maybe.withDefault []
+toUnsignedInt8List bytes =
+    bytes
+        |> Bytes.Decode.decode
+            (unsignedInt8ListBytesDecoder (bytes |> Bytes.width))
+        |> -- above decoder should never fail
+           Maybe.withDefault []
 
 
 unsignedInt8ListBytesDecoder : Int -> Bytes.Decode.Decoder (List Int)

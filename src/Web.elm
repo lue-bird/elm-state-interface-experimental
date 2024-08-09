@@ -472,8 +472,8 @@ type SocketId
 {-| Combine multiple [`Interface`](#Interface)s into one
 -}
 interfaceBatch : List (Interface future) -> Interface future
-interfaceBatch =
-    \interfaces -> interfaces |> Rope.fromList |> Rope.concat
+interfaceBatch interfaces =
+    interfaces |> Rope.fromList |> Rope.concat
 
 
 {-| Doing nothing as an [`Interface`](#Interface). These two examples are equivalent:
@@ -762,6 +762,19 @@ domElementHeaderFutureMap futureChange domElementToMap =
     }
 
 
+sortedKeyValueListMap :
+    ({ key : key, value : value } -> newValue)
+    -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
+sortedKeyValueListMap elementChange (SortedKeyValueList sortedKeyValueList) =
+    SortedKeyValueList
+        (sortedKeyValueList
+            |> List.map
+                (\entry ->
+                    { key = entry.key, value = elementChange entry }
+                )
+        )
+
+
 domNodeFutureMap : (future -> mappedFuture) -> (DomTextOrElementHeader future -> DomTextOrElementHeader mappedFuture)
 domNodeFutureMap futureChange domElementToMap =
     case domElementToMap of
@@ -1023,6 +1036,11 @@ domTextOrElementHeaderDiffMap fromDomEdit nodes =
                         |> domElementHeaderDiffMap fromDomEdit
 
 
+sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
+sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
+    sortedKeyValueList
+
+
 domElementHeaderDiffMap :
     (DomEdit -> fromDomEdit)
     ->
@@ -1143,6 +1161,60 @@ namespacedKeyToComparable =
     \namespacedKey -> namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
 
 
+{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
+The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
+-}
+sortedKeyValueListMergeBy :
+    (key -> comparable_)
+    -> ({ key : key, value : a } -> folded -> folded)
+    -> (a -> { key : key, value : b } -> folded -> folded)
+    -> ({ key : key, value : b } -> folded -> folded)
+    -> List { key : key, value : a }
+    -> List { key : key, value : b }
+    -> folded
+    -> folded
+sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
+    case aSortedKeyValueList of
+        [] ->
+            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry soFar) initialFolded
+
+        aLowest :: aWithoutLowest ->
+            case bSortedKeyValueList of
+                [] ->
+                    aWithoutLowest
+                        |> List.foldl (\entry soFar -> onlyA entry soFar)
+                            (onlyA aLowest initialFolded)
+
+                bLowest :: bWithoutLowest ->
+                    case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
+                        EQ ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bWithoutLowest
+                                (bothAB aLowest.value bLowest initialFolded)
+
+                        LT ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bSortedKeyValueList
+                                (onlyA aLowest initialFolded)
+
+                        GT ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aSortedKeyValueList
+                                bWithoutLowest
+                                (onlyB bLowest initialFolded)
+
+
 sortedKeyValueListEditAndRemoveDiffMapBy :
     (key -> comparable_)
     -> ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
@@ -1236,140 +1308,134 @@ audioDiffMap fromAudioEdit audios =
 interfaceSingleEdits :
     { old : InterfaceSingle future, updated : InterfaceSingle future }
     -> List InterfaceSingleEdit
-interfaceSingleEdits =
-    \interfaces -> interfaces |> interfaceSingleEditsMap Basics.identity
+interfaceSingleEdits interfaces =
+    interfaces |> interfaceSingleEditsMap Basics.identity
 
 
 toJsToJson : { id : String, diff : InterfaceSingleDiff future_ } -> Json.Encode.Value
-toJsToJson =
-    \toJs ->
-        Json.Encode.object
-            [ ( "id", toJs.id |> Json.Encode.string )
-            , ( "diff", toJs.diff |> interfaceSingleDiffToJson )
-            ]
+toJsToJson toJs =
+    Json.Encode.object
+        [ ( "id", toJs.id |> Json.Encode.string )
+        , ( "diff", toJs.diff |> interfaceSingleDiffToJson )
+        ]
 
 
 interfaceSingleDiffToJson : InterfaceSingleDiff future_ -> Json.Encode.Value
-interfaceSingleDiffToJson =
-    \diff ->
-        Json.Encode.LocalExtra.variant
-            (case diff of
-                Add interfaceSingleInfo ->
-                    { tag = "Add", value = interfaceSingleInfo |> interfaceSingleToJson }
+interfaceSingleDiffToJson diff =
+    Json.Encode.LocalExtra.variant
+        (case diff of
+            Add interfaceSingleInfo ->
+                { tag = "Add", value = interfaceSingleInfo |> interfaceSingleToJson }
 
-                Edit edit ->
-                    { tag = "Edit", value = edit |> interfaceSingleEditToJson }
+            Edit edit ->
+                { tag = "Edit", value = edit |> interfaceSingleEditToJson }
 
-                Remove () ->
-                    { tag = "Remove", value = Json.Encode.null }
-            )
+            Remove () ->
+                { tag = "Remove", value = Json.Encode.null }
+        )
 
 
 audioParameterTimelineToJson : AudioParameterTimeline -> Json.Encode.Value
-audioParameterTimelineToJson =
-    \timeline ->
-        Json.Encode.object
-            [ ( "startValue", timeline.startValue |> Json.Encode.float )
-            , ( "keyFrames"
-              , timeline.keyFrames
-                    |> List.sortBy (\keyFrame -> keyFrame.time |> Time.posixToMillis)
-                    |> Json.Encode.list
-                        (\keyFrame ->
-                            Json.Encode.object
-                                [ ( "time", keyFrame.time |> Time.posixToMillis |> Json.Encode.int )
-                                , ( "value", keyFrame.value |> Json.Encode.float )
-                                ]
-                        )
-              )
-            ]
+audioParameterTimelineToJson timeline =
+    Json.Encode.object
+        [ ( "startValue", timeline.startValue |> Json.Encode.float )
+        , ( "keyFrames"
+          , timeline.keyFrames
+                |> List.sortBy (\keyFrame -> keyFrame.time |> Time.posixToMillis)
+                |> Json.Encode.list
+                    (\keyFrame ->
+                        Json.Encode.object
+                            [ ( "time", keyFrame.time |> Time.posixToMillis |> Json.Encode.int )
+                            , ( "value", keyFrame.value |> Json.Encode.float )
+                            ]
+                    )
+          )
+        ]
 
 
 audioProcessingToJson : AudioProcessing -> Json.Encode.Value
-audioProcessingToJson =
-    \processing ->
-        Json.Encode.LocalExtra.variant
-            (case processing of
-                AudioLinearConvolution linearConvolution ->
-                    { tag = "LinearConvolution"
-                    , value = Json.Encode.object [ ( "sourceUrl", linearConvolution.sourceUrl |> Json.Encode.string ) ]
-                    }
+audioProcessingToJson processing =
+    Json.Encode.LocalExtra.variant
+        (case processing of
+            AudioLinearConvolution linearConvolution ->
+                { tag = "LinearConvolution"
+                , value = Json.Encode.object [ ( "sourceUrl", linearConvolution.sourceUrl |> Json.Encode.string ) ]
+                }
 
-                AudioLowpass lowpass ->
-                    { tag = "Lowpass"
-                    , value = Json.Encode.object [ ( "cutoffFrequency", lowpass.cutoffFrequency |> audioParameterTimelineToJson ) ]
-                    }
+            AudioLowpass lowpass ->
+                { tag = "Lowpass"
+                , value = Json.Encode.object [ ( "cutoffFrequency", lowpass.cutoffFrequency |> audioParameterTimelineToJson ) ]
+                }
 
-                AudioHighpass highpass ->
-                    { tag = "highpasses"
-                    , value = Json.Encode.object [ ( "cutoffFrequency", highpass.cutoffFrequency |> audioParameterTimelineToJson ) ]
-                    }
-            )
+            AudioHighpass highpass ->
+                { tag = "highpasses"
+                , value = Json.Encode.object [ ( "cutoffFrequency", highpass.cutoffFrequency |> audioParameterTimelineToJson ) ]
+                }
+        )
 
 
 interfaceSingleEditToJson : InterfaceSingleEdit -> Json.Encode.Value
-interfaceSingleEditToJson =
-    \edit ->
-        Json.Encode.LocalExtra.variant
-            (case edit of
-                EditDom editDomDiff ->
-                    { tag = "EditDom"
-                    , value =
-                        Json.Encode.object
-                            [ ( "pathReverse", editDomDiff.pathReverse |> Json.Encode.list Json.Encode.int )
-                            , ( "replacement", editDomDiff.replacement |> editDomDiffToJson )
-                            ]
-                    }
+interfaceSingleEditToJson edit =
+    Json.Encode.LocalExtra.variant
+        (case edit of
+            EditDom editDomDiff ->
+                { tag = "EditDom"
+                , value =
+                    Json.Encode.object
+                        [ ( "pathReverse", editDomDiff.pathReverse |> Json.Encode.list Json.Encode.int )
+                        , ( "replacement", editDomDiff.replacement |> editDomDiffToJson )
+                        ]
+                }
 
-                EditAudio audioEdit ->
-                    { tag = "EditAudio"
-                    , value =
-                        Json.Encode.object
-                            [ ( "url", audioEdit.url |> Json.Encode.string )
-                            , ( "startTime", audioEdit.startTime |> Time.posixToMillis |> Json.Encode.int )
-                            , ( "replacement"
-                              , Json.Encode.LocalExtra.variant
-                                    (case audioEdit.replacement of
-                                        ReplacementAudioSpeed new ->
-                                            { tag = "Speed", value = new |> audioParameterTimelineToJson }
+            EditAudio audioEdit ->
+                { tag = "EditAudio"
+                , value =
+                    Json.Encode.object
+                        [ ( "url", audioEdit.url |> Json.Encode.string )
+                        , ( "startTime", audioEdit.startTime |> Time.posixToMillis |> Json.Encode.int )
+                        , ( "replacement"
+                          , Json.Encode.LocalExtra.variant
+                                (case audioEdit.replacement of
+                                    ReplacementAudioSpeed new ->
+                                        { tag = "Speed", value = new |> audioParameterTimelineToJson }
 
-                                        ReplacementAudioVolume new ->
-                                            { tag = "Volume", value = new |> audioParameterTimelineToJson }
+                                    ReplacementAudioVolume new ->
+                                        { tag = "Volume", value = new |> audioParameterTimelineToJson }
 
-                                        ReplacementAudioStereoPan new ->
-                                            { tag = "StereoPan", value = new |> audioParameterTimelineToJson }
+                                    ReplacementAudioStereoPan new ->
+                                        { tag = "StereoPan", value = new |> audioParameterTimelineToJson }
 
-                                        ReplacementAudioProcessing new ->
-                                            { tag = "Processing"
-                                            , value = new |> Json.Encode.list audioProcessingToJson
-                                            }
-                                    )
-                              )
-                            ]
-                    }
+                                    ReplacementAudioProcessing new ->
+                                        { tag = "Processing"
+                                        , value = new |> Json.Encode.list audioProcessingToJson
+                                        }
+                                )
+                          )
+                        ]
+                }
 
-                EditNotification editNotificationDiff ->
-                    { tag = "EditNotification"
-                    , value =
-                        Json.Encode.object
-                            [ ( "id", editNotificationDiff.id |> Json.Encode.string )
-                            , ( "message", editNotificationDiff.message |> Json.Encode.string )
-                            , ( "details", editNotificationDiff.details |> Json.Encode.string )
-                            ]
-                    }
-            )
+            EditNotification editNotificationDiff ->
+                { tag = "EditNotification"
+                , value =
+                    Json.Encode.object
+                        [ ( "id", editNotificationDiff.id |> Json.Encode.string )
+                        , ( "message", editNotificationDiff.message |> Json.Encode.string )
+                        , ( "details", editNotificationDiff.details |> Json.Encode.string )
+                        ]
+                }
+        )
 
 
 domTextOrElementHeaderInfoToJson : DomTextOrElementHeader future_ -> Json.Encode.Value
-domTextOrElementHeaderInfoToJson =
-    \domNodeId ->
-        Json.Encode.LocalExtra.variant
-            (case domNodeId of
-                DomText text ->
-                    { tag = "Text", value = text |> Json.Encode.string }
+domTextOrElementHeaderInfoToJson domNodeId =
+    Json.Encode.LocalExtra.variant
+        (case domNodeId of
+            DomText text ->
+                { tag = "Text", value = text |> Json.Encode.string }
 
-                DomElementHeader element ->
-                    { tag = "Element", value = element |> domElementHeaderInfoToJson }
-            )
+            DomElementHeader element ->
+                { tag = "Element", value = element |> domElementHeaderInfoToJson }
+        )
 
 
 defaultActionHandlingToJson : DefaultActionHandling -> Json.Encode.Value
@@ -1386,78 +1452,74 @@ defaultActionHandlingToJson =
 
 
 domElementVisibilityAlignmentsToJson : { y : DomElementVisibilityAlignment, x : DomElementVisibilityAlignment } -> Json.Encode.Value
-domElementVisibilityAlignmentsToJson =
-    \alignments ->
-        Json.Encode.object
-            [ ( "x", alignments.x |> domElementVisibilityAlignmentToJson )
-            , ( "y", alignments.y |> domElementVisibilityAlignmentToJson )
-            ]
+domElementVisibilityAlignmentsToJson alignments =
+    Json.Encode.object
+        [ ( "x", alignments.x |> domElementVisibilityAlignmentToJson )
+        , ( "y", alignments.y |> domElementVisibilityAlignmentToJson )
+        ]
 
 
 domElementVisibilityAlignmentToJson : DomElementVisibilityAlignment -> Json.Encode.Value
-domElementVisibilityAlignmentToJson =
-    \alignment ->
-        Json.Encode.string
-            (case alignment of
-                DomElementStart ->
-                    "start"
+domElementVisibilityAlignmentToJson alignment =
+    Json.Encode.string
+        (case alignment of
+            DomElementStart ->
+                "start"
 
-                DomElementEnd ->
-                    "end"
+            DomElementEnd ->
+                "end"
 
-                DomElementCenter ->
-                    "center"
-            )
+            DomElementCenter ->
+                "center"
+        )
 
 
 domElementScrollPositionToJson : { fromLeft : Float, fromTop : Float } -> Json.Encode.Value
-domElementScrollPositionToJson =
-    \position ->
-        Json.Encode.object
-            [ ( "fromLeft", position.fromLeft |> Json.Encode.float )
-            , ( "fromTop", position.fromTop |> Json.Encode.float )
-            ]
+domElementScrollPositionToJson position =
+    Json.Encode.object
+        [ ( "fromLeft", position.fromLeft |> Json.Encode.float )
+        , ( "fromTop", position.fromTop |> Json.Encode.float )
+        ]
 
 
 domElementHeaderInfoToJson : DomElementHeader future_ -> Json.Encode.Value
-domElementHeaderInfoToJson =
-    \header ->
-        Json.Encode.object
-            [ ( "namespace", header.namespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
-            , ( "tag", header.tag |> Json.Encode.string )
-            , ( "styles", header.styles |> domElementStylesToJson )
-            , ( "attributes", header.attributes |> domElementAttributesToJson )
-            , ( "attributesNamespaced", header.attributesNamespaced |> domElementAttributesNamespacedToJson )
-            , ( "stringProperties", header.stringProperties |> domElementStringPropertiesToJson )
-            , ( "boolProperties", header.boolProperties |> domElementBoolPropertiesToJson )
-            , ( "scrollToPosition"
-              , header.scrollToPosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
-              )
-            , ( "scrollToShow"
-              , header.scrollToShow |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
-              )
-            , ( "scrollPositionRequest"
-              , Json.Encode.bool
-                    (case header.scrollPositionRequest of
-                        Nothing ->
-                            False
+domElementHeaderInfoToJson header =
+    Json.Encode.object
+        [ ( "namespace", header.namespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+        , ( "tag", header.tag |> Json.Encode.string )
+        , ( "styles", header.styles |> domElementStylesToJson )
+        , ( "attributes", header.attributes |> domElementAttributesToJson )
+        , ( "attributesNamespaced", header.attributesNamespaced |> domElementAttributesNamespacedToJson )
+        , ( "stringProperties", header.stringProperties |> domElementStringPropertiesToJson )
+        , ( "boolProperties", header.boolProperties |> domElementBoolPropertiesToJson )
+        , ( "scrollToPosition"
+          , header.scrollToPosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
+          )
+        , ( "scrollToShow"
+          , header.scrollToShow |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
+          )
+        , ( "scrollPositionRequest"
+          , Json.Encode.bool
+                (case header.scrollPositionRequest of
+                    Nothing ->
+                        False
 
-                        Just _ ->
-                            True
+                    Just _ ->
+                        True
+                )
+          )
+        , ( "eventListens"
+          , header.eventListens
+                |> sortedKeyValueListToList
+                |> Json.Encode.list
+                    (\entry ->
+                        Json.Encode.object
+                            [ ( "name", entry.key |> Json.Encode.string )
+                            , ( "defaultActionHandling", entry.value.defaultActionHandling |> defaultActionHandlingToJson )
+                            ]
                     )
-              )
-            , ( "eventListens"
-              , header.eventListens
-                    |> sortedKeyValueListToList
-                    |> Json.Encode.list
-                        (\entry ->
-                            Json.Encode.object
-                                [ ( "name", entry.key |> Json.Encode.string )
-                                , ( "defaultActionHandling", entry.value.defaultActionHandling |> defaultActionHandlingToJson )
-                                ]
-                        )
-              )
-            ]
+          )
+        ]
 
 
 domElementAttributesNamespacedToJson :
@@ -1465,46 +1527,43 @@ domElementAttributesNamespacedToJson :
         { namespace : String, key : String }
         String
     -> Json.Encode.Value
-domElementAttributesNamespacedToJson =
-    \attributes ->
-        attributes
-            |> sortedKeyValueListToList
-            |> Json.Encode.list
-                (\entry ->
-                    Json.Encode.object
-                        [ ( "namespace", entry.key.namespace |> Json.Encode.string )
-                        , ( "key", entry.key.key |> Json.Encode.string )
-                        , ( "value", entry.value |> Json.Encode.string )
-                        ]
-                )
+domElementAttributesNamespacedToJson attributes =
+    attributes
+        |> sortedKeyValueListToList
+        |> Json.Encode.list
+            (\entry ->
+                Json.Encode.object
+                    [ ( "namespace", entry.key.namespace |> Json.Encode.string )
+                    , ( "key", entry.key.key |> Json.Encode.string )
+                    , ( "value", entry.value |> Json.Encode.string )
+                    ]
+            )
 
 
 domElementAttributesToJson : SortedKeyValueList String String -> Json.Encode.Value
-domElementAttributesToJson =
-    \attributes ->
-        attributes
-            |> sortedKeyValueListToList
-            |> Json.Encode.list
-                (\entry ->
-                    Json.Encode.object
-                        [ ( "key", entry.key |> Json.Encode.string )
-                        , ( "value", entry.value |> Json.Encode.string )
-                        ]
-                )
+domElementAttributesToJson attributes =
+    attributes
+        |> sortedKeyValueListToList
+        |> Json.Encode.list
+            (\entry ->
+                Json.Encode.object
+                    [ ( "key", entry.key |> Json.Encode.string )
+                    , ( "value", entry.value |> Json.Encode.string )
+                    ]
+            )
 
 
 domElementStylesToJson : SortedKeyValueList String String -> Json.Encode.Value
-domElementStylesToJson =
-    \styles ->
-        styles
-            |> sortedKeyValueListToList
-            |> Json.Encode.list
-                (\entry ->
-                    Json.Encode.object
-                        [ ( "key", entry.key |> Json.Encode.string )
-                        , ( "value", entry.value |> Json.Encode.string )
-                        ]
-                )
+domElementStylesToJson styles =
+    styles
+        |> sortedKeyValueListToList
+        |> Json.Encode.list
+            (\entry ->
+                Json.Encode.object
+                    [ ( "key", entry.key |> Json.Encode.string )
+                    , ( "value", entry.value |> Json.Encode.string )
+                    ]
+            )
 
 
 domElementBoolPropertiesToJson : SortedKeyValueList String Bool -> Json.Encode.Value
@@ -1918,23 +1977,22 @@ addContentTypeForBody body headers =
 
 
 httpBodyToJson : HttpBody -> Json.Encode.Value
-httpBodyToJson =
-    \body ->
-        Json.Encode.LocalExtra.variant
-            (case body of
-                HttpBodyString stringBodyInfo ->
-                    { tag = "String"
-                    , value = stringBodyInfo.content |> Json.Encode.string
-                    }
+httpBodyToJson body =
+    Json.Encode.LocalExtra.variant
+        (case body of
+            HttpBodyString stringBodyInfo ->
+                { tag = "String"
+                , value = stringBodyInfo.content |> Json.Encode.string
+                }
 
-                HttpBodyUnsignedInt8s bytesBodyInfo ->
-                    { tag = "Uint8Array"
-                    , value = bytesBodyInfo.content |> Json.Encode.list Json.Encode.int
-                    }
+            HttpBodyUnsignedInt8s bytesBodyInfo ->
+                { tag = "Uint8Array"
+                , value = bytesBodyInfo.content |> Json.Encode.list Json.Encode.int
+                }
 
-                HttpBodyEmpty ->
-                    { tag = "Empty", value = Json.Encode.null }
-            )
+            HttpBodyEmpty ->
+                { tag = "Empty", value = Json.Encode.null }
+        )
 
 
 httpExpectInfoToJson : HttpExpect future_ -> Json.Encode.Value
@@ -2175,23 +2233,30 @@ socketIdToStructuredId =
     \(SocketId raw) -> raw |> StructuredId.ofInt
 
 
+{-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](#SortedKeyValueList)
+-}
+sortedKeyValueListFromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
+sortedKeyValueListFromList =
+    \unsortedList ->
+        SortedKeyValueList (unsortedList |> List.sortBy .key)
+
+
 interfacesFromRope : Rope (InterfaceSingle future) -> SortedKeyValueList String (InterfaceSingle future)
-interfacesFromRope =
-    \rope ->
-        let
-            flattened : List { key : String, value : InterfaceSingle future }
-            flattened =
-                rope
-                    |> Rope.foldl
-                        (\interfaceSingle soFar ->
-                            { key = interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
-                            , value = interfaceSingle
-                            }
-                                :: soFar
-                        )
-                        []
-        in
-        flattened |> sortedKeyValueListFromList
+interfacesFromRope rope =
+    let
+        flattened : List { key : String, value : InterfaceSingle future }
+        flattened =
+            rope
+                |> Rope.foldl
+                    (\interfaceSingle soFar ->
+                        { key = interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
+                        , value = interfaceSingle
+                        }
+                            :: soFar
+                    )
+                    []
+    in
+    flattened |> sortedKeyValueListFromList
 
 
 {-| The "init" part for an embedded program
@@ -2220,6 +2285,23 @@ programInit appConfig =
             )
         |> Cmd.batch
     )
+
+
+{-| The fact that this can only be implemented linearly might seem shocking.
+In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
+-}
+sortedKeyValueListGet : key -> SortedKeyValueList key value -> Maybe value
+sortedKeyValueListGet keyToFind sortedKeyValueList =
+    sortedKeyValueList
+        |> sortedKeyValueListToList
+        |> List.LocalExtra.firstJustMap
+            (\entry ->
+                if entry.key == keyToFind then
+                    Just entry.value
+
+                else
+                    Nothing
+            )
 
 
 {-| The "subscriptions" part for an embedded program
@@ -2255,239 +2337,238 @@ programSubscriptions appConfig (State state) =
 for the transformed event data coming back
 -}
 interfaceSingleFutureJsonDecoder : InterfaceSingle future -> Maybe (Json.Decode.Decoder future)
-interfaceSingleFutureJsonDecoder =
-    \interface ->
-        case interface of
-            DocumentTitleReplaceBy _ ->
-                Nothing
+interfaceSingleFutureJsonDecoder interface =
+    case interface of
+        DocumentTitleReplaceBy _ ->
+            Nothing
 
-            DocumentAuthorSet _ ->
-                Nothing
+        DocumentAuthorSet _ ->
+            Nothing
 
-            DocumentKeywordsSet _ ->
-                Nothing
+        DocumentKeywordsSet _ ->
+            Nothing
 
-            DocumentDescriptionSet _ ->
-                Nothing
+        DocumentDescriptionSet _ ->
+            Nothing
 
-            ConsoleLog _ ->
-                Nothing
+        ConsoleLog _ ->
+            Nothing
 
-            ConsoleWarn _ ->
-                Nothing
+        ConsoleWarn _ ->
+            Nothing
 
-            ConsoleError _ ->
-                Nothing
+        ConsoleError _ ->
+            Nothing
 
-            DocumentEventListen listen ->
-                listen.on |> Just
+        DocumentEventListen listen ->
+            listen.on |> Just
 
-            NavigationReplaceUrl _ ->
-                Nothing
+        NavigationReplaceUrl _ ->
+            Nothing
 
-            NavigationPushUrl _ ->
-                Nothing
+        NavigationPushUrl _ ->
+            Nothing
 
-            NavigationGo _ ->
-                Nothing
+        NavigationGo _ ->
+            Nothing
 
-            NavigationLoad _ ->
-                Nothing
+        NavigationLoad _ ->
+            Nothing
 
-            NavigationReload () ->
-                Nothing
+        NavigationReload () ->
+            Nothing
 
-            NavigationUrlRequest toFuture ->
-                Url.LocalExtra.jsonDecoder
-                    |> Json.Decode.map AppUrl.fromUrl
-                    |> Json.Decode.map toFuture
-                    |> Just
+        NavigationUrlRequest toFuture ->
+            Url.LocalExtra.jsonDecoder
+                |> Json.Decode.map AppUrl.fromUrl
+                |> Json.Decode.map toFuture
+                |> Just
 
-            FileDownloadUnsignedInt8s _ ->
-                Nothing
+        FileDownloadUnsignedInt8s _ ->
+            Nothing
 
-            ClipboardReplaceBy _ ->
-                Nothing
+        ClipboardReplaceBy _ ->
+            Nothing
 
-            ClipboardRequest toFuture ->
-                Json.Decode.string |> Json.Decode.map toFuture |> Just
+        ClipboardRequest toFuture ->
+            Json.Decode.string |> Json.Decode.map toFuture |> Just
 
-            AudioSourceLoad load ->
-                Json.Decode.oneOf
-                    [ Json.Decode.map (\duration -> Ok { url = load.url, duration = duration })
-                        (Json.Decode.LocalExtra.variant "Success"
-                            (Json.Decode.field "durationInSeconds"
-                                (Json.Decode.map Duration.seconds Json.Decode.float)
-                            )
+        AudioSourceLoad load ->
+            Json.Decode.oneOf
+                [ Json.Decode.map (\duration -> Ok { url = load.url, duration = duration })
+                    (Json.Decode.LocalExtra.variant "Success"
+                        (Json.Decode.field "durationInSeconds"
+                            (Json.Decode.map Duration.seconds Json.Decode.float)
                         )
-                    , Json.Decode.LocalExtra.variant "Error"
-                        (Json.Decode.map Err audioSourceLoadErrorJsonDecoder)
-                    ]
-                    |> Json.Decode.map load.on
-                    |> Just
+                    )
+                , Json.Decode.LocalExtra.variant "Error"
+                    (Json.Decode.map Err audioSourceLoadErrorJsonDecoder)
+                ]
+                |> Json.Decode.map load.on
+                |> Just
 
-            AudioPlay _ ->
-                Nothing
+        AudioPlay _ ->
+            Nothing
 
-            DomNodeRender toRender ->
-                case toRender.node of
-                    DomText _ ->
-                        Nothing
+        DomNodeRender toRender ->
+            case toRender.node of
+                DomText _ ->
+                    Nothing
 
-                    DomElementHeader domElement ->
-                        let
-                            eventListenDecoder : Json.Decode.Decoder future
-                            eventListenDecoder =
-                                Json.Decode.LocalExtra.variant "EventListen"
-                                    (Json.Decode.map2 (\eventListen event -> eventListen.on event)
-                                        (Json.Decode.field "name"
-                                            (Json.Decode.string
-                                                |> Json.Decode.andThen
-                                                    (\specificEventName ->
-                                                        case domElement.eventListens |> sortedKeyValueListGet specificEventName of
-                                                            Nothing ->
-                                                                Json.Decode.fail "received event of a kind that isn't listened for"
+                DomElementHeader domElement ->
+                    let
+                        eventListenDecoder : Json.Decode.Decoder future
+                        eventListenDecoder =
+                            Json.Decode.LocalExtra.variant "EventListen"
+                                (Json.Decode.map2 (\eventListen event -> eventListen.on event)
+                                    (Json.Decode.field "name"
+                                        (Json.Decode.string
+                                            |> Json.Decode.andThen
+                                                (\specificEventName ->
+                                                    case domElement.eventListens |> sortedKeyValueListGet specificEventName of
+                                                        Nothing ->
+                                                            Json.Decode.fail "received event of a kind that isn't listened for"
 
-                                                            Just eventListen ->
-                                                                eventListen |> Json.Decode.succeed
-                                                    )
-                                            )
+                                                        Just eventListen ->
+                                                            eventListen |> Json.Decode.succeed
+                                                )
                                         )
-                                        (Json.Decode.field "event" Json.Decode.value)
                                     )
-                        in
-                        (case domElement.scrollPositionRequest of
-                            Nothing ->
-                                eventListenDecoder
+                                    (Json.Decode.field "event" Json.Decode.value)
+                                )
+                    in
+                    (case domElement.scrollPositionRequest of
+                        Nothing ->
+                            eventListenDecoder
 
-                            Just request ->
-                                Json.Decode.oneOf
-                                    [ eventListenDecoder
-                                    , Json.Decode.LocalExtra.variant "ScrollPositionRequest"
-                                        domElementScrollPositionJsonDecoder
-                                        |> Json.Decode.map request
-                                    ]
-                        )
-                            |> Just
-
-            NotificationAskForPermission () ->
-                Nothing
-
-            NotificationShow show ->
-                notificationResponseJsonDecoder
-                    |> Json.Decode.map show.on
-                    |> Just
-
-            HttpRequest httpRequest ->
-                Json.Decode.oneOf
-                    [ Json.Decode.LocalExtra.variant "Success" (httpSuccessResponseJsonDecoder httpRequest.expect)
-                    , Json.Decode.LocalExtra.variant "Error" httpErrorJsonDecoder
-                        |> Json.Decode.map (httpExpectOnError httpRequest.expect)
-                    ]
-                    |> Just
-
-            TimePosixRequest toFuture ->
-                Time.LocalExtra.posixJsonDecoder |> Json.Decode.map toFuture |> Just
-
-            TimezoneOffsetRequest toFuture ->
-                Json.Decode.int |> Json.Decode.map toFuture |> Just
-
-            TimePeriodicallyListen timePeriodicallyListen ->
-                Time.LocalExtra.posixJsonDecoder
-                    |> Json.Decode.map timePeriodicallyListen.on
-                    |> Just
-
-            TimeOnce once ->
-                Time.LocalExtra.posixJsonDecoder
-                    |> Json.Decode.map once.on
-                    |> Just
-
-            TimezoneNameRequest toFuture ->
-                Json.Decode.string |> Json.Decode.map toFuture |> Just
-
-            RandomUnsignedInt32sRequest randomUnsignedInt32sRequest ->
-                Json.Decode.list Json.Decode.int
-                    |> Json.Decode.map randomUnsignedInt32sRequest.on
-                    |> Just
-
-            WindowSizeRequest toFuture ->
-                Json.Decode.map2 (\width height -> { width = width, height = height })
-                    (Json.Decode.field "width" Json.Decode.int)
-                    (Json.Decode.field "height" Json.Decode.int)
-                    |> Json.Decode.map toFuture
-                    |> Just
-
-            WindowPreferredLanguagesRequest toFuture ->
-                Json.Decode.list Json.Decode.string
-                    |> Json.Decode.map toFuture
-                    |> Just
-
-            WindowEventListen listen ->
-                listen.on |> Just
-
-            WindowVisibilityChangeListen toFuture ->
-                windowVisibilityJsonDecoder |> Json.Decode.map toFuture |> Just
-
-            WindowAnimationFrameListen toFuture ->
-                Time.LocalExtra.posixJsonDecoder |> Json.Decode.map toFuture |> Just
-
-            WindowPreferredLanguagesChangeListen toFuture ->
-                Json.Decode.list Json.Decode.string
-                    |> Json.Decode.map toFuture
-                    |> Just
-
-            SocketConnect connect ->
-                socketConnectionEventJsonDecoder
-                    |> Json.Decode.map connect.on
-                    |> Just
-
-            SocketMessage _ ->
-                Nothing
-
-            SocketDisconnect _ ->
-                Nothing
-
-            SocketMessageListen messageListen ->
-                Json.Decode.string |> Json.Decode.map messageListen.on |> Just
-
-            LocalStorageSet _ ->
-                Nothing
-
-            LocalStorageRequest request ->
-                Json.Decode.nullable Json.Decode.string
-                    |> Json.Decode.map request.on
-                    |> Just
-
-            LocalStorageRemoveOnADifferentTabListen listen ->
-                Url.LocalExtra.jsonDecoder
-                    |> Json.Decode.map AppUrl.fromUrl
-                    |> Json.Decode.map listen.on
-                    |> Just
-
-            LocalStorageSetOnADifferentTabListen listen ->
-                Json.Decode.map3
-                    (\appUrl oldValue newValue ->
-                        { appUrl = appUrl, oldValue = oldValue, newValue = newValue }
+                        Just request ->
+                            Json.Decode.oneOf
+                                [ eventListenDecoder
+                                , Json.Decode.LocalExtra.variant "ScrollPositionRequest"
+                                    domElementScrollPositionJsonDecoder
+                                    |> Json.Decode.map request
+                                ]
                     )
-                    (Json.Decode.field "url"
-                        (Url.LocalExtra.jsonDecoder |> Json.Decode.map AppUrl.fromUrl)
-                    )
-                    (Json.Decode.field "oldValue" (Json.Decode.nullable Json.Decode.string))
-                    (Json.Decode.field "newValue" Json.Decode.string)
-                    |> Json.Decode.map listen.on
-                    |> Just
+                        |> Just
 
-            GeoLocationRequest toFuture ->
-                geoLocationJsonDecoder |> Json.Decode.map toFuture |> Just
+        NotificationAskForPermission () ->
+            Nothing
 
-            GeoLocationChangeListen toFuture ->
-                geoLocationJsonDecoder |> Json.Decode.map toFuture |> Just
+        NotificationShow show ->
+            notificationResponseJsonDecoder
+                |> Json.Decode.map show.on
+                |> Just
 
-            GamepadsRequest toFuture ->
-                gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
+        HttpRequest httpRequest ->
+            Json.Decode.oneOf
+                [ Json.Decode.LocalExtra.variant "Success" (httpSuccessResponseJsonDecoder httpRequest.expect)
+                , Json.Decode.LocalExtra.variant "Error" httpErrorJsonDecoder
+                    |> Json.Decode.map (httpExpectOnError httpRequest.expect)
+                ]
+                |> Just
 
-            GamepadsChangeListen toFuture ->
-                gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
+        TimePosixRequest toFuture ->
+            Time.LocalExtra.posixJsonDecoder |> Json.Decode.map toFuture |> Just
+
+        TimezoneOffsetRequest toFuture ->
+            Json.Decode.int |> Json.Decode.map toFuture |> Just
+
+        TimePeriodicallyListen timePeriodicallyListen ->
+            Time.LocalExtra.posixJsonDecoder
+                |> Json.Decode.map timePeriodicallyListen.on
+                |> Just
+
+        TimeOnce once ->
+            Time.LocalExtra.posixJsonDecoder
+                |> Json.Decode.map once.on
+                |> Just
+
+        TimezoneNameRequest toFuture ->
+            Json.Decode.string |> Json.Decode.map toFuture |> Just
+
+        RandomUnsignedInt32sRequest randomUnsignedInt32sRequest ->
+            Json.Decode.list Json.Decode.int
+                |> Json.Decode.map randomUnsignedInt32sRequest.on
+                |> Just
+
+        WindowSizeRequest toFuture ->
+            Json.Decode.map2 (\width height -> { width = width, height = height })
+                (Json.Decode.field "width" Json.Decode.int)
+                (Json.Decode.field "height" Json.Decode.int)
+                |> Json.Decode.map toFuture
+                |> Just
+
+        WindowPreferredLanguagesRequest toFuture ->
+            Json.Decode.list Json.Decode.string
+                |> Json.Decode.map toFuture
+                |> Just
+
+        WindowEventListen listen ->
+            listen.on |> Just
+
+        WindowVisibilityChangeListen toFuture ->
+            windowVisibilityJsonDecoder |> Json.Decode.map toFuture |> Just
+
+        WindowAnimationFrameListen toFuture ->
+            Time.LocalExtra.posixJsonDecoder |> Json.Decode.map toFuture |> Just
+
+        WindowPreferredLanguagesChangeListen toFuture ->
+            Json.Decode.list Json.Decode.string
+                |> Json.Decode.map toFuture
+                |> Just
+
+        SocketConnect connect ->
+            socketConnectionEventJsonDecoder
+                |> Json.Decode.map connect.on
+                |> Just
+
+        SocketMessage _ ->
+            Nothing
+
+        SocketDisconnect _ ->
+            Nothing
+
+        SocketMessageListen messageListen ->
+            Json.Decode.string |> Json.Decode.map messageListen.on |> Just
+
+        LocalStorageSet _ ->
+            Nothing
+
+        LocalStorageRequest request ->
+            Json.Decode.nullable Json.Decode.string
+                |> Json.Decode.map request.on
+                |> Just
+
+        LocalStorageRemoveOnADifferentTabListen listen ->
+            Url.LocalExtra.jsonDecoder
+                |> Json.Decode.map AppUrl.fromUrl
+                |> Json.Decode.map listen.on
+                |> Just
+
+        LocalStorageSetOnADifferentTabListen listen ->
+            Json.Decode.map3
+                (\appUrl oldValue newValue ->
+                    { appUrl = appUrl, oldValue = oldValue, newValue = newValue }
+                )
+                (Json.Decode.field "url"
+                    (Url.LocalExtra.jsonDecoder |> Json.Decode.map AppUrl.fromUrl)
+                )
+                (Json.Decode.field "oldValue" (Json.Decode.nullable Json.Decode.string))
+                (Json.Decode.field "newValue" Json.Decode.string)
+                |> Json.Decode.map listen.on
+                |> Just
+
+        GeoLocationRequest toFuture ->
+            geoLocationJsonDecoder |> Json.Decode.map toFuture |> Just
+
+        GeoLocationChangeListen toFuture ->
+            geoLocationJsonDecoder |> Json.Decode.map toFuture |> Just
+
+        GamepadsRequest toFuture ->
+            gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
+
+        GamepadsChangeListen toFuture ->
+            gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
 
 
 audioSourceLoadErrorJsonDecoder : Json.Decode.Decoder AudioSourceLoadError
@@ -2721,14 +2802,13 @@ gamepadThumbstickUnknown =
 
 
 gamepadThumbsticksFromAxes : List Float -> List { x : Float, y : Float }
-gamepadThumbsticksFromAxes =
-    \axes ->
-        case axes of
-            x :: y :: rest ->
-                { x = x, y = y } :: gamepadThumbsticksFromAxes rest
+gamepadThumbsticksFromAxes axes =
+    case axes of
+        x :: y :: rest ->
+            { x = x, y = y } :: gamepadThumbsticksFromAxes rest
 
-            _ ->
-                []
+        _ ->
+            []
 
 
 gamepadButtonJsonDecoder : Json.Decode.Decoder GamepadButton
@@ -3247,103 +3327,6 @@ interfacesDiffMap idAndDiffCombine interfaces =
 remove : InterfaceSingleDiff irrelevantFuture_
 remove =
     Remove ()
-
-
-sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
-sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
-    sortedKeyValueList
-
-
-{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
-The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
--}
-sortedKeyValueListMergeBy :
-    (key -> comparable_)
-    -> ({ key : key, value : a } -> folded -> folded)
-    -> (a -> { key : key, value : b } -> folded -> folded)
-    -> ({ key : key, value : b } -> folded -> folded)
-    -> List { key : key, value : a }
-    -> List { key : key, value : b }
-    -> folded
-    -> folded
-sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
-    case aSortedKeyValueList of
-        [] ->
-            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry soFar) initialFolded
-
-        aLowest :: aWithoutLowest ->
-            case bSortedKeyValueList of
-                [] ->
-                    aWithoutLowest
-                        |> List.foldl (\entry soFar -> onlyA entry soFar)
-                            (onlyA aLowest initialFolded)
-
-                bLowest :: bWithoutLowest ->
-                    case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
-                        EQ ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bWithoutLowest
-                                (bothAB aLowest.value bLowest initialFolded)
-
-                        LT ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bSortedKeyValueList
-                                (onlyA aLowest initialFolded)
-
-                        GT ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aSortedKeyValueList
-                                bWithoutLowest
-                                (onlyB bLowest initialFolded)
-
-
-{-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](#SortedKeyValueList)
--}
-sortedKeyValueListFromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
-sortedKeyValueListFromList =
-    \unsortedList ->
-        SortedKeyValueList (unsortedList |> List.sortBy .key)
-
-
-sortedKeyValueListMap :
-    ({ key : key, value : value } -> newValue)
-    -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
-sortedKeyValueListMap elementChange (SortedKeyValueList sortedKeyValueList) =
-    SortedKeyValueList
-        (sortedKeyValueList
-            |> List.map
-                (\entry ->
-                    { key = entry.key, value = elementChange entry }
-                )
-        )
-
-
-{-| The fact that this can only be implemented linearly might seem shocking.
-In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
--}
-sortedKeyValueListGet : key -> SortedKeyValueList key value -> Maybe value
-sortedKeyValueListGet keyToFind sortedKeyValueList =
-    sortedKeyValueList
-        |> sortedKeyValueListToList
-        |> List.LocalExtra.firstJustMap
-            (\entry ->
-                if entry.key == keyToFind then
-                    Just entry.value
-
-                else
-                    Nothing
-            )
 
 
 {-| A Request can fail in a couple ways:

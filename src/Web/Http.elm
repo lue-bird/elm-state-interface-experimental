@@ -193,6 +193,5 @@ post options =
 using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
 -}
 request : Web.HttpRequest future -> Web.Interface future
-request =
-    \httpRequest ->
-        httpRequest |> Web.HttpRequest |> Rope.singleton
+request httpRequest =
+    httpRequest |> Web.HttpRequest |> Rope.singleton
