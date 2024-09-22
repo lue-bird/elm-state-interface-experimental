@@ -4,14 +4,14 @@ module SortedKeyValueList exposing (fromList, fromListBy, map)
 Would be a terrible fit if we needed fast insert and get.
 -}
 
-import Web exposing (SortedKeyValueList(..))
+import Web
 
 
 map :
     ({ key : key, value : value } -> newValue)
-    -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
-map elementChange (SortedKeyValueList sortedKeyValueList) =
-    SortedKeyValueList
+    -> (Web.SortedKeyValueList key value -> Web.SortedKeyValueList key newValue)
+map elementChange (Web.SortedKeyValueList sortedKeyValueList) =
+    Web.SortedKeyValueList
         (sortedKeyValueList
             |> List.map
                 (\entry ->
@@ -26,9 +26,9 @@ to create a [`SortedKeyValueList`](Web#SortedKeyValueList)
 -}
 fromListBy :
     (key -> comparable_)
-    -> (List { value : value, key : key } -> SortedKeyValueList key value)
+    -> (List { value : value, key : key } -> Web.SortedKeyValueList key value)
 fromListBy keyToComparable unsortedList =
-    SortedKeyValueList
+    Web.SortedKeyValueList
         (unsortedList
             |> List.sortBy (\entry -> entry.key |> keyToComparable)
         )
@@ -36,6 +36,6 @@ fromListBy keyToComparable unsortedList =
 
 {-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](Web#SortedKeyValueList)
 -}
-fromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
+fromList : List { value : value, key : comparable } -> Web.SortedKeyValueList comparable value
 fromList unsortedList =
-    SortedKeyValueList (unsortedList |> List.sortBy .key)
+    Web.SortedKeyValueList (unsortedList |> List.sortBy .key)
