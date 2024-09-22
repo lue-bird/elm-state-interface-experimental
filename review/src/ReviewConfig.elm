@@ -24,7 +24,6 @@ import NoDeprecated
 import NoDuplicatePorts
 import NoExposingEverything
 import NoForbiddenWords
-import NoFunctionOutsideOfModules
 import NoImportAs
 import NoImportingEverything
 import NoMissingTypeAnnotation
@@ -38,9 +37,9 @@ import NoSimpleLetBody
 import NoSinglePatternCase
 import NoUnnecessaryTrailingUnderscore
 import NoUnoptimizedRecursion
+import NoUnsafeDivision
 import NoUnsafePorts
 import NoUnsortedCases
-import NoUnsortedLetDeclarations
 import NoUnsortedTopLevelDeclarations
 import NoUnused.CustomTypeConstructorArgs
 import NoUnused.CustomTypeConstructors
@@ -51,9 +50,14 @@ import NoUnused.Patterns
 import NoUnused.Variables
 import NoUnusedPorts
 import OnlyAllSingleUseTypeVarsEndWith_
+import Review.Documentation.CodeSnippet
+import Review.ImportSimple
+import Review.OpaqueType
 import Review.Pattern.As
 import Review.Pattern.Record
-import Review.Rule exposing (Rule)
+import Review.PhantomType
+import Review.Rule
+import Review.VariantValueCount
 import ReviewPipelineStyles
 import ReviewPipelineStyles.Fixes
 import ReviewPipelineStyles.Predicates
@@ -62,9 +66,11 @@ import UseCamelCase
 import VariablesBetweenCaseOf.AccessInCases
 
 
-config : List Rule
+config : List Review.Rule.Rule
 config =
     [ -- ## documentation
+      -- enable on a per-project basis
+      --, Review.Documentation.CodeSnippet.check
       Docs.ReviewLinksAndSections.rule
     , Docs.ReviewAtDocs.rule
     , Docs.NoMissing.rule
@@ -74,11 +80,8 @@ config =
     , Docs.UpToDateReadmeLinks.rule
 
     -- ## simplify
-    , NoUnused.CustomTypeConstructors.rule []
-    , NoUnused.CustomTypeConstructorArgs.rule
     , NoUnused.Dependencies.rule
     , NoUnused.Exports.rule
-        |> Review.Rule.ignoreErrorsForFiles [ "src/N/Local.elm" ]
     , NoUnused.Parameters.rule
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule
@@ -102,19 +105,16 @@ config =
                -- but such an ordering is not supported by the rule
                NoUnsortedCases.sortOnlyMatchingTypes (\_ _ -> False)
             |> NoUnsortedCases.doNotSortLiterals
-            |> NoUnsortedCases.sortListPatternsByLength
         )
     , NoUnsortedTopLevelDeclarations.rule
         (NoUnsortedTopLevelDeclarations.sortTopLevelDeclarations
             |> NoUnsortedTopLevelDeclarations.glueHelpersAfter
-            |> NoUnsortedTopLevelDeclarations.glueDependenciesBeforeFirstDependent
-        )
-    , NoUnsortedLetDeclarations.rule
-        (NoUnsortedLetDeclarations.sortLetDeclarations
-            |> NoUnsortedLetDeclarations.glueDependenciesBeforeFirstDependent
         )
 
     -- ## limit
+    , NoUnused.CustomTypeConstructors.rule []
+    , NoUnused.CustomTypeConstructorArgs.rule
+    , Review.VariantValueCount.zeroOrOne
     , [ ReviewPipelineStyles.rightPizzaPipelines
             |> ReviewPipelineStyles.forbid
             |> ReviewPipelineStyles.that
@@ -165,10 +165,23 @@ config =
                   ]
                     |> String.concat
                 ]
+      , ReviewPipelineStyles.parentheticalApplicationPipelines
+            |> ReviewPipelineStyles.forbid
+            |> ReviewPipelineStyles.that
+                (ReviewPipelineStyles.Predicates.haveAnyNonInputStepThatIs
+                    ReviewPipelineStyles.Predicates.aSemanticallyInfixFunction
+                )
+            |> ReviewPipelineStyles.andTryToFixThemBy ReviewPipelineStyles.Fixes.convertingToRightPizza
+            |> ReviewPipelineStyles.andCallThem "parenthetical application of a semantically-infix function"
       ]
         |> ReviewPipelineStyles.rule
-    --, UseCamelCase.rule UseCamelCase.default
+    , UseCamelCase.rule
+        (UseCamelCase.default
+            |> UseCamelCase.withCamel toCamelCase
+            |> UseCamelCase.withPascal toCamelCase
+        )
     , NoPrimitiveTypeAlias.rule
+    , Review.ImportSimple.rule
     , OnlyAllSingleUseTypeVarsEndWith_.rule
     , NoRecordAliasConstructor.rule
     , NoExposingEverything.rule
@@ -178,10 +191,9 @@ config =
     , NoMissingTypeAnnotation.rule
     , NoMissingTypeAnnotationInLetIn.rule
     , NoMissingTypeExpose.rule
-    , NoFunctionOutsideOfModules.rule
-        [ ( forbiddenFunctionOrValues, [] ) ]
     , NoAlways.rule
     , NoDebug.Log.rule
+        |> Review.Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoDebug.TodoOrToString.rule
         |> Review.Rule.ignoreErrorsForDirectories [ "tests/" ]
     , VariablesBetweenCaseOf.AccessInCases.forbid
@@ -196,38 +208,73 @@ config =
         |> Review.Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoSimpleLetBody.rule
     , NoUnnecessaryTrailingUnderscore.rule
+    , NoUnsafeDivision.rule
     , Review.Pattern.Record.forbid
     , Review.Pattern.As.forbid
+    , Review.PhantomType.forbid
+    , Review.OpaqueType.forbid
     ]
         |> List.map (Review.Rule.ignoreErrorsForDirectories [ "VerifyExamples/" ])
 
 
-forbiddenFunctionOrValues : List String
-forbiddenFunctionOrValues =
-    -- these should one day be fully fledged
-    [ -- use tuple destructuring instead
-      -- for improved descriptiveness
-      "Tuple.first"
-    , "Tuple.second"
-    , -- use `mapFirst |> mapSecond` instead
-      "Tuple.mapBoth"
-    , -- use `String.indexes` instead
-      "String.indices"
-    , -- use a `case` instead
-      "String.isEmpty"
-    , "List.isEmpty"
-    , "List.tail"
-
-    -- use a `Set`, `Dict` or `List.sortWith`
-    , "List.sort"
-    , "List.sortBy"
-    ]
-
-
 forbiddenWords : List String
 forbiddenWords =
-    [ [ "REPLACEME", "FIXME", "REMOVEME", "CHECKME" ]
-    , [ "TOREPLACE", "TOFIX", "TOREMOVE", "TOCHECK", "TODO" ]
-    , [ "- []" ]
-    ]
-        |> List.concat
+    [ "REPLACEME", "TODO", "- []" ]
+
+
+toCamelCase : String -> String
+toCamelCase =
+    \name ->
+        let
+            camelFolded : { camelized : String, upperCaseNextRequired : Maybe { underscores : Int } }
+            camelFolded =
+                name
+                    |> String.foldl
+                        (\char soFar ->
+                            if char |> Char.isUpper then
+                                { upperCaseNextRequired = Nothing
+                                , camelized = soFar.camelized ++ (char |> String.fromChar)
+                                }
+
+                            else if char |> Char.isLower then
+                                { upperCaseNextRequired = Nothing
+                                , camelized =
+                                    case soFar.upperCaseNextRequired of
+                                        Just _ ->
+                                            soFar.camelized ++ (char |> Char.toUpper |> String.fromChar)
+
+                                        Nothing ->
+                                            soFar.camelized ++ (char |> String.fromChar)
+                                }
+
+                            else
+                                case char of
+                                    '_' ->
+                                        { upperCaseNextRequired =
+                                            Just
+                                                { underscores =
+                                                    case soFar.upperCaseNextRequired of
+                                                        Nothing ->
+                                                            1
+
+                                                        Just trail ->
+                                                            trail.underscores + 1
+                                                }
+                                        , camelized = soFar.camelized
+                                        }
+
+                                    nonLetterNonUnderscoreChar ->
+                                        { upperCaseNextRequired = Nothing
+                                        , camelized = soFar.camelized ++ (nonLetterNonUnderscoreChar |> String.fromChar)
+                                        }
+                        )
+                        { camelized = ""
+                        , upperCaseNextRequired = Nothing
+                        }
+        in
+        case camelFolded.upperCaseNextRequired of
+            Nothing ->
+                camelFolded.camelized
+
+            Just trail ->
+                camelFolded.camelized ++ String.repeat trail.underscores "_"
