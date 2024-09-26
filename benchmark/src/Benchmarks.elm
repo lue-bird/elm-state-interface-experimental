@@ -7,8 +7,6 @@ import Json.Encode
 import Rope exposing (Rope)
 import StructuredId exposing (StructuredId)
 import Web
-import Web.Dom
-import Web.Svg
 
 
 benchmarks : Benchmark.Benchmark
@@ -816,7 +814,7 @@ toStringUsingToJson =
 
 
 domRenderUsingTCOButReversedPath :
-    Web.Dom.Node future
+    Web.DomNode future
     -> Web.Interface future
 domRenderUsingTCOButReversedPath =
     \node -> nodeFlattenToListUsingTCOButReversedPath [] { pathReverse = [], node = node } [] |> Rope.fromList
@@ -824,7 +822,7 @@ domRenderUsingTCOButReversedPath =
 
 flattenRemainingNodesToListUsingTCOButReversedPath :
     List (Web.InterfaceSingle future)
-    -> List { pathReverse : List Int, node : Web.Dom.Node future }
+    -> List { pathReverse : List Int, node : Web.DomNode future }
     -> List (Web.InterfaceSingle future)
 flattenRemainingNodesToListUsingTCOButReversedPath updatedInterfaces nodesRemaining =
     case nodesRemaining of
@@ -837,8 +835,8 @@ flattenRemainingNodesToListUsingTCOButReversedPath updatedInterfaces nodesRemain
 
 nodeFlattenToListUsingTCOButReversedPath :
     List (Web.InterfaceSingle future)
-    -> { pathReverse : List Int, node : Web.Dom.Node future }
-    -> List { pathReverse : List Int, node : Web.Dom.Node future }
+    -> { pathReverse : List Int, node : Web.DomNode future }
+    -> List { pathReverse : List Int, node : Web.DomNode future }
     -> List (Web.InterfaceSingle future)
 nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining =
     case current.node of
@@ -866,7 +864,7 @@ nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining 
 
                 sub0 :: sub1Up ->
                     let
-                        updatedRemaining : { index : Int, mapped : List { pathReverse : List Int, node : Web.Dom.Node future } }
+                        updatedRemaining : { index : Int, mapped : List { pathReverse : List Int, node : Web.DomNode future } }
                         updatedRemaining =
                             sub1Up
                                 |> List.foldl
@@ -888,7 +886,7 @@ nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining 
 
 
 domRenderUsingTCO :
-    Web.Dom.Node future
+    Web.DomNode future
     -> Web.Interface future
 domRenderUsingTCO =
     \node -> nodeFlattenToListUsingTCO [] { pathReverse = [], node = node } [] |> Rope.fromList
@@ -896,7 +894,7 @@ domRenderUsingTCO =
 
 flattenRemainingNodesToListUsingTCO :
     List (Web.InterfaceSingle future)
-    -> List { pathReverse : List Int, node : Web.Dom.Node future }
+    -> List { pathReverse : List Int, node : Web.DomNode future }
     -> List (Web.InterfaceSingle future)
 flattenRemainingNodesToListUsingTCO updatedInterfaces nodesRemaining =
     case nodesRemaining of
@@ -909,8 +907,8 @@ flattenRemainingNodesToListUsingTCO updatedInterfaces nodesRemaining =
 
 nodeFlattenToListUsingTCO :
     List (Web.InterfaceSingle future)
-    -> { pathReverse : List Int, node : Web.Dom.Node future }
-    -> List { pathReverse : List Int, node : Web.Dom.Node future }
+    -> { pathReverse : List Int, node : Web.DomNode future }
+    -> List { pathReverse : List Int, node : Web.DomNode future }
     -> List (Web.InterfaceSingle future)
 nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
     case current.node of
@@ -938,7 +936,7 @@ nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
 
                 sub0 :: sub1Up ->
                     let
-                        updatedRemaining : { index : Int, mapped : List { pathReverse : List Int, node : Web.Dom.Node future } }
+                        updatedRemaining : { index : Int, mapped : List { pathReverse : List Int, node : Web.DomNode future } }
                         updatedRemaining =
                             sub1Up
                                 |> List.foldl
@@ -959,7 +957,7 @@ nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
                         updatedRemaining.mapped
 
 
-domRenderUsingNestedRecursionWithPath : Web.Dom.Node future -> Web.Interface future
+domRenderUsingNestedRecursionWithPath : Web.DomNode future -> Web.Interface future
 domRenderUsingNestedRecursionWithPath =
     \domNode ->
         domNode |> nodeFlattenToRopeUsingNestedRecursionWithPath []
@@ -967,7 +965,7 @@ domRenderUsingNestedRecursionWithPath =
 
 nodeFlattenToRopeUsingNestedRecursionWithPath :
     List Int
-    -> Web.Dom.Node future
+    -> Web.DomNode future
     -> Rope (Web.InterfaceSingle future)
 nodeFlattenToRopeUsingNestedRecursionWithPath pathReverse =
     \node ->
@@ -995,7 +993,7 @@ nodeFlattenToRopeUsingNestedRecursionWithPath pathReverse =
                     ).rope
 
 
-domRenderUsingNestedRecursionWithSubsMapAndFinalListMap : Web.Dom.Node future -> Web.Interface future
+domRenderUsingNestedRecursionWithSubsMapAndFinalListMap : Web.DomNode future -> Web.Interface future
 domRenderUsingNestedRecursionWithSubsMapAndFinalListMap =
     \domNode ->
         domNode
@@ -1004,12 +1002,12 @@ domRenderUsingNestedRecursionWithSubsMapAndFinalListMap =
             |> Rope.fromList
 
 
-nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap : Web.Dom.Node future -> List { pathReverse : List Int, node : Web.DomTextOrElementHeader future }
+nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap : Web.DomNode future -> List { pathReverse : List Int, node : Web.DomTextOrElementHeader future }
 nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap =
     \node -> node |> nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap |> Rope.toList
 
 
-nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap : Web.Dom.Node future -> Rope { pathReverse : List Int, node : Web.DomTextOrElementHeader future }
+nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap : Web.DomNode future -> Rope { pathReverse : List Int, node : Web.DomTextOrElementHeader future }
 nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap =
     \node ->
         case node of
@@ -1124,31 +1122,31 @@ exampleStructuredId =
     exampleTree |> exampleTreeToStructuredId
 
 
-exampleDom : Web.Dom.Node future_
+exampleDom : Web.DomNode future_
 exampleDom =
     exampleTree |> treeToDom
 
 
-treeToDom : ExampleTree -> Web.Dom.Node future_
+treeToDom : ExampleTree -> Web.DomNode future_
 treeToDom =
     \tree ->
         case tree of
             Leaf n ->
-                Web.Dom.text
+                Web.domText
                     ((n |> String.fromInt)
                         ++ (List.range 0 n |> List.map Char.fromCode |> String.fromList)
                     )
 
             Branch subs ->
-                Web.Svg.element "div"
-                    [ Web.Dom.style "fill" "blue"
-                    , Web.Dom.style "font-size" "3em"
-                    , Web.Dom.attribute "text-anchor" "middle"
-                    , Web.Dom.attribute "dominant-baseline" "middle"
-                    , Web.Dom.attribute "font-weight" "bolder"
-                    , Web.Dom.attribute "x" "50%"
-                    , Web.Dom.attribute "y" "8%"
-                    , Web.Dom.attribute "width" "50%"
-                    , Web.Dom.attribute "height" "50%"
+                Web.svgElement "div"
+                    [ Web.domStyle "fill" "blue"
+                    , Web.domStyle "font-size" "3em"
+                    , Web.domAttribute "text-anchor" "middle"
+                    , Web.domAttribute "dominant-baseline" "middle"
+                    , Web.domAttribute "font-weight" "bolder"
+                    , Web.domAttribute "x" "50%"
+                    , Web.domAttribute "y" "8%"
+                    , Web.domAttribute "width" "50%"
+                    , Web.domAttribute "height" "50%"
                     ]
                     (subs |> List.map treeToDom)

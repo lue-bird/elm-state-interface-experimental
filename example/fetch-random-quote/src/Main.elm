@@ -4,8 +4,6 @@ import Color
 import Json.Decode
 import Json.Encode
 import Web
-import Web.Dom
-import Web.Http
 
 
 main : Web.Program State
@@ -30,10 +28,10 @@ interface =
                 Web.interfaceNone
 
             Nothing ->
-                Web.Http.get
+                Web.httpGet
                     { url = "https://api.quotable.io/quotes/random"
                     , expect =
-                        Web.Http.expectJson
+                        Web.httpExpectJson
                             (Json.Decode.index 0
                                 (Json.Decode.map2 (\content author -> { content = content, author = author })
                                     (Json.Decode.field "content" Json.Decode.string)
@@ -41,64 +39,64 @@ interface =
                                 )
                             )
                     }
-                    |> Web.Http.request
+                    |> Web.httpRequest
                     |> Web.interfaceFutureMap MoviesReceived
-        , Web.Dom.element "div"
-            [ Web.Dom.style "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
-            , Web.Dom.style "color" (Color.rgb 1 1 1 |> Color.toCssString)
-            , Web.Dom.style "font-size" "2em"
-            , Web.Dom.style "padding-left" "80px"
-            , Web.Dom.style "padding-right" "80px"
-            , Web.Dom.style "position" "fixed"
-            , Web.Dom.style "top" "0"
-            , Web.Dom.style "right" "0"
-            , Web.Dom.style "bottom" "0"
-            , Web.Dom.style "left" "0"
+        , Web.domElement "div"
+            [ Web.domStyle "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
+            , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
+            , Web.domStyle "font-size" "2em"
+            , Web.domStyle "padding-left" "80px"
+            , Web.domStyle "padding-right" "80px"
+            , Web.domStyle "position" "fixed"
+            , Web.domStyle "top" "0"
+            , Web.domStyle "right" "0"
+            , Web.domStyle "bottom" "0"
+            , Web.domStyle "left" "0"
             ]
-            [ Web.Dom.element "div"
-                [ Web.Dom.style "max-width" "870px"
-                , Web.Dom.style "padding-top" "80px"
+            [ Web.domElement "div"
+                [ Web.domStyle "max-width" "870px"
+                , Web.domStyle "padding-top" "80px"
                 ]
-                [ Web.Dom.element "h1" [] [ Web.Dom.text "random quote" ]
-                , Web.Dom.element "div"
+                [ Web.domElement "h1" [] [ Web.domText "random quote" ]
+                , Web.domElement "div"
                     []
-                    [ Web.Dom.element "div"
-                        [ Web.Dom.style "font-size" "1.2em"
+                    [ Web.domElement "div"
+                        [ Web.domStyle "font-size" "1.2em"
                         ]
                         [ case state.movies of
                             Nothing ->
-                                Web.Dom.text "waiting for response"
+                                Web.domText "waiting for response"
 
                             Just (Err Web.HttpBadUrl) ->
-                                Web.Dom.text "Malformed URL"
+                                Web.domText "Malformed URL"
 
                             Just (Err Web.HttpNetworkError) ->
-                                Web.Dom.text "Network error"
+                                Web.domText "Network error"
 
                             Just (Err (Web.HttpBadStatus _)) ->
-                                Web.Dom.text "Bad response status"
+                                Web.domText "Bad response status"
 
                             Just (Ok (Err decodeError)) ->
-                                Web.Dom.text
+                                Web.domText
                                     (decodeError.jsonError |> Json.Decode.errorToString)
 
                             Just (Ok (Ok movies)) ->
-                                Web.Dom.element "div"
+                                Web.domElement "div"
                                     []
-                                    [ Web.Dom.element "blockquote" [ Web.Dom.style "textAlign" "center" ] [ Web.Dom.text movies.content ]
-                                    , Web.Dom.element "i" [ Web.Dom.style "textAlign" "center" ] [ Web.Dom.text ("by " ++ movies.author) ]
+                                    [ Web.domElement "blockquote" [ Web.domStyle "textAlign" "center" ] [ Web.domText movies.content ]
+                                    , Web.domElement "i" [ Web.domStyle "textAlign" "center" ] [ Web.domText ("by " ++ movies.author) ]
                                     ]
                         ]
-                    , Web.Dom.element "br" [] []
+                    , Web.domElement "br" [] []
                     , buttonUi
-                        [ Web.Dom.style "font-size" "2em"
+                        [ Web.domStyle "font-size" "2em"
                         ]
-                        [ Web.Dom.text "next!" ]
-                        |> Web.Dom.futureMap (\() -> MoreClicked)
+                        [ Web.domText "next!" ]
+                        |> Web.domFutureMap (\() -> MoreClicked)
                     ]
                 ]
             ]
-            |> Web.Dom.render
+            |> Web.domRender
         ]
             |> Web.interfaceBatch
             |> Web.interfaceFutureMap
@@ -112,20 +110,20 @@ interface =
                 )
 
 
-buttonUi : List (Web.Dom.Modifier ()) -> List (Web.Dom.Node ()) -> Web.Dom.Node ()
+buttonUi : List (Web.DomModifier ()) -> List (Web.DomNode ()) -> Web.DomNode ()
 buttonUi modifiers subs =
-    Web.Dom.element "button"
-        ([ Web.Dom.listenTo "click"
-            |> Web.Dom.modifierFutureMap (\_ -> ())
-         , Web.Dom.style "background-color" (Color.rgba 0 0 0 0 |> Color.toCssString)
-         , Web.Dom.style "color" (Color.rgb 1 1 1 |> Color.toCssString)
-         , Web.Dom.style "padding" "4px 13px"
-         , Web.Dom.style "text-align" "center"
-         , Web.Dom.style "border-radius" "20px"
-         , Web.Dom.style "border-top" "none"
-         , Web.Dom.style "border-left" "none"
-         , Web.Dom.style "border-right" "none"
-         , Web.Dom.style "border-bottom" ("5px solid " ++ (Color.rgba 1 1 1 0.2 |> Color.toCssString))
+    Web.domElement "button"
+        ([ Web.domListenTo "click"
+            |> Web.domModifierFutureMap (\_ -> ())
+         , Web.domStyle "background-color" (Color.rgba 0 0 0 0 |> Color.toCssString)
+         , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
+         , Web.domStyle "padding" "4px 13px"
+         , Web.domStyle "text-align" "center"
+         , Web.domStyle "border-radius" "20px"
+         , Web.domStyle "border-top" "none"
+         , Web.domStyle "border-left" "none"
+         , Web.domStyle "border-right" "none"
+         , Web.domStyle "border-bottom" ("5px solid " ++ (Color.rgba 1 1 1 0.2 |> Color.toCssString))
          ]
             ++ modifiers
         )

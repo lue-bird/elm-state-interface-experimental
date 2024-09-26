@@ -5,12 +5,6 @@ import Json.Decode
 import Json.Encode
 import Time
 import Web
-import Web.Audio
-import Web.Audio.Parameter
-import Web.Console
-import Web.Dom
-import Web.Time
-import Web.Window
 
 
 main : Web.Program State
@@ -35,12 +29,12 @@ initialState =
 interface : State -> Web.Interface State
 interface =
     \(State state) ->
-        [ [ Web.Window.sizeRequest, Web.Window.resizeListen ]
+        [ [ Web.windowSizeRequest, Web.windowResizeListen ]
             |> Web.interfaceBatch
             |> Web.interfaceFutureMap (\windowSize -> State { state | windowSize = windowSize })
         , case state.musicSource of
             Just (Err _) ->
-                Web.Console.error "audio failed to load"
+                Web.consoleError "audio failed to load"
 
             Just (Ok musicSource) ->
                 [ case state.lastUnplayedClickPitchPercentage of
@@ -48,7 +42,7 @@ interface =
                         Web.interfaceNone
 
                     Just pitchPercentage ->
-                        Web.Time.posixRequest
+                        Web.timePosixRequest
                             |> Web.interfaceFutureMap
                                 (\time ->
                                     State
@@ -62,36 +56,36 @@ interface =
                 , state.tonesPlaying
                     |> List.map
                         (\tonePlaying ->
-                            Web.Audio.fromSource musicSource tonePlaying.time
-                                |> Web.Audio.volumeScaleBy (Web.Audio.Parameter.at 0.6)
-                                |> Web.Audio.speedScaleBy
-                                    (Web.Audio.Parameter.at (2 ^ (((tonePlaying.pitchPercentage - 0.5) * 36) / 12)))
-                                |> Web.Audio.play
+                            Web.audioFromSource musicSource tonePlaying.time
+                                |> Web.audioVolumeScaleBy (Web.audioParameterAt 0.6)
+                                |> Web.audioSpeedScaleBy
+                                    (Web.audioParameterAt (2 ^ (((tonePlaying.pitchPercentage - 0.5) * 36) / 12)))
+                                |> Web.audioPlay
                         )
                     |> Web.interfaceBatch
                 ]
                     |> Web.interfaceBatch
 
             Nothing ->
-                Web.Audio.sourceLoad "piano-C5.mp3"
+                Web.audioSourceLoad "piano-C5.mp3"
                     |> Web.interfaceFutureMap
                         (\result -> State { state | musicSource = result |> Just })
-        , Web.Dom.element "div"
-            [ Web.Dom.style "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
-            , Web.Dom.style "color" (Color.rgb 1 1 1 |> Color.toCssString)
-            , Web.Dom.style "position" "fixed"
-            , Web.Dom.style "top" "0"
-            , Web.Dom.style "right" "0"
-            , Web.Dom.style "bottom" "0"
-            , Web.Dom.style "left" "0"
-            , Web.Dom.listenTo "click"
-                |> Web.Dom.modifierFutureMap
+        , Web.domElement "div"
+            [ Web.domStyle "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
+            , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
+            , Web.domStyle "position" "fixed"
+            , Web.domStyle "top" "0"
+            , Web.domStyle "right" "0"
+            , Web.domStyle "bottom" "0"
+            , Web.domStyle "left" "0"
+            , Web.domListenTo "click"
+                |> Web.domModifierFutureMap
                     (\clickJson ->
                         clickJson
                             |> Json.Decode.decodeValue
                                 (Json.Decode.field "clientY" Json.Decode.float)
                     )
-                |> Web.Dom.modifierFutureMap
+                |> Web.domModifierFutureMap
                     (\clientYResult ->
                         case clientYResult of
                             Err _ ->
@@ -105,17 +99,17 @@ interface =
                                     }
                     )
             ]
-            [ Web.Dom.element "table"
-                [ Web.Dom.style "width" "100%"
-                , Web.Dom.style "height" "100%"
-                , Web.Dom.style "position" "absolute"
-                , Web.Dom.style "z-index" "1"
+            [ Web.domElement "table"
+                [ Web.domStyle "width" "100%"
+                , Web.domStyle "height" "100%"
+                , Web.domStyle "position" "absolute"
+                , Web.domStyle "z-index" "1"
                 ]
                 (List.range 0 35
                     |> List.map
                         (\i ->
-                            Web.Dom.element "tr"
-                                [ Web.Dom.style "background"
+                            Web.domElement "tr"
+                                [ Web.domStyle "background"
                                     (Color.hsl
                                         ((i |> Basics.remainderBy 12 |> Basics.toFloat) / 12)
                                         1
@@ -123,27 +117,27 @@ interface =
                                         |> Color.toCssString
                                     )
                                 ]
-                                [ Web.Dom.element "th"
+                                [ Web.domElement "th"
                                     []
                                     []
                                 ]
                         )
                 )
-            , Web.Dom.element "div"
-                [ Web.Dom.style "font-size" "3em"
-                , Web.Dom.style "padding" "1%"
-                , Web.Dom.style "margin" "auto"
-                , Web.Dom.style "width" "50%"
-                , Web.Dom.style "position" "relative"
-                , Web.Dom.style "user-select" "none"
-                , Web.Dom.style "text-align" "center"
-                , Web.Dom.style "z-index" "2"
-                , Web.Dom.style "background-color" (Color.rgba 0 0 0 0.5 |> Color.toCssString)
+            , Web.domElement "div"
+                [ Web.domStyle "font-size" "3em"
+                , Web.domStyle "padding" "1%"
+                , Web.domStyle "margin" "auto"
+                , Web.domStyle "width" "50%"
+                , Web.domStyle "position" "relative"
+                , Web.domStyle "user-select" "none"
+                , Web.domStyle "text-align" "center"
+                , Web.domStyle "z-index" "2"
+                , Web.domStyle "background-color" (Color.rgba 0 0 0 0.5 |> Color.toCssString)
                 ]
-                [ Web.Dom.element "b" [] [ Web.Dom.text "click height = note pitch" ]
+                [ Web.domElement "b" [] [ Web.domText "click height = note pitch" ]
                 ]
             ]
-            |> Web.Dom.render
+            |> Web.domRender
         ]
             |> Web.interfaceBatch
 

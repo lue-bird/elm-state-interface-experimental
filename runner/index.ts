@@ -120,7 +120,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                         createdAudioPlaying.processingNodes.forEach(node => { node.disconnect() })
                     })
                 } else {
-                    warn("tried to play audio from source that isn't loaded. Did you use Web.Audio.sourceLoad?")
+                    warn("tried to play audio from source that isn't loaded. Did you use Web.audioSourceLoad?")
                 }
             }
             case "DomNodeRender": return (config: { pathReverse: number[], node: any }) => {
@@ -970,7 +970,7 @@ function createProcessingNodes(processingFirstToLast: AudioProcessingInfo[]): Au
                     if (buffer !== undefined) {
                         convolverNode.buffer = buffer
                     } else {
-                        warn("tried to create a linear convolution from source that isn't loaded. Did you use Web.Audio.sourceLoad?")
+                        warn("tried to create a linear convolution from source that isn't loaded. Did you use Web.audioSourceLoad?")
                     }
                     return convolverNode
                 }

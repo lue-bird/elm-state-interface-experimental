@@ -4,8 +4,9 @@
 >
 > Changes so far compared to the stable [elm-state-interface](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest):
 > 
+>   - move all `Web.X.y` module members to `Web.xY`
 >   - internal: switch `interfaces` representation from `FastDict.Dict` to sorted assoc-list
->   - internal: switch `Dict` values to sorted assoc-list or `FastDict.Dict`
+>   - internal: switch `Dict` values to sorted assoc-list or `FastDict.Dict` (TODO switch to custom `FastDict.Dict` that exposes `fromSortedList`/`insertRight`/`insertLeft` with index lists as 4-0 padded)
 >   - internal: change representation of DOM path
 
 ### define an app in a simple, safe and declarative way
@@ -18,21 +19,20 @@ Here's a simple app that shows a number and a button that increments it
 
 ```elm
 import Web
-import Web.Dom
 
 app =
     { initialState = 0
     , interface =
         \state ->
-            Web.Dom.element "div"
+            Web.domElement "div"
                 []
-                [ state |> String.fromInt |> Web.Dom.text
-                , Web.Dom.element "button"
-                    [ Web.Dom.listenTo "click" ]
-                    [ "+" |> Web.Dom.text ]
-                    |> Web.Dom.futureMap (\_ -> state + 1)
+                [ state |> String.fromInt |> Web.domText
+                , Web.domElement "button"
+                    [ Web.domListenTo "click" ]
+                    [ "+" |> Web.domText ]
+                    |> Web.domFutureMap (\_ -> state + 1)
                 ]
-                |> Web.Dom.render
+                |> Web.domRender
     }
 ```
 
@@ -53,45 +53,45 @@ interface : Int -> Interface Int
 in our case an incremented counter state.
 The app will use this result as the new state.
 
-We use [`Web.Dom.listenTo`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Dom#listenTo) to be notified when a user clicks the button.
-Without [`Web.Dom.futureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Dom#futureMap), our interface would have the type
+We use [`Web.domListenTo`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web#domListenTo) to be notified when a user clicks the button.
+Without [`Web.domFutureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web#domFutureMap), our interface would have the type
 ```elm
-Web.Dom.element "button" [ Web.Dom.listenTo "click" ] []
-    |> Web.Dom.render
+Web.domElement "button" [ Web.domListenTo "click" ] []
+    |> Web.domRender
 : Interface Json.Decode.Value
 ```
 which means this interface will on click come back with an event as [json](https://dark.elm.dmy.fr/packages/elm/json/latest/).
 Later, we'll see how to get information out of this kind of event.
 
-Right now, we use [`Web.Dom.futureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Dom#futureMap) to change the information the interface will send back to us in the future by just ignoring the event `\_ ->` and returning the incremented state.
+Right now, we use [`Web.domFutureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web#domFutureMap) to change the information the interface will send back to us in the future by just ignoring the event `\_ ->` and returning the incremented state.
 
 You can change the value that comes back from an interface in many places, like
 ```elm
-Web.Dom.element "button" [ Web.Dom.listenTo "click" ] []
-    |> Web.Dom.render
+Web.domElement "button" [ Web.domListenTo "click" ] []
+    |> Web.domRender
     |> Web.interfaceFutureMap (\_ -> state + 1)
 : Interface Int
 ```
 or
 ```elm
-Web.Dom.element "button"
-    [ Web.Dom.listenTo "click"
-        |> Web.Dom.modifierFutureMap (\_ -> state + 1)
-    , Web.Dom.listenTo "dblclick"
-        |> Web.Dom.modifierFutureMap (\_ -> state + 10)
+Web.domElement "button"
+    [ Web.domListenTo "click"
+        |> Web.domModifierFutureMap (\_ -> state + 1)
+    , Web.domListenTo "dblclick"
+        |> Web.domModifierFutureMap (\_ -> state + 10)
     ]
     []
-    |> Web.Dom.render
+    |> Web.domRender
 : Interface Int
 ```
 Basically anywhere a type used for an interface has data it can come back with.
 
 If we only perform actions without any events coming back, we get the type
 ```elm
-"never change" |> Web.Dom.text |> Web.Dom.render
+"never change" |> Web.domText |> Web.domRender
 : Interface nothingEverComesBack
 
-"never change" |> Web.Console.log
+"never change" |> Web.consoleLog
 : Interface nothingEverComesBack
 ```
 Because `nothingEverComesBack` is a variable, it will fit for any other interface type.
@@ -101,7 +101,6 @@ It's nice to give this number state you pass around a name
 
 ```elm
 import Web
-import Web.Dom
 
 type State
     = Counter Int
@@ -111,17 +110,17 @@ app =
     { initialState = Counter 0
     , interface =
         \(Counter counter) ->
-            Web.Dom.element "div"
+            Web.domElement "div"
                 []
-                [ counter |> String.fromInt |> Web.Dom.text
-                , Web.Dom.element "button"
-                    [ Web.Dom.listenTo "click"
-                        |> Web.Dom.modifierFutureMap
+                [ counter |> String.fromInt |> Web.domText
+                , Web.domElement "button"
+                    [ Web.domListenTo "click"
+                        |> Web.domModifierFutureMap
                             (\_ -> Counter (counter + 1))
                     ]
-                    [ "+" |> Web.Dom.text ]
+                    [ "+" |> Web.domText ]
                 ]
-                |> Web.Dom.render
+                |> Web.domRender
     }
 ```
 It allows us to annotate pieces of our app,
@@ -135,7 +134,6 @@ Here we go:
 
 ```elm
 import Web
-import Web.Dom
 
 type State
     = Counter Int
@@ -144,23 +142,23 @@ app =
     { initialState = Counter 0
     , interface =
         \(Counter counter) ->
-            Web.Dom.element "div"
+            Web.domElement "div"
                 []
-                [ Web.Dom.element "button"
-                    [ Web.Dom.listenTo "click"
-                        |> Web.Dom.modifierFutureMap
+                [ Web.domElement "button"
+                    [ Web.domListenTo "click"
+                        |> Web.domModifierFutureMap
                             (\_ -> Counter (counter + 1))
                     ]
-                    [ "+" |> Web.Dom.text ]
-                , counter |> String.fromInt |> Web.Dom.text
-                , Web.Dom.element "button"
-                    [ Web.Dom.listenTo "click"
-                        |> Web.Dom.modifierFutureMap
+                    [ "+" |> Web.domText ]
+                , counter |> String.fromInt |> Web.domText
+                , Web.domElement "button"
+                    [ Web.domListenTo "click"
+                        |> Web.domModifierFutureMap
                             (\_ -> Counter (counter - 1))
                     ]
-                    [ "-" |> Web.Dom.text ]
+                    [ "-" |> Web.domText ]
                 ]
-                |> Web.Dom.render
+                |> Web.domRender
     }
 ```
 
@@ -168,7 +166,6 @@ it can be nice to separate behavior from the interface by explicitly listing all
 
 ```elm
 import Web
-import Web.Dom
 
 type State
     = Counter Int
@@ -181,23 +178,23 @@ app =
     { initialState = WaitingForInitialUrl
     , interface =
         \(Counter counter) ->
-            Web.Dom.element "div"
+            Web.domElement "div"
                 []
-                [ Web.Dom.element "button"
-                    [ Web.Dom.listenTo "click"
-                        |> Web.Dom.modifierFutureMap (\_ -> PlusClicked)
+                [ Web.domElement "button"
+                    [ Web.domListenTo "click"
+                        |> Web.domModifierFutureMap (\_ -> PlusClicked)
                     ]
-                    [ "+" |> Web.Dom.text ]
-                , Web.Dom.element "div"
+                    [ "+" |> Web.domText ]
+                , Web.domElement "div"
                     []
-                    [ counter |> String.fromInt |> Web.Dom.text ]
-                , Web.Dom.element "button"
-                    [ Web.Dom.listenTo "click"
-                        |> Web.Dom.modifierFutureMap (\_ -> MinusClicked)
+                    [ counter |> String.fromInt |> Web.domText ]
+                , Web.domElement "button"
+                    [ Web.domListenTo "click"
+                        |> Web.domModifierFutureMap (\_ -> MinusClicked)
                     ]
-                    [ "-" |> Web.Dom.text ]
+                    [ "-" |> Web.domText ]
                 ]
-                |> Web.Dom.render
+                |> Web.domRender
                 |> Web.interfaceFutureMap
                     (\event ->
                         case event of
@@ -219,7 +216,6 @@ a text showing whether the entered text is a palindrome or not.
 
 ```elm
 import Web
-import Web.Dom
 
 type State
     = State { text : String, warnings : List String }
@@ -231,12 +227,12 @@ app =
     { initialState = State { text = "", warnings = [] }
     , interface =
         \(State state) ->
-            [ Web.Dom.element "div"
+            [ Web.domElement "div"
                 []
-                [ Web.Dom.element "input"
-                    [ Web.Dom.stringProperty "value" state.text
-                    , Web.Dom.listenTo "change"
-                        |> Web.Dom.modifierFutureMap
+                [ Web.domElement "input"
+                    [ Web.domStringProperty "value" state.text
+                    , Web.domListenTo "change"
+                        |> Web.domModifierFutureMap
                             (\eventJson ->
                                 eventJson
                                     |> Json.Decode.decodeString
@@ -245,7 +241,7 @@ app =
                             )
                     ]
                     []
-                , Web.Dom.text
+                , Web.domText
                     (if state.text == (state.text |> String.reverse) then
                         "is a palindrome"
                     
@@ -253,9 +249,9 @@ app =
                         "is not a palindrome"
                     )
                 ]
-                |> Web.Dom.render
+                |> Web.domRender
             , state.warnings
-                |> List.map (\warning -> Web.Console.warn warning)
+                |> List.map (\warning -> Web.consoleWarn warning)
                 |> Web.interfaceBatch
             ]
                 |> Web.interfaceBatch
@@ -283,7 +279,7 @@ Now, how does the `warnings` thing work?
 ```elm
 interface =
     \_ ->
-        Web.Console.log "Hello"
+        Web.consoleLog "Hello"
 ```
 when will it print to the console? All the time? Every time the state changes?
 
@@ -300,7 +296,7 @@ Here's a little exercise for the first point:
 ```elm
 interface =
     \state ->
-        Web.Console.log
+        Web.consoleLog
             (case state |> Basics.remainderBy 2 of
                 0 ->
                     "even"
@@ -312,11 +308,11 @@ interface =
 the state will take on the values: `1 → 2 → 2 → 4`. What will have been printed to the console?
 
 Done? Here's the solution
-  - `state → 1`: we had no prior interface, so the `Web.Console.log "odd"` is a new addition. `odd` is printed
-  - `state → 2`: our prior interface had `Web.Console.log "odd"` which is not part of the new one.
-    But there's a new additional interface: `Web.Console.log "even"`. `even` is printed
-  - `state → 2`: our prior interface had `Web.Console.log "even"` which is also part of the new one. Nothing is printed
-  - `state → 4`: our prior interface had `Web.Console.log "even"` which is also part of the new one. Nothing is printed
+  - `state → 1`: we had no prior interface, so the `Web.consoleLog "odd"` is a new addition. `odd` is printed
+  - `state → 2`: our prior interface had `Web.consoleLog "odd"` which is not part of the new one.
+    But there's a new additional interface: `Web.consoleLog "even"`. `even` is printed
+  - `state → 2`: our prior interface had `Web.consoleLog "even"` which is also part of the new one. Nothing is printed
+  - `state → 4`: our prior interface had `Web.consoleLog "even"` which is also part of the new one. Nothing is printed
 
 So in the end, the app will have printed
 ```
@@ -332,7 +328,6 @@ and not worry about what interfaces could have been constructed previously.
 Now then, here's the promised counter+url example
 ```elm
 import Web
-import Web.Dom
 import AppUrl exposing (AppUrl) -- lydell/elm-app-url
 
 type State
@@ -354,27 +349,27 @@ interface =
     \state ->
         case state of
             Counter counter ->
-                [ Web.Dom.element "div"
+                [ Web.domElement "div"
                     []
-                    [ Web.Dom.element "button"
-                        [ Web.Dom.listenTo "click" ]
-                        [ "+" |> Web.Dom.text ]
-                        |> Web.Dom.futureMap (\_ -> PlusClicked)
-                    , Web.Dom.element "div"
+                    [ Web.domElement "button"
+                        [ Web.domListenTo "click" ]
+                        [ "+" |> Web.domText ]
+                        |> Web.domFutureMap (\_ -> PlusClicked)
+                    , Web.domElement "div"
                         []
-                        [ counter |> String.fromInt |> Web.Dom.text ]
-                    , Web.Dom.element "button"
-                        [ Web.Dom.listenTo "click" ]
-                        [ "-" |> Web.Dom.text ]
-                        |> Web.Dom.futureMap (\_ -> MinusClicked)
+                        [ counter |> String.fromInt |> Web.domText ]
+                    , Web.domElement "button"
+                        [ Web.domListenTo "click" ]
+                        [ "-" |> Web.domText ]
+                        |> Web.domFutureMap (\_ -> MinusClicked)
                     ]
-                    |> Web.Dom.render
-                , Web.Navigation.pushUrl
+                    |> Web.domRender
+                , Web.pushUrl
                     { path = []
                     , queryParameters = Dict.singleton "counter" [ counter |> String.fromInt ]
                     , fragment = Nothing
                     }
-                , Web.Navigation.movementListen |> Web.interfaceFutureMap UserWentToUrl
+                , Web.navigationListen |> Web.interfaceFutureMap UserWentToUrl
                 ]
                     |> Web.interfaceBatch
                     |> Web.interfaceFutureMap
@@ -391,7 +386,7 @@ interface =
                         )
             
             WaitingForInitialUrl ->
-                Web.Navigation.urlRequest
+                Web.urlRequest
                     |> Web.interfaceFutureMap
                         (\initialUrl ->
                             Counter (initialUrl |> counterUrlParse |> Maybe.withDefault 0)
@@ -417,20 +412,20 @@ Don't both just give you the latest url?
 The Elm Architecture uses command/task types for one and subscription types for the other.
 In state-interface, these 2 look identical:
 ```elm
-Web.Window.sizeRequest : Interface { width : Int, height : Int }
-Web.Window.resizeListen : Interface { width : Int, height : Int }
+Web.windowSizeRequest : Interface { width : Int, height : Int }
+Web.windowResizeListen : Interface { width : Int, height : Int }
 ```
 "-Listen" is equivalent to subscription in The Elm Architecture, "-Request" is roughly like command/task.
 So trying to keep your window size state updated using
 ```elm
-Web.Window.sizeRequest
+Web.windowSizeRequest
     |> Web.interfaceFutureMap (\windowSize -> { state | windowSize = windowSize })
 ```
 is not going to work as the request will only be executed once.
 
 So the full solution to always get the current window size is
 ```elm
-[ Web.Window.sizeRequest, Web.Window.resizeListen ]
+[ Web.windowSizeRequest, Web.windowResizeListen ]
     |> Web.interfaceBatch
     |> Web.interfaceFutureMap (\windowSize -> { state | windowSize = windowSize })
 ```
@@ -440,7 +435,7 @@ So the full solution to always get the current window size is
 
 Why can't we do the same in the counter + url example above?
 ```elm
-[ Navigation.urlRequest, Web.Navigation.movementListen ]
+[ Web.urlRequest, Web.navigationListen ]
     |> Web.interfaceBatch
     |> Web.interfaceFutureMap UserWentToUrl
 ```
@@ -602,7 +597,7 @@ For now, some more niche interfaces like [`WebGL.Texture.loadWith`](https://dark
 ## future
 
   - ⛵ add more [example projects](https://github.com/lue-bird/elm-state-interface-experimental/tree/main/example). Would you like to see something specific? Or maybe you're motivated to make one yourself 👀
-  - 📐 `Web.Dom.element "div" ...` etc are a bit clumsy. Sadly, most ui packages out there only convert to a type inaccessible to `state-interface`, making them incompatible. Though a port of them would be awesome, a good first step may be creating a package for generating the html/svg/... elements, inspired by [`Orasund/elm-html-style`](https://dark.elm.dmy.fr/packages/Orasund/elm-html-style/latest/)
+  - 📐 `Web.domElement "div" ...` etc are a bit clumsy. Sadly, most ui packages out there only convert to a type inaccessible to `state-interface`, making them incompatible. Though a port of them would be awesome, a good first step may be creating a package for generating the html/svg/... elements, inspired by [`Orasund/elm-html-style`](https://dark.elm.dmy.fr/packages/Orasund/elm-html-style/latest/)
   - 🔋 add the web APIs you miss the most. Maybe [MIDI](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API), [speech](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API), [sensors](https://developer.mozilla.org/en-US/docs/Web/API/Sensor_APIs) or [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)?
   - 🗃️ add basic `node` or `deno` APIs (only with help!)
 

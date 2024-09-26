@@ -2,54 +2,53 @@ module Svg.LocalExtra exposing (circle, ellipse, fillUniform, line, polygon, pol
 
 import Angle
 import Color exposing (Color)
-import Web.Dom
-import Web.Svg
+import Web
 
 
 line :
     { start : { x : Float, y : Float }, end : { x : Float, y : Float } }
-    -> List (Web.Dom.Modifier future)
-    -> Web.Dom.Node future
+    -> List (Web.DomModifier future)
+    -> Web.DomNode future
 line lineGeometry additionalModifiers =
-    Web.Svg.element "line"
-        ([ Web.Dom.attribute "x1" (lineGeometry.start.x |> String.fromFloat)
-         , Web.Dom.attribute "y1" (lineGeometry.start.y |> String.fromFloat)
-         , Web.Dom.attribute "x2" (lineGeometry.end.x |> String.fromFloat)
-         , Web.Dom.attribute "y2" (lineGeometry.end.y |> String.fromFloat)
+    Web.svgElement "line"
+        ([ Web.domAttribute "x1" (lineGeometry.start.x |> String.fromFloat)
+         , Web.domAttribute "y1" (lineGeometry.start.y |> String.fromFloat)
+         , Web.domAttribute "x2" (lineGeometry.end.x |> String.fromFloat)
+         , Web.domAttribute "y2" (lineGeometry.end.y |> String.fromFloat)
          ]
             ++ additionalModifiers
         )
         []
 
 
-circle : { position : { x : Float, y : Float }, radius : Float } -> List (Web.Dom.Modifier future) -> Web.Dom.Node future
+circle : { position : { x : Float, y : Float }, radius : Float } -> List (Web.DomModifier future) -> Web.DomNode future
 circle geometry additionalModifiers =
-    Web.Svg.element "circle"
-        ([ Web.Dom.attribute "cx" ((geometry.position.x |> String.fromFloat) ++ "px")
-         , Web.Dom.attribute "cy" ((geometry.position.y |> String.fromFloat) ++ "px")
-         , Web.Dom.attribute "r" ((geometry.radius |> String.fromFloat) ++ "px")
+    Web.svgElement "circle"
+        ([ Web.domAttribute "cx" ((geometry.position.x |> String.fromFloat) ++ "px")
+         , Web.domAttribute "cy" ((geometry.position.y |> String.fromFloat) ++ "px")
+         , Web.domAttribute "r" ((geometry.radius |> String.fromFloat) ++ "px")
          ]
             ++ additionalModifiers
         )
         []
 
 
-ellipse : { position : { x : Float, y : Float }, radiusX : Float, radiusY : Float } -> List (Web.Dom.Modifier future) -> Web.Dom.Node future
+ellipse : { position : { x : Float, y : Float }, radiusX : Float, radiusY : Float } -> List (Web.DomModifier future) -> Web.DomNode future
 ellipse geometry additionalModifiers =
-    Web.Svg.element "ellipse"
-        ([ Web.Dom.attribute "cx" ((geometry.position.x |> String.fromFloat) ++ "px")
-         , Web.Dom.attribute "cy" ((geometry.position.y |> String.fromFloat) ++ "px")
-         , Web.Dom.attribute "rx" ((geometry.radiusX |> String.fromFloat) ++ "px")
-         , Web.Dom.attribute "ry" ((geometry.radiusY |> String.fromFloat) ++ "px")
+    Web.svgElement "ellipse"
+        ([ Web.domAttribute "cx" ((geometry.position.x |> String.fromFloat) ++ "px")
+         , Web.domAttribute "cy" ((geometry.position.y |> String.fromFloat) ++ "px")
+         , Web.domAttribute "rx" ((geometry.radiusX |> String.fromFloat) ++ "px")
+         , Web.domAttribute "ry" ((geometry.radiusY |> String.fromFloat) ++ "px")
          ]
             ++ additionalModifiers
         )
         []
 
 
-rotated : { angle : Angle.Angle, center : { x : Float, y : Float } } -> Web.Dom.Modifier future_
+rotated : { angle : Angle.Angle, center : { x : Float, y : Float } } -> Web.DomModifier future_
 rotated geometry =
-    Web.Dom.attribute "transform"
+    Web.domAttribute "transform"
         ([ "rotate("
          , geometry.angle |> Angle.inDegrees |> String.fromFloat
          , ", "
@@ -62,20 +61,20 @@ rotated geometry =
         )
 
 
-fillUniform : Color -> Web.Dom.Modifier future_
+fillUniform : Color -> Web.DomModifier future_
 fillUniform color =
-    Web.Dom.attribute "fill" (color |> Color.toCssString)
+    Web.domAttribute "fill" (color |> Color.toCssString)
 
 
-strokeUniform : Color -> Web.Dom.Modifier future_
+strokeUniform : Color -> Web.DomModifier future_
 strokeUniform color =
-    Web.Dom.attribute "stroke" (color |> Color.toCssString)
+    Web.domAttribute "stroke" (color |> Color.toCssString)
 
 
-points : List { x : Float, y : Float } -> Web.Dom.Modifier future_
+points : List { x : Float, y : Float } -> Web.DomModifier future_
 points =
     \points_ ->
-        Web.Dom.attribute "points"
+        Web.domAttribute "points"
             ((case points_ of
                 [ onlyElement ] ->
                     [ onlyElement, onlyElement ]
@@ -88,23 +87,23 @@ points =
             )
 
 
-polygon : List { x : Float, y : Float } -> List (Web.Dom.Modifier future) -> Web.Dom.Node future
+polygon : List { x : Float, y : Float } -> List (Web.DomModifier future) -> Web.DomNode future
 polygon points_ additionalModifiers =
-    Web.Svg.element "polyline"
+    Web.svgElement "polyline"
         (points points_
             :: additionalModifiers
         )
         []
 
 
-strokeWidth : Float -> Web.Dom.Modifier future_
+strokeWidth : Float -> Web.DomModifier future_
 strokeWidth pixels =
-    Web.Dom.attribute "stroke-width" ((pixels |> String.fromFloat) ++ "px")
+    Web.domAttribute "stroke-width" ((pixels |> String.fromFloat) ++ "px")
 
 
-polyline : List { x : Float, y : Float } -> List (Web.Dom.Modifier future) -> Web.Dom.Node future
+polyline : List { x : Float, y : Float } -> List (Web.DomModifier future) -> Web.DomNode future
 polyline points_ additionalModifiers =
-    Web.Svg.element "polyline"
+    Web.svgElement "polyline"
         (points points_
             :: additionalModifiers
         )

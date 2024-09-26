@@ -13,14 +13,6 @@ import Set
 import Svg.LocalExtra
 import Time
 import Web
-import Web.Audio
-import Web.Audio.Parameter
-import Web.Dom
-import Web.Gamepads
-import Web.Navigation
-import Web.Svg
-import Web.Time
-import Web.Window
 
 
 main : Program () (Web.ProgramState State) (Web.ProgramEvent State)
@@ -35,7 +27,7 @@ programConfig =
         \stateChoice ->
             case stateChoice of
                 WaitingForInitialUrl ->
-                    Web.Navigation.urlRequest
+                    Web.urlRequest
                         |> Web.interfaceFutureMap
                             (\initialUrl ->
                                 case initialUrl |> appUrlToState of
@@ -55,8 +47,8 @@ programConfig =
 
                 Initialized initialized ->
                     [ initialized |> initializedInterface
-                    , Web.Navigation.pushUrl (initialized |> stateToAppUrl)
-                    , Web.Navigation.movementListen
+                    , Web.pushUrl (initialized |> stateToAppUrl)
+                    , Web.navigationListen
                         |> Web.interfaceFutureMap
                             (\newUrl ->
                                 case newUrl |> appUrlToState of
@@ -124,52 +116,52 @@ initializedInterface =
                 mapWithExitInterface
 
 
-narrativeUiFrame : List (Web.Dom.Modifier state) -> List (Web.Dom.Node state) -> Web.Dom.Node state
+narrativeUiFrame : List (Web.DomModifier state) -> List (Web.DomNode state) -> Web.DomNode state
 narrativeUiFrame modifiers subs =
     uiFrame
         modifiers
-        [ Web.Dom.element "div"
-            [ Web.Dom.style "max-width" "870px"
-            , Web.Dom.style "padding-top" "80px"
+        [ Web.domElement "div"
+            [ Web.domStyle "max-width" "870px"
+            , Web.domStyle "padding-top" "80px"
             ]
             subs
         ]
 
 
-uiFrame : List (Web.Dom.Modifier state) -> List (Web.Dom.Node state) -> Web.Dom.Node state
+uiFrame : List (Web.DomModifier state) -> List (Web.DomNode state) -> Web.DomNode state
 uiFrame modifiers subs =
-    Web.Dom.element "div"
-        ([ Web.Dom.style "font-size" "2em"
-         , Web.Dom.style "padding-left" "80px"
-         , Web.Dom.style "padding-right" "80px"
-         , Web.Dom.style "position" "fixed"
-         , Web.Dom.style "top" "0"
-         , Web.Dom.style "right" "0"
-         , Web.Dom.style "bottom" "0"
-         , Web.Dom.style "left" "0"
-         , Web.Dom.style "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
-         , Web.Dom.style "color" (Color.rgb 1 1 1 |> Color.toCssString)
+    Web.domElement "div"
+        ([ Web.domStyle "font-size" "2em"
+         , Web.domStyle "padding-left" "80px"
+         , Web.domStyle "padding-right" "80px"
+         , Web.domStyle "position" "fixed"
+         , Web.domStyle "top" "0"
+         , Web.domStyle "right" "0"
+         , Web.domStyle "bottom" "0"
+         , Web.domStyle "left" "0"
+         , Web.domStyle "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
+         , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
          ]
             ++ modifiers
         )
         subs
 
 
-buttonUi : List (Web.Dom.Modifier ()) -> List (Web.Dom.Node ()) -> Web.Dom.Node ()
+buttonUi : List (Web.DomModifier ()) -> List (Web.DomNode ()) -> Web.DomNode ()
 buttonUi modifiers subs =
-    Web.Dom.element "button"
-        ([ Web.Dom.listenTo "click"
-            |> Web.Dom.modifierFutureMap (\_ -> ())
-         , Web.Dom.style "background-color" "#000000"
-         , Web.Dom.style "border" "3px solid"
-         , Web.Dom.style "border-radius" "50px"
-         , Web.Dom.style "color" "#FFFFFF"
-         , Web.Dom.style "padding" "5px 15px"
-         , Web.Dom.style "margin" "7px 0px"
-         , Web.Dom.style "text-align" "center"
-         , Web.Dom.style "display" "inline-block"
-         , Web.Dom.style "font-size" "1em"
-         , Web.Dom.style "font-family" "inherit"
+    Web.domElement "button"
+        ([ Web.domListenTo "click"
+            |> Web.domModifierFutureMap (\_ -> ())
+         , Web.domStyle "background-color" "#000000"
+         , Web.domStyle "border" "3px solid"
+         , Web.domStyle "border-radius" "50px"
+         , Web.domStyle "color" "#FFFFFF"
+         , Web.domStyle "padding" "5px 15px"
+         , Web.domStyle "margin" "7px 0px"
+         , Web.domStyle "text-align" "center"
+         , Web.domStyle "display" "inline-block"
+         , Web.domStyle "font-size" "1em"
+         , Web.domStyle "font-family" "inherit"
          ]
             ++ modifiers
         )
@@ -180,8 +172,8 @@ startingRoomInterface : StartingRoomState -> Web.Interface InitializedState
 startingRoomInterface =
     \state ->
         [ narrativeUiFrame
-            [ Web.Dom.listenTo "mousemove"
-                |> Web.Dom.modifierFutureMap
+            [ Web.domListenTo "mousemove"
+                |> Web.domModifierFutureMap
                     (\mouseEvent ->
                         mouseEvent
                             |> Json.Decode.decodeValue
@@ -192,20 +184,20 @@ startingRoomInterface =
                             |> MouseMovedTo
                     )
             ]
-            [ "Your gaze drifts towards a clock on the wall " |> Web.Dom.text
+            [ "Your gaze drifts towards a clock on the wall " |> Web.domText
             , clockUi { posix = state.posix, timezone = state.timezone }
-            , " and with a shiver you realize. You're trapped in a state-interface. Countless questions rush in:" |> Web.Dom.text
-            , Web.Dom.element "ul"
+            , " and with a shiver you realize. You're trapped in a state-interface. Countless questions rush in:" |> Web.domText
+            , Web.domElement "ul"
                 []
-                [ Web.Dom.element "li"
+                [ Web.domElement "li"
                     []
-                    [ Web.Dom.element "q"
+                    [ Web.domElement "q"
                         []
-                        [ "How did you get here?" |> Web.Dom.text ]
+                        [ "How did you get here?" |> Web.domText ]
                     ]
-                , Web.Dom.element "li"
+                , Web.domElement "li"
                     []
-                    [ Web.Dom.element "q"
+                    [ Web.domElement "q"
                         []
                         [ ([ "Why do I know that you're exactly at "
                            , "x"
@@ -216,51 +208,51 @@ startingRoomInterface =
                            ]
                             |> String.concat
                           )
-                            |> Web.Dom.text
+                            |> Web.domText
                         ]
                     ]
-                , Web.Dom.element "li"
+                , Web.domElement "li"
                     []
-                    [ Web.Dom.element "q"
+                    [ Web.domElement "q"
                         []
-                        [ "How did I know your name is " |> Web.Dom.text
-                        , textInputUi state.name |> Web.Dom.futureMap NameChanged
-                        , "?" |> Web.Dom.text
+                        [ "How did I know your name is " |> Web.domText
+                        , textInputUi state.name |> Web.domFutureMap NameChanged
+                        , "?" |> Web.domText
                         ]
                     ]
-                , Web.Dom.element "li"
+                , Web.domElement "li"
                     []
-                    [ Web.Dom.element "q"
+                    [ Web.domElement "q"
                         []
-                        [ "Why is there a tutl?" |> Web.Dom.text ]
-                    , Web.Svg.element "svg"
-                        [ Web.Dom.attribute "viewBox" "0 12 96 40"
-                        , Web.Dom.attribute "width" "96"
-                        , Web.Dom.attribute "height" "40"
+                        [ "Why is there a tutl?" |> Web.domText ]
+                    , Web.svgElement "svg"
+                        [ Web.domAttribute "viewBox" "0 12 96 40"
+                        , Web.domAttribute "width" "96"
+                        , Web.domAttribute "height" "40"
                         ]
-                        [ Web.Svg.element "image"
-                            [ Web.Dom.attribute "width" "72"
-                            , Web.Dom.attribute "height" "72"
-                            , Web.Dom.attribute "href" "https://elm-lang.org/images/turtle.gif"
+                        [ Web.svgElement "image"
+                            [ Web.domAttribute "width" "72"
+                            , Web.domAttribute "height" "72"
+                            , Web.domAttribute "href" "https://elm-lang.org/images/turtle.gif"
                             ]
                             []
                         ]
                     ]
                 ]
-            , Web.Dom.element "p"
+            , Web.domElement "p"
                 []
-                [ Web.Dom.element "q"
+                [ Web.domElement "q"
                     []
-                    [ "Don't worry" |> Web.Dom.text ]
-                , Web.Dom.text ", I say. "
-                , Web.Dom.element "q"
+                    [ "Don't worry" |> Web.domText ]
+                , Web.domText ", I say. "
+                , Web.domElement "q"
                     []
-                    [ "I know how we can get out. See this little bird on the sign over there? It will give us a map for 💎3" |> Web.Dom.text ]
+                    [ "I know how we can get out. See this little bird on the sign over there? It will give us a map for 💎3" |> Web.domText ]
                 ]
-            , Web.Dom.element "p"
+            , Web.domElement "p"
                 []
-                [ "The voice repeats: " |> Web.Dom.text
-                , Web.Dom.element "q"
+                [ "The voice repeats: " |> Web.domText
+                , Web.domElement "q"
                     []
                     [ ([ "Don't worry. Here,  take a couple 💎 if you want"
                        , case state.name of
@@ -273,31 +265,31 @@ startingRoomInterface =
                        ]
                         |> String.concat
                       )
-                        |> Web.Dom.text
+                        |> Web.domText
                     ]
                 ]
-            , Web.Dom.element "div"
-                [ Web.Dom.style "padding-top" "30px"
-                , Web.Dom.style "padding-bottom" "30px"
+            , Web.domElement "div"
+                [ Web.domStyle "padding-top" "30px"
+                , Web.domStyle "padding-bottom" "30px"
                 ]
                 [ buttonUi
-                    [ Web.Dom.style "height" "60px"
-                    , Web.Dom.style "width" "60px"
-                    , Web.Dom.style "text-align" "center"
+                    [ Web.domStyle "height" "60px"
+                    , Web.domStyle "width" "60px"
+                    , Web.domStyle "text-align" "center"
                     ]
-                    [ "+" |> Web.Dom.text ]
-                    |> Web.Dom.futureMap (\() -> GemCountIncreaseClicked)
-                , Web.Dom.element "b"
-                    [ Web.Dom.style "padding" "15px 15px"
+                    [ "+" |> Web.domText ]
+                    |> Web.domFutureMap (\() -> GemCountIncreaseClicked)
+                , Web.domElement "b"
+                    [ Web.domStyle "padding" "15px 15px"
                     ]
-                    [ "💎" ++ (state.gemCount |> String.fromInt) |> Web.Dom.text ]
+                    [ "💎" ++ (state.gemCount |> String.fromInt) |> Web.domText ]
                 , buttonUi
-                    [ Web.Dom.style "height" "60px"
-                    , Web.Dom.style "width" "60px"
-                    , Web.Dom.style "text-align" "center"
+                    [ Web.domStyle "height" "60px"
+                    , Web.domStyle "width" "60px"
+                    , Web.domStyle "text-align" "center"
                     ]
-                    [ "-" |> Web.Dom.text ]
-                    |> Web.Dom.futureMap (\() -> GemCountDecreaseClicked)
+                    [ "-" |> Web.domText ]
+                    |> Web.domFutureMap (\() -> GemCountDecreaseClicked)
                 ]
             , buttonUi []
                 [ "walk towards the sign as "
@@ -308,13 +300,13 @@ startingRoomInterface =
                             Just name ->
                                 name
                        )
-                    |> Web.Dom.text
+                    |> Web.domText
                 ]
-                |> Web.Dom.futureMap (\() -> WalkToSignClicked)
+                |> Web.domFutureMap (\() -> WalkToSignClicked)
             ]
-            |> Web.Dom.render
-        , Web.Time.zoneRequest |> Web.interfaceFutureMap TimeZoneReceived
-        , Web.Time.periodicallyListen Duration.second |> Web.interfaceFutureMap TimePassed
+            |> Web.domRender
+        , Web.timeZoneRequest |> Web.interfaceFutureMap TimeZoneReceived
+        , Web.timePeriodicallyListen Duration.second |> Web.interfaceFutureMap TimePassed
         ]
             |> Web.interfaceBatch
             |> Web.interfaceFutureMap
@@ -369,11 +361,11 @@ startingRoomInterface =
                 )
 
 
-textInputUi : Maybe String -> Web.Dom.Node (Result Json.Decode.Error String)
+textInputUi : Maybe String -> Web.DomNode (Result Json.Decode.Error String)
 textInputUi currentInputValue =
-    Web.Dom.element "input"
-        [ Web.Dom.attribute "type" "text"
-        , Web.Dom.stringProperty "value"
+    Web.domElement "input"
+        [ Web.domAttribute "type" "text"
+        , Web.domStringProperty "value"
             (case currentInputValue of
                 Nothing ->
                     ""
@@ -381,24 +373,24 @@ textInputUi currentInputValue =
                 Just inputValue ->
                     inputValue
             )
-        , Web.Dom.listenTo "input"
-            |> Web.Dom.modifierFutureMap
+        , Web.domListenTo "input"
+            |> Web.domModifierFutureMap
                 (Json.Decode.decodeValue
                     (Json.Decode.field "target" (Json.Decode.field "value" Json.Decode.string))
                 )
-        , Web.Dom.style "font-size" "1em"
-        , Web.Dom.style "background-color" "transparent"
-        , Web.Dom.style "border-bottom" "3px solid white"
-        , Web.Dom.style "border-top" "none"
-        , Web.Dom.style "border-left" "none"
-        , Web.Dom.style "border-right" "none"
-        , Web.Dom.style "color" "inherit"
-        , Web.Dom.style "font-family" "inherit"
+        , Web.domStyle "font-size" "1em"
+        , Web.domStyle "background-color" "transparent"
+        , Web.domStyle "border-bottom" "3px solid white"
+        , Web.domStyle "border-top" "none"
+        , Web.domStyle "border-left" "none"
+        , Web.domStyle "border-right" "none"
+        , Web.domStyle "color" "inherit"
+        , Web.domStyle "font-family" "inherit"
         ]
         []
 
 
-clockUi : { posix : Time.Posix, timezone : Time.Zone } -> Web.Dom.Node state_
+clockUi : { posix : Time.Posix, timezone : Time.Zone } -> Web.DomNode state_
 clockUi state =
     let
         hour : Int
@@ -413,10 +405,10 @@ clockUi state =
         second =
             Time.toSecond state.timezone state.posix
     in
-    Web.Svg.element "svg"
-        [ Web.Dom.attribute "viewBox" "0 0 60 60"
-        , Web.Dom.attribute "width" "60"
-        , Web.Dom.attribute "height" "60"
+    Web.svgElement "svg"
+        [ Web.domAttribute "viewBox" "0 0 60 60"
+        , Web.domAttribute "width" "60"
+        , Web.domAttribute "height" "60"
         ]
         [ Svg.LocalExtra.circle
             { radius = 30
@@ -433,7 +425,7 @@ clockUi state =
         ]
 
 
-clockHandUi : { width : Int, length : Float, turns : Float } -> Web.Dom.Node state_
+clockHandUi : { width : Int, length : Float, turns : Float } -> Web.DomNode state_
 clockHandUi config =
     let
         clockTurns : Float
@@ -449,7 +441,7 @@ clockHandUi config =
         }
         [ Svg.LocalExtra.strokeUniform (Color.rgb 1 1 1)
         , Svg.LocalExtra.strokeWidth (config.width |> Basics.toFloat)
-        , Web.Dom.attribute "stroke-linecap" "round"
+        , Web.domAttribute "stroke-linecap" "round"
         ]
 
 
@@ -478,29 +470,29 @@ atSignInterface : AtSignState -> Web.Interface InitializedState
 atSignInterface =
     \state ->
         [ narrativeUiFrame []
-            [ Web.Dom.element "p"
+            [ Web.domElement "p"
                 []
-                [ Web.Dom.element "q"
+                [ Web.domElement "q"
                     []
-                    [ ([ "And there we are, ", state.name, "!" ] |> String.concat) |> Web.Dom.text ]
+                    [ ([ "And there we are, ", state.name, "!" ] |> String.concat) |> Web.domText ]
                 ]
-            , Web.Dom.element "div"
-                [ Web.Dom.style "text-align" "center"
-                , Web.Dom.style "width" "50%"
+            , Web.domElement "div"
+                [ Web.domStyle "text-align" "center"
+                , Web.domStyle "width" "50%"
                 ]
-                [ "🕊️" |> Web.Dom.text ]
-            , Web.Dom.element "div"
-                [ Web.Dom.style "text-align" "center"
-                , Web.Dom.style "width" "50%"
+                [ "🕊️" |> Web.domText ]
+            , Web.domElement "div"
+                [ Web.domStyle "text-align" "center"
+                , Web.domStyle "width" "50%"
                 ]
-                [ "🎏" |> Web.Dom.text ]
-            , Web.Dom.element "p"
+                [ "🎏" |> Web.domText ]
+            , Web.domElement "p"
                 []
                 [ case state.appleCount of
                     0 ->
-                        Web.Dom.element "q"
+                        Web.domElement "q"
                             []
-                            [ "Don't you think the bird looks a bit hungry..." |> Web.Dom.text ]
+                            [ "Don't you think the bird looks a bit hungry..." |> Web.domText ]
 
                     non0AppleCount ->
                         ([ "You've already picked "
@@ -509,17 +501,17 @@ atSignInterface =
                          ]
                             |> String.concat
                         )
-                            |> Web.Dom.text
+                            |> Web.domText
                 ]
             , case state.birdConversationState of
                 WaitingForTalk ->
-                    Web.Dom.element "div"
+                    Web.domElement "div"
                         []
                         [ buttonUi []
-                            [ "talk to the bird" |> Web.Dom.text
+                            [ "talk to the bird" |> Web.domText
                             ]
-                            |> Web.Dom.futureMap (\() -> TalkToBirdClicked)
-                        , " or " |> Web.Dom.text
+                            |> Web.domFutureMap (\() -> TalkToBirdClicked)
+                        , " or " |> Web.domText
                         , buttonUi []
                             [ (case state.appleCount of
                                 0 ->
@@ -528,83 +520,83 @@ atSignInterface =
                                 _ ->
                                     "pick even more 🍎s"
                               )
-                                |> Web.Dom.text
+                                |> Web.domText
                             ]
-                            |> Web.Dom.futureMap (\() -> PickApplesClicked)
+                            |> Web.domFutureMap (\() -> PickApplesClicked)
                         ]
 
                 GreetingAndAskingForWhatYouWant ->
-                    Web.Dom.element "div"
+                    Web.domElement "div"
                         []
-                        [ Web.Dom.element "p"
+                        [ Web.domElement "p"
                             []
-                            [ Web.Dom.element "q"
+                            [ Web.domElement "q"
                                 []
                                 [ "chirp chirp. Thanks for coming by!"
                                     ++ " I usually sell for 💎 but since your new here, a couple of 🍎s would make me happy as well :)"
-                                    |> Web.Dom.text
+                                    |> Web.domText
                                 ]
                             ]
                         , buttonUi []
-                            [ "Ask for an introduction" |> Web.Dom.text
+                            [ "Ask for an introduction" |> Web.domText
                             ]
-                            |> Web.Dom.futureMap (\() -> BirdTellAboutYourselfClicked)
-                        , " or " |> Web.Dom.text
+                            |> Web.domFutureMap (\() -> BirdTellAboutYourselfClicked)
+                        , " or " |> Web.domText
                         , buttonUi []
-                            [ "Buy map with the exit" |> Web.Dom.text
+                            [ "Buy map with the exit" |> Web.domText
                             ]
-                            |> Web.Dom.futureMap (\() -> BuyMapClicked)
+                            |> Web.domFutureMap (\() -> BuyMapClicked)
                         ]
 
                 BirdTellAboutItself ->
-                    Web.Dom.element "div"
+                    Web.domElement "div"
                         []
-                        [ Web.Dom.element "q"
+                        [ Web.domElement "q"
                             []
                             [ "Jo jo. I'm the map and info dealer in this village since I fly around a lot."
                                 ++ " If you want to catch me to suggest some offers I could make you, write me a "
-                                |> Web.Dom.text
+                                |> Web.domText
+                            , Web.domElement "a"
+                                [ Web.domAttribute "href" "https://github.com/lue-bird/elm-state-interface-experimental/discussions/new/choose"
+                                , Web.domStyle "color" "inherit"
+                                ]
+                                [ "letter" |> Web.domText ]
                             ]
-                        , Web.Dom.element "a"
-                            [ Web.Dom.attribute "href" "https://github.com/lue-bird/elm-state-interface-experimental/discussions/new/choose"
-                            , Web.Dom.style "color" "inherit"
-                            ]
-                            [ "letter" |> Web.Dom.text ]
                         , buttonUi []
-                            [ "Buy map with the exit" |> Web.Dom.text
+                            [ "Buy map with the exit" |> Web.domText
                             ]
-                            |> Web.Dom.futureMap (\() -> BuyMapClicked)
+                            |> Web.domFutureMap (\() -> BuyMapClicked)
                         ]
 
                 AskedBirdForMap ->
-                    Web.Dom.element "div"
+                    Web.domElement "div"
                         []
-                        [ Web.Dom.element "p"
+                        [ Web.domElement "p"
                             []
-                            [ Web.Dom.element "q"
+                            [ Web.domElement "q"
                                 []
-                                [ "Hope you'll come by again!" |> Web.Dom.text ]
-                            , " says the bird, looking a bit down" |> Web.Dom.text
+                                [ "Hope you'll come by again!" |> Web.domText ]
+                            , " says the bird, looking a bit down" |> Web.domText
                             ]
                         , buttonUi []
-                            [ "Open the map" |> Web.Dom.text
+                            [ "Open the map" |> Web.domText
                             ]
-                            |> Web.Dom.futureMap (\() -> OpenMapClicked)
+                            |> Web.domFutureMap (\() -> OpenMapClicked)
                         ]
 
                 TooHungryToSell ->
-                    Web.Dom.element "div"
+                    Web.domElement "div"
                         []
-                        [ Web.Dom.element "q"
+                        [ Web.domElement "q"
                             []
-                            [ "Nah, I'm hungry, I will need more of these fresh 🍎s" |> Web.Dom.text ]
+                            [ "Nah, I'm hungry, I will need more of these fresh 🍎s" |> Web.domText ]
                         , buttonUi []
-                            [ "pick 🍎s" |> Web.Dom.text
+                            [ "pick 🍎s" |> Web.domText
                             ]
-                            |> Web.Dom.futureMap (\() -> PickApplesClicked)
+                            |> Web.domFutureMap (\() -> PickApplesClicked)
                         ]
             ]
-            |> Web.Dom.render
+            |> Web.domRender
         ]
             |> Web.interfaceBatch
             |> Web.interfaceFutureMap
@@ -648,24 +640,24 @@ pickApplesInterface state =
             state.eatAppleTimes
                 |> List.map
                     (\eatAppleAudio ->
-                        Web.Audio.fromSource eatAppleAudioSource eatAppleAudio.time
-                            |> Web.Audio.speedScaleBy
-                                (Web.Audio.Parameter.at
+                        Web.audioFromSource eatAppleAudioSource eatAppleAudio.time
+                            |> Web.audioSpeedScaleBy
+                                (Web.audioParameterAt
                                     (2 ^ ((eatAppleAudio.nthPickedApple |> Basics.toFloat) * 0.01))
                                 )
                     )
-                |> List.map Web.Audio.play
+                |> List.map Web.audioPlay
                 |> Web.interfaceBatch
 
         _ ->
-            Web.Audio.sourceLoad "eat-apple.mp3"
+            Web.audioSourceLoad "eat-apple.mp3"
                 |> Web.interfaceFutureMap EatAppleAudioReceived
-    , Web.Time.periodicallyListen (Duration.milliseconds 110)
+    , Web.timePeriodicallyListen (Duration.milliseconds 110)
         |> Web.interfaceFutureMap PickApplesSimulationTick
-    , [ Web.Window.sizeRequest, Web.Window.resizeListen ]
+    , [ Web.windowSizeRequest, Web.windowResizeListen ]
         |> Web.interfaceBatch
         |> Web.interfaceFutureMap WindowSizeReceived
-    , Web.Window.listenTo "keydown"
+    , Web.windowListenTo "keydown"
         |> Web.interfaceFutureMap
             (\event ->
                 event
@@ -673,7 +665,7 @@ pickApplesInterface state =
                         (Json.Decode.field "key" Json.Decode.string)
                     |> PickApplesKeyPressed
             )
-    , [ Web.Gamepads.request, Web.Gamepads.changeListen ]
+    , [ Web.gamepadsRequest, Web.gamepadsChangeListen ]
         |> Web.interfaceBatch
         |> Web.interfaceFutureMap
             (\gamepads ->
@@ -681,12 +673,12 @@ pickApplesInterface state =
                     (gamepads |> Dict.foldr (\_ gamepad _ -> gamepad |> Just) Nothing)
             )
     , let
-        worldUi : Web.Dom.Node state_
+        worldUi : Web.DomNode state_
         worldUi =
-            Web.Svg.element "rect"
+            Web.svgElement "rect"
                 [ Svg.LocalExtra.fillUniform Color.black
-                , Web.Dom.attribute "width" "100%"
-                , Web.Dom.attribute "height" "100%"
+                , Web.domAttribute "width" "100%"
+                , Web.domAttribute "height" "100%"
                 ]
                 []
 
@@ -727,7 +719,7 @@ pickApplesInterface state =
         cellSideLength =
             worldSize.width / (worldSizeCells.x |> Basics.toFloat)
 
-        headTailUi : Web.Dom.Node future_
+        headTailUi : Web.DomNode future_
         headTailUi =
             let
                 segments : List (List { x : Int, y : Int })
@@ -735,7 +727,7 @@ pickApplesInterface state =
                     (state.headLocation :: state.tailSegments)
                         |> splitIntoSegmentsThatDoNotWrapAround
 
-                legsUi : Web.Dom.Node future_
+                legsUi : Web.DomNode future_
                 legsUi =
                     segments
                         |> List.concat
@@ -754,7 +746,7 @@ pickApplesInterface state =
                                     }
                                     [ Svg.LocalExtra.strokeUniform (Color.rgb 0.5 0.7 0.7)
                                     , Svg.LocalExtra.strokeWidth (cellSideLength * 0.3)
-                                    , Web.Dom.attribute "stroke-linecap" "round"
+                                    , Web.domAttribute "stroke-linecap" "round"
                                     ]
                                 , Svg.LocalExtra.line
                                     { start =
@@ -768,14 +760,14 @@ pickApplesInterface state =
                                     }
                                     [ Svg.LocalExtra.strokeUniform (Color.rgb 0.5 0.7 0.7)
                                     , Svg.LocalExtra.strokeWidth (cellSideLength * 0.3)
-                                    , Web.Dom.attribute "stroke-linecap" "round"
+                                    , Web.domAttribute "stroke-linecap" "round"
                                     ]
                                 ]
-                                    |> Web.Svg.element "g" []
+                                    |> Web.svgElement "g" []
                             )
-                        |> Web.Svg.element "g" []
+                        |> Web.svgElement "g" []
 
-                warpAnimationUi : Web.Dom.Node future_
+                warpAnimationUi : Web.DomNode future_
                 warpAnimationUi =
                     case segments |> List.reverse of
                         (lastPoint :: beforeLastPoint) :: _ ->
@@ -815,7 +807,7 @@ pickApplesInterface state =
                                         , Svg.LocalExtra.strokeWidth (cellSideLength * 0.7)
                                         ]
                                     ]
-                                        |> Web.Svg.element "g" []
+                                        |> Web.svgElement "g" []
 
                                 [ _ ] ->
                                     [ Svg.LocalExtra.circle
@@ -841,13 +833,13 @@ pickApplesInterface state =
                                         , Svg.LocalExtra.strokeWidth (cellSideLength * 0.7)
                                         ]
                                     ]
-                                        |> Web.Svg.element "g" []
+                                        |> Web.svgElement "g" []
 
                                 _ :: _ :: _ ->
-                                    Web.Dom.text ""
+                                    Web.domText ""
 
                         _ ->
-                            Web.Dom.text ""
+                            Web.domText ""
 
                 facePoints : { x : Int, y : Int } -> Float -> List { x : Float, y : Float }
                 facePoints head size =
@@ -865,7 +857,7 @@ pickApplesInterface state =
                       }
                     ]
 
-                headUi : Web.Dom.Node future_
+                headUi : Web.DomNode future_
                 headUi =
                     [ Svg.LocalExtra.polygon (facePoints state.headLocation 0.8)
                         [ Svg.LocalExtra.fillUniform (Color.rgba 0 0.5 1 0.5)
@@ -874,7 +866,7 @@ pickApplesInterface state =
                         [ Svg.LocalExtra.fillUniform (Color.rgba 1 1 1 1)
                         ]
                     ]
-                        |> Web.Svg.element "g" []
+                        |> Web.svgElement "g" []
             in
             [ legsUi
             , warpAnimationUi
@@ -892,17 +884,17 @@ pickApplesInterface state =
                             )
                             [ Svg.LocalExtra.strokeUniform (Color.rgb 0.9 0.9 0.9)
                             , Svg.LocalExtra.fillUniform colorInvisible
-                            , Web.Dom.attribute "stroke-linecap" "round"
-                            , Web.Dom.attribute "stroke-linejoin" "round"
+                            , Web.domAttribute "stroke-linecap" "round"
+                            , Web.domAttribute "stroke-linejoin" "round"
                             , Svg.LocalExtra.strokeWidth cellSideLength
                             ]
                     )
-                |> Web.Svg.element "g" []
+                |> Web.svgElement "g" []
             , headUi
             ]
-                |> Web.Svg.element "g" []
+                |> Web.svgElement "g" []
 
-        appleUi : Web.Dom.Node future_
+        appleUi : Web.DomNode future_
         appleUi =
             [ Svg.LocalExtra.circle
                 { radius = cellSideLength * 0.45
@@ -925,7 +917,7 @@ pickApplesInterface state =
                 }
                 [ Svg.LocalExtra.strokeUniform (Color.rgb 0.34 0.19 0.01)
                 , Svg.LocalExtra.strokeWidth (cellSideLength * 0.16)
-                , Web.Dom.attribute "stroke-linecap" "round"
+                , Web.domAttribute "stroke-linecap" "round"
                 ]
             , Svg.LocalExtra.line
                 { start =
@@ -939,7 +931,7 @@ pickApplesInterface state =
                 }
                 [ Svg.LocalExtra.strokeUniform (Color.rgba 0.2 0.12 0 0.7)
                 , Svg.LocalExtra.strokeWidth (cellSideLength * 0.07)
-                , Web.Dom.attribute "stroke-linecap" "round"
+                , Web.domAttribute "stroke-linecap" "round"
                 ]
             , let
                 position : { x : Float, y : Float }
@@ -987,35 +979,35 @@ pickApplesInterface state =
                 , Svg.LocalExtra.rotated { center = position, angle = Angle.turns -0.083 }
                 ]
             ]
-                |> Web.Svg.element "g" []
+                |> Web.svgElement "g" []
 
-        pickedAppleCountUi : Web.Dom.Node future_
+        pickedAppleCountUi : Web.DomNode future_
         pickedAppleCountUi =
-            Web.Svg.element "text"
+            Web.svgElement "text"
                 [ Svg.LocalExtra.fillUniform (Color.rgba 0.3 1 0.5 0.13)
-                , Web.Dom.style "font-size" "30em"
-                , Web.Dom.attribute "text-anchor" "middle"
-                , Web.Dom.attribute "dominant-baseline" "middle"
-                , Web.Dom.attribute "font-weight" "bolder"
-                , Web.Dom.attribute "x" "50%"
-                , Web.Dom.attribute "y" "50%"
-                , Web.Dom.attribute "width" "50%"
-                , Web.Dom.attribute "height" "50%"
+                , Web.domStyle "font-size" "30em"
+                , Web.domAttribute "text-anchor" "middle"
+                , Web.domAttribute "dominant-baseline" "middle"
+                , Web.domAttribute "font-weight" "bolder"
+                , Web.domAttribute "x" "50%"
+                , Web.domAttribute "y" "50%"
+                , Web.domAttribute "width" "50%"
+                , Web.domAttribute "height" "50%"
                 ]
-                [ state.pickedAppleCount |> String.fromInt |> Web.Dom.text ]
+                [ state.pickedAppleCount |> String.fromInt |> Web.domText ]
 
-        controlsUi : Web.Dom.Node state_
+        controlsUi : Web.DomNode state_
         controlsUi =
-            Web.Svg.element "text"
+            Web.svgElement "text"
                 [ Svg.LocalExtra.fillUniform (Color.rgb 0.3 0.7 0.5)
-                , Web.Dom.style "font-size" "3em"
-                , Web.Dom.attribute "text-anchor" "middle"
-                , Web.Dom.attribute "dominant-baseline" "middle"
-                , Web.Dom.attribute "font-weight" "bolder"
-                , Web.Dom.attribute "x" "50%"
-                , Web.Dom.attribute "y" "8%"
-                , Web.Dom.attribute "width" "50%"
-                , Web.Dom.attribute "height" "50%"
+                , Web.domStyle "font-size" "3em"
+                , Web.domAttribute "text-anchor" "middle"
+                , Web.domAttribute "dominant-baseline" "middle"
+                , Web.domAttribute "font-weight" "bolder"
+                , Web.domAttribute "x" "50%"
+                , Web.domAttribute "y" "8%"
+                , Web.domAttribute "width" "50%"
+                , Web.domAttribute "height" "50%"
                 ]
                 [ (if state.pickedAppleCount >= 3 then
                     ""
@@ -1023,7 +1015,7 @@ pickApplesInterface state =
                    else
                     "arrow keys or left controller thumbstick"
                   )
-                    |> Web.Dom.text
+                    |> Web.domText
                 ]
 
         worldSize : { width : Float, height : Float }
@@ -1045,20 +1037,20 @@ pickApplesInterface state =
                 , height = state.windowSize.height |> Basics.toFloat
                 }
       in
-      Web.Dom.element "div"
-        [ Web.Dom.style "background-color" (Color.rgb 0.05 0.05 0.05 |> Color.toCssString)
-        , Web.Dom.style "position" "fixed"
-        , Web.Dom.style "top" "0"
-        , Web.Dom.style "right" "0"
-        , Web.Dom.style "bottom" "0"
-        , Web.Dom.style "left" "0"
+      Web.domElement "div"
+        [ Web.domStyle "background-color" (Color.rgb 0.05 0.05 0.05 |> Color.toCssString)
+        , Web.domStyle "position" "fixed"
+        , Web.domStyle "top" "0"
+        , Web.domStyle "right" "0"
+        , Web.domStyle "bottom" "0"
+        , Web.domStyle "left" "0"
         ]
-        [ Web.Svg.element "svg"
-            [ Web.Dom.attribute "viewBox" ([ "0 0 ", worldSize.width |> String.fromFloat, " ", worldSize.height |> String.fromFloat ] |> String.concat)
-            , Web.Dom.attribute "width" ((worldSize.width |> String.fromFloat) ++ "px")
-            , Web.Dom.attribute "height" ((worldSize.height |> String.fromFloat) ++ "px")
-            , Web.Dom.style "display" "block"
-            , Web.Dom.style "margin" "auto"
+        [ Web.svgElement "svg"
+            [ Web.domAttribute "viewBox" ([ "0 0 ", worldSize.width |> String.fromFloat, " ", worldSize.height |> String.fromFloat ] |> String.concat)
+            , Web.domAttribute "width" ((worldSize.width |> String.fromFloat) ++ "px")
+            , Web.domAttribute "height" ((worldSize.height |> String.fromFloat) ++ "px")
+            , Web.domStyle "display" "block"
+            , Web.domStyle "margin" "auto"
             ]
             [ worldUi
             , pickedAppleCountUi
@@ -1067,7 +1059,7 @@ pickApplesInterface state =
             , appleUi
             ]
         ]
-        |> Web.Dom.render
+        |> Web.domRender
     ]
         |> Web.interfaceBatch
         |> Web.interfaceFutureMap
@@ -1277,7 +1269,7 @@ directionToXYOffset direction =
 
 mapWithExitInterface : Web.Interface future_
 mapWithExitInterface =
-    Web.Navigation.load "https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/"
+    Web.navigateTo "https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/"
 
 
 stateCodec : Serialize.Codec error_ InitializedState

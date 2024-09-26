@@ -1,15 +1,49 @@
 module Web exposing
     ( program, Program
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
+    , timePosixRequest, timeZoneRequest, timeZoneNameRequest
+    , timePeriodicallyListen, timeOnceAt
     , DomElementHeader, DomElementVisibilityAlignment(..), DefaultActionHandling(..)
-    , Audio, AudioSource, AudioSourceLoadError(..), AudioProcessing(..), AudioParameterTimeline
+    , DomNode(..), domText
+    , DomElement, domElement, svgElement, domElementNamespaced
+    , domFutureMap, domRender
+    , DomModifier, domModifierFutureMap, domModifierBatch, domModifierNone
+    , domAttribute, domAttributeNamespaced, domStyle, domBoolProperty, domStringProperty
+    , domListenTo, domListenToPreventingDefaultAction
+    , domScrollToShow, domScrollPositionRequest, domScrollToPosition
+    , urlRequest
+    , pushUrl, replaceUrl
+    , navigateForward, navigateBack, navigationListen
+    , navigateTo, reload
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
+    , httpRequest
+    , httpGet, httpPost, httpAddHeaders
+    , httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
+    , httpBodyJson, httpBodyBytes
+    , randomUnsignedInt32s
+    , consoleLog, consoleWarn, consoleError
+    , localStorageRequest, localStorageSet, localStorageRemove
+    , localStorageSetOnADifferentTabListen, localStorageRemoveOnADifferentTabListen
     , SocketConnectionEvent(..), SocketId(..)
-    , GeoLocation
-    , Gamepad, GamepadButton(..)
-    , NotificationClicked(..)
-    , WindowVisibility(..)
+    , socketConnectTo, socketDisconnect
+    , socketMessage, socketMessageListen
+    , fileDownloadBytes
+    , Audio, AudioSource, AudioSourceLoadError(..), AudioProcessing(..), AudioParameterTimeline
+    , audioSourceLoad, audioFromSource, audioPlay
+    , audioVolumeScaleBy, audioSpeedScaleBy, audioStereoPan
+    , audioAddLinearConvolutionWith, audioAddHighpassFromFrequency, audioAddLowpassUntilFrequency
+    , audioParameterAt, audioParameterThrough
+    , clipboardRequest, clipboardReplaceBy
+    , GeoLocation, geoLocationRequest, geoLocationChangeListen
+    , Gamepad, GamepadButton(..), gamepadsRequest, gamepadsChangeListen
+    , notificationAskForPermission, notificationShow, NotificationClicked(..)
+    , animationFrameListen, windowVisibilityChangeListen, WindowVisibility(..)
+    , windowSizeRequest, windowResizeListen
+    , preferredLanguagesRequest, preferredLanguagesChangeListen
+    , documentListenTo, windowListenTo
+    , titleReplaceBy, authorSet, keywordsSet, descriptionSet
     , ProgramConfig, programInit, programUpdate, programSubscriptions
+    , DomModifierSingle(..)
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..)
     , SortedKeyValueList(..)
     , interfaceSingleEdits, InterfaceSingleEdit(..), AudioEdit(..), DomEdit(..)
@@ -26,65 +60,355 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 @docs Interface, interfaceBatch, interfaceNone, interfaceFutureMap
 
-That's it. Everything else below is types used in the other modules
-like [`Web.Time`](Web-Time), [`Web.Dom`](Web-Dom), [`Web.Http`](Web-Http) etc.
-Leave them be and look at those modules :)
+
+## time
+
+[`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/) primitives as part of an [`Interface`](Web#Interface).
+
+@docs timePosixRequest, timeZoneRequest, timeZoneNameRequest
+@docs timePeriodicallyListen, timeOnceAt
 
 
 ## DOM
 
-Types used by [`Web.Dom`](Web-Dom)
+These are primitives used for SVG and HTML
+(filling the same role as [`elm/virtual-dom`](https://dark.elm.dmy.fr/packages/elm/virtual-dom/latest/))
 
 @docs DomElementHeader, DomElementVisibilityAlignment, DefaultActionHandling
 
+@docs DomNode, domText
+@docs DomElement, domElement, svgElement, domElementNamespaced
+@docs domFutureMap, domRender
+@docs DomModifier, domModifierFutureMap, domModifierBatch, domModifierNone
+@docs domAttribute, domAttributeNamespaced, domStyle, domBoolProperty, domStringProperty
+@docs domListenTo, domListenToPreventingDefaultAction
+@docs domScrollToShow, domScrollPositionRequest, domScrollToPosition
 
-## Audio
 
-Types used by [`Web.Audio`](Web-Audio)
+## navigation
 
-@docs Audio, AudioSource, AudioSourceLoadError, AudioProcessing, AudioParameterTimeline
+`history` interaction as part of an [`Interface`](Web#Interface)
+
+@docs urlRequest
+@docs pushUrl, replaceUrl
+@docs navigateForward, navigateBack, navigationListen
+@docs navigateTo, reload
 
 
 ## HTTP
 
-Types used by [`Web.Http`](Web-Http)
+Helpers for HTTP requests as part of an [`Interface`](Web#Interface)
 
 @docs HttpRequest, HttpBody, HttpExpect, HttpError, HttpMetadata
+
+@docs httpRequest
+@docs httpGet, httpPost, httpAddHeaders
+@docs httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
+@docs httpBodyJson, httpBodyBytes
+
+
+## random
+
+Helpers for randomness as part of an [`Interface`](Web#Interface).
+Not familiar with random "generators"? [`elm/random`](https://package.elm-lang.org/packages/elm/random/latest)
+explains it nicely!
+
+Here's an example showing a number between 1 and 6 and a button to reroll
+using [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packages/NoRedInk/elm-random-pcg-extended/latest/)
+
+    import Random.Pcg.Extended
+    import Web
+
+    type State
+        = WaitingForInitialRandomness
+        | DiceUiState { diceEyes : Int, seed : Random.Pcg.Extended.Seed }
+
+    type DiceUiEvent
+        = RerollClicked
+
+    diceEyesRandomGenerator : Random.Pcg.Extended.Generator Int
+    diceEyesRandomGenerator =
+        Random.Pcg.Extended.int 1 6
+
+    { initialState = WaitingForInitialRandomness
+    , interface =
+        \state ->
+            case state of
+                WaitingForInitialRandomness ->
+                    Web.randomUnsignedInt32s 4
+                        |> Web.interfaceFutureMap
+                            (\unsignedInt32s ->
+                                let
+                                    initialSeed : Random.Pcg.Extended.Seed
+                                    initialSeed =
+                                        Random.Pcg.Extended.initialSeed (unsignedInt32s |> List.head |> Maybe.withDefault 0) (unsignedInt32s |> List.drop 1)
+
+                                    ( diceEyes, newSeed ) =
+                                        Random.Pcg.Extended.step diceEyesRandomGenerator initialSeed
+                                in
+                                DiceUiState { diceEyes = diceEyes, seed = newSeed }
+                            )
+
+                DiceUiState randomStuff ->
+                    Web.domElement "div"
+                        []
+                        [ randomStuff.diceEyes |> String.fromInt |> Web.domText
+                        , Web.domElement "button"
+                            [ Web.domListenTo "click"
+                                |> Web.domModifierFutureMap (\_ -> RerollClicked)
+                            ]
+                            [ Web.domText "roll the dice" ]
+                        ]
+                        |> Web.domRender
+                        |> Web.interfaceFutureMap
+                            (\RerollClicked ->
+                                let
+                                    ( diceEyes, newSeed ) =
+                                        Random.Pcg.Extended.step diceEyesRandomGenerator randomStuff.seed
+                                in
+                                DiceUiState { diceEyes = diceEyes, seed = newSeed }
+                            )
+    }
+
+@docs randomUnsignedInt32s
+
+
+## console
+
+Helpers for console interactions as part of an [`Interface`](Web#Interface)
+
+@docs consoleLog, consoleWarn, consoleError
+
+
+## local storage
+
+Saved data for the url origin (protocol, host name, port) across browser sessions.
+
+This data doesn't expire and won't be cleared when the page is closed.
+The only exception is "incognito mode", where all data is cleared once the last "private" tab is closed.
+
+see [mdn on `Window.localStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage)
+
+@docs localStorageRequest, localStorageSet, localStorageRemove
+@docs localStorageSetOnADifferentTabListen, localStorageRemoveOnADifferentTabListen
 
 
 ## socket
 
-Types used by [`Web.Socket`](Web-Socket)
+Helpers for web sockets as part of an [`Interface`](Web#Interface)
 
 @docs SocketConnectionEvent, SocketId
 
 
+### connection
+
+@docs socketConnectTo, socketDisconnect
+
+
+### communicate
+
+@docs socketMessage, socketMessageListen
+
+
+## File download
+
+Helpers for downloading a dynamically generated file as part of an [`Interface`](Web#Interface).
+
+Security note: Browsers require downloads to be initiated by a user event.
+So rather than allowing malicious sites to put files on your computer however they please,
+the user has to at least click a button first.
+As a result, the following interfaces only work when they are triggered by some user event.
+
+Note: There's no equivalent module for file select
+since you can easily replicate the behavior using an input element with type file or file drop area modifiers,
+see for example [mpizenberg/elm-file](https://dark.elm.dmy.fr/packages/mpizenberg/elm-file/latest/FileValue#load-files-with-an-input).
+
+@docs fileDownloadBytes
+
+
+## audio
+
+Play sounds and music as part of an [`Interface`](Web#Interface).
+
+    import Time
+    import Web
+
+    type alias State =
+        { audioSource : Maybe (Result Web.AudioSourceLoadError Web.AudioSource)
+        , audioStartTime : Maybe Time.Posix
+        }
+
+    { initialState =
+        { audioSource = Nothing
+        , audioStartTime = Nothing
+        }
+    , interface =
+        \state ->
+            case state.audioSource of
+                Just (Ok audioSource) ->
+                    case state.audioStartTime of
+                        Just startTime
+                            Web.audioFromSource audioSource startTime
+                                |> Web.audioPlay
+
+
+                        Nothing ->
+                            Web.timePosixRequest
+                                |> Web.interfaceFutureMap
+                                    (\time -> { state | audioSTartTime = time |> Just })
+
+                Nothing ->
+                    Web.audioSourceLoad "https://s3-us-west-2.amazonaws.com/s.cdpn.io/123941/Yodel_Sound_Effect.mp3"
+                        |> Web.interfaceFutureMap
+                            (\result -> { state | audioSource = result |> Just })
+
+                Just (Err _) ->
+                    Web.consoleError "audio failed to load"
+    }
+
+@docs Audio, AudioSource, AudioSourceLoadError, AudioProcessing, AudioParameterTimeline
+
+@docs audioSourceLoad, audioFromSource, audioPlay
+@docs audioVolumeScaleBy, audioSpeedScaleBy, audioStereoPan
+@docs audioAddLinearConvolutionWith, audioAddHighpassFromFrequency, audioAddLowpassUntilFrequency
+
+To detune, use [`audioSpeedScaleBy`](#audioSpeedScaleBy). It's documentation also shows which scale relates to which semitone pitch.
+
+To build an [`AudioParameterTimeline`](Web#AudioParameterTimeline):
+
+@docs audioParameterAt, audioParameterThrough
+
+
+## clipboard
+
+Helpers for clipboard interactions as part of an [`Interface`](Web#Interface)
+
+@docs clipboardRequest, clipboardReplaceBy
+
+Note: To listen for [copy, cut and paste events](https://developer.mozilla.org/en-US/docs/Web/API/ClipboardEvent),
+use [`Web.domListenTo`](Web#domListenTo)
+
+
 ## geo location
 
-Types used by [`Web.GeoLocation`](Web-GeoLocation)
+Observe the [`GeoLocation`](Web#GeoLocation) as part of an [`Interface`](Web#Interface)
+using the [web geolocation API](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API).
 
-@docs GeoLocation
+@docs GeoLocation, geoLocationRequest, geoLocationChangeListen
 
 
 ## gamepads
 
-Types used by [`Web.Gamepads`](Web-Gamepads)
+Observe connected [gamepads and other game controllers](Web#Gamepad)
+(not including motion sensing, gesture recognition etc.).
 
-@docs Gamepad, GamepadButton
+    import Web
+
+    interface =
+        \state ->
+            [ Web.timePeriodicallyListen (Duration.seconds (1 / 50))
+                |> Web.interfaceFutureMap
+                    ..simulate one tick using gamepad inputs..
+            , [ Web.gamepadsRequest, Web.gamepadsChangeListen ]
+                |> Web.interfaceBatch
+                |> Web.interfaceFutureMap (\gamepads -> { state | gamepads = gamepads })
+            ]
+                |> Web.interfaceBatch
+
+If your gamepad isn't showing up in the list,
+press some buttons. On some devices, only certain buttons will wake up the gamepad API (the shapes on PS3 controllers, for instance)
+
+@docs Gamepad, GamepadButton, gamepadsRequest, gamepadsChangeListen
 
 
-## notification
+## Notification
 
-Types used by [`Web.Notification`](Web-Notification)
+Give important notices to the user as push notifications.
+Consider this a convenience feature, not something users have to rely upon.
+Always offer users alternative methods to view messages or initiate actions
+and allow users to opt out of getting more in the future.
 
-@docs NotificationClicked
+@docs notificationAskForPermission, notificationShow, NotificationClicked
+
+You can combine it with [`Web.windowVisibilityChangeListen`](Web#windowVisibilityChangeListen)
+to only notify users when they're on a different page
+
+    import Web
+
+    type State
+        = State
+            { windowVisibility : Web.WindowVisibility
+            , whoseMove : Player
+            , mode : Mode
+            , notificationPermissionToggle : Permission
+            }
+
+    type Permission
+        = Rejected
+        | Accepted
+
+    type Mode
+        = LongGameBoardMode
+        | SettingsPage
+
+    type Player
+        = You
+        | Opponent
+
+    interface : State -> Web.Interface State
+    interface =
+        \(State state) ->
+            [ case state.notificationPermissionToggle of
+                Accepted ->
+                    Web.notificationAskForPermission
+
+                Rejected ->
+                    Web.interfaceNone
+            , case state.windowVisibility of
+                Web.WindowShown ->
+                    Web.interfaceNone
+
+                Web.WindowHidden ->
+                    case state.whoseTurn of
+                        Opponent ->
+                            Web.interfaceNone
+
+                        You ->
+                            Web.Notification.show
+                                { message = "opponent moved", ... }
+                                |> Web.interfaceFutureMap
+                                    (\Web.NotificationClicked ->
+                                        -- return to the game if previously in settings
+                                        State { state | mode = LongGameBoardMode }
+                                    )
+
+            , case state.mode of
+                LongGameBoardMode ->
+                    ..listen for opponent move from server..
+                        |> Web.interfaceFutureMap
+                            (\... -> State { state | whoseMove = You })
+
+                SettingsPage ->
+                    ..toggle for accepting/rejecting notifications..
+                        |> Web.interfaceFutureMap
+                            (\... -> State { state | notificationPermissionToggle = ..opposite.. })
+            ]
+                |> Web.interfaceBatch
 
 
 ## window
 
-Types used by [`Web.Window`](Web-Window)
+Observe and alter the page's global environment as part of an [`Interface`](Web#Interface)
 
-@docs WindowVisibility
+@docs animationFrameListen, windowVisibilityChangeListen, WindowVisibility
+@docs windowSizeRequest, windowResizeListen
+@docs preferredLanguagesRequest, preferredLanguagesChangeListen
+@docs documentListenTo, windowListenTo
+
+When navigating to a new page on the same site,
+you may want to change the document's context:
+
+@docs titleReplaceBy, authorSet, keywordsSet, descriptionSet
 
 
 ## embed
@@ -106,6 +430,8 @@ Under the hood, [`Web.program`](Web#program) is then defined as just
 ## internals, safe to ignore for users
 
 Exposed so can for example simulate it more easily in tests, add a debugger etc.
+
+@docs DomModifierSingle
 
 @docs ProgramState, ProgramEvent, InterfaceSingle, DomTextOrElementHeader
 
@@ -225,7 +551,7 @@ type alias ProgramConfig state =
 
 
 {-| Incoming and outgoing effects.
-To create one, use the helpers in [`Web.Time`](Web-Time), [`Web.Dom`](Web-Dom), [`Web.Http`](Web-Http) etc.
+To create one, use the helpers in [time](#time), [DOM](#dom), [HTTP](#http) etc.
 
 To combine multiple, use [`Web.interfaceBatch`](#interfaceBatch) and [`Web.interfaceNone`](#interfaceNone).
 To change the value that comes back in the future, use [`Web.interfaceFutureMap`](Web#interfaceFutureMap)
@@ -236,7 +562,7 @@ type alias Interface future =
 
 
 {-| A "non-batched" [`Interface`](#Interface).
-To create one, use the helpers in [`Web.Time`](Web-Time), [`Web.Dom`](Web-Dom), [`Web.Http`](Web-Http) etc.
+To create one, use the helpers in [time](#time), [DOM](#dom), [HTTP](#http) etc.
 -}
 type InterfaceSingle future
     = DocumentTitleReplaceBy String
@@ -315,7 +641,7 @@ type NotificationClicked
 
 
 {-| An indication that connection has changed
-after having initiated [`Web.Socket.connectTo`](Web-Socket#connectTo).
+after having initiated [`Web.socketConnectTo`](Web#socketConnectTo).
 
   - `SocketConnected`: connection has been opened. Gives access to a [`Web.SocketId`](#SocketId)
   - `SocketDisconnected`: connection has been closed with
@@ -364,8 +690,8 @@ type WindowVisibility
 
 {-| An HTTP request for use in an [`Interface`](#Interface).
 
-Use [`Web.Http.addHeaders`](Web-Http#addHeaders) to set custom headers as needed.
-Use [`Web.Time.onceAt`](Web-Time#onceAt) to add a timeout of how long you are willing to wait before giving up.
+Use [`Web.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
+Use [`Web.timeOnceAt`](Web#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
 
 -}
 type alias HttpRequest future =
@@ -391,18 +717,18 @@ type HttpExpect future
   - `HttpBodyEmpty`: Create an empty body for your request.
     This is useful for `GET` requests and `POST` requests where you are not sending any data.
 
-  - `HttpBodyString`: Put a `String` in the body of your request. Defining `Web.Http.jsonBody` looks like this:
+  - `HttpBodyString`: Put a `String` in the body of your request. Defining `Web.httpJsonBody` looks like this:
 
         import Json.Encode
 
-        jsonBody : Json.Encode.Value -> Web.HttpBody
-        jsonBody value =
+        httpJsonBody : Json.Encode.Value -> Web.HttpBody
+        httpJsonBody value =
             Web.HttpBodyString "application/json" (Json.Encode.encode 0 value)
 
     The first argument is a [MIME type](https://en.wikipedia.org/wiki/Media_type) of the body.
 
   - `HttpBodyUnsignedInt8s` is pretty much the same as `HttpBodyString` but for [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/),
-    see [`Web.Http.bodyBytes`](Web-Http#bodyBytes)
+    see [`Web.httpBodyBytes`](Web#httpBodyBytes)
 
 -}
 type HttpBody
@@ -414,12 +740,12 @@ type HttpBody
 {-| Plain text or a [`DomElementHeader`](#DomElementHeader) for use in an [`Interface`](#Interface).
 -}
 type DomTextOrElementHeader future
-    = DomText String
+    = DomHeaderText String
     | DomElementHeader (DomElementHeader future)
 
 
-{-| Everything about a [tagged DOM element](Web-Dom#Element)
-except potential sub-[node](Web-Dom#Node)s
+{-| Everything about a [tagged DOM element](Web#DomElement)
+except potential sub-[node](Web#DomNode)s
 -}
 type alias DomElementHeader future =
     RecordWithoutConstructorFunction
@@ -442,7 +768,7 @@ type alias DomElementHeader future =
         }
 
 
-{-| What part of the [`Web.Dom.Element`](Web-Dom#Element) should be visible
+{-| What part of the [`Web.domElement`](Web#domElement) should be visible
 
   - `DomElementStart`: mostly for text to read
   - `DomElementEnd`: mostly for text to write
@@ -455,7 +781,7 @@ type DomElementVisibilityAlignment
     | DomElementCenter
 
 
-{-| Setting for a listen [`Web.Dom.Modifier`](Web-Dom#Modifier)
+{-| Setting for a listen [`Web.DomModifier`](Web#DomModifier)
 to keep or overwrite the browser's default action
 -}
 type DefaultActionHandling
@@ -463,7 +789,8 @@ type DefaultActionHandling
     | DefaultActionExecute
 
 
-{-| Identifier for a [`Web.Socket`](Web-Socket) that can be used to [communicate](Web-Socket#communicate)
+{-| Local identifier for a [web socket](#socket) for this session
+that can be used to [communicate](Web#communicate)
 -}
 type SocketId
     = SocketId Int
@@ -497,11 +824,11 @@ interfaceNone =
 
 In practice, this is sometimes used like a kind of event-config pattern:
 
-    Web.Time.posixRequest
+    Web.timePosixRequest
         |> Web.interfaceFutureMap (\timeNow -> TimeReceived timeNow)
 
     button "show all entries"
-        |> Web.Dom.render
+        |> Web.domRender
         |> Web.interfaceFutureMap (\Pressed -> ShowAllEntriesButtonClicked)
 
 sometimes as a way to deal with all events (like `update` in The Elm Architecture)
@@ -537,9 +864,9 @@ and sometimes to nest events (like `Cmd.map/Task.map/Sub.map/...` in The Elm Arc
                 |> Web.interfaceFutureMap DirectoryTreeViewEvent
             , ...
             ]
-            |> Web.Dom.render
+            |> Web.domRender
 
-    treeUi : ... -> Web.Dom.Node TreeUiEvent
+    treeUi : ... -> Web.DomNode TreeUiEvent
 
 In all these examples, you end up converting the narrow future representation of part of the interface
 to a broader representation for the parent interface
@@ -602,8 +929,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         AudioPlay audio ->
             AudioPlay audio
 
-        SocketMessage socketMessage ->
-            SocketMessage socketMessage
+        SocketMessage message ->
+            SocketMessage message
 
         SocketDisconnect id ->
             SocketDisconnect id
@@ -612,7 +939,7 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             LocalStorageSet localStorageItem
 
         NotificationAskForPermission () ->
-            notificationAskForPermission
+            notificationAskForPermissionSingle
 
         DomNodeRender toRender ->
             { pathReverse = toRender.pathReverse
@@ -620,8 +947,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             }
                 |> DomNodeRender
 
-        AudioSourceLoad load ->
-            { url = load.url, on = \event -> load.on event |> futureChange }
+        AudioSourceLoad sourceLoad ->
+            { url = sourceLoad.url, on = \event -> sourceLoad.on event |> futureChange }
                 |> AudioSourceLoad
 
         SocketConnect connect ->
@@ -636,8 +963,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             }
                 |> NotificationShow
 
-        HttpRequest httpRequest ->
-            httpRequest |> httpRequestFutureMap futureChange |> HttpRequest
+        HttpRequest request ->
+            request |> httpRequestFutureMap futureChange |> HttpRequest
 
         LocalStorageRequest request ->
             { key = request.key, on = \event -> event |> request.on |> futureChange }
@@ -698,9 +1025,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         WindowPreferredLanguagesChangeListen toFuture ->
             (\event -> toFuture event |> futureChange) |> WindowPreferredLanguagesChangeListen
 
-        TimePeriodicallyListen timePeriodicallyListen ->
-            { intervalDurationMilliSeconds = timePeriodicallyListen.intervalDurationMilliSeconds
-            , on = \posix -> timePeriodicallyListen.on posix |> futureChange
+        TimePeriodicallyListen periodicallyListen ->
+            { intervalDurationMilliSeconds = periodicallyListen.intervalDurationMilliSeconds
+            , on = \posix -> periodicallyListen.on posix |> futureChange
             }
                 |> TimePeriodicallyListen
 
@@ -732,9 +1059,38 @@ navigationReload =
     NavigationReload ()
 
 
-notificationAskForPermission : InterfaceSingle future_
-notificationAskForPermission =
+notificationAskForPermissionSingle : InterfaceSingle future_
+notificationAskForPermissionSingle =
     NotificationAskForPermission ()
+
+
+domNodeFutureMap : (future -> mappedFuture) -> (DomTextOrElementHeader future -> DomTextOrElementHeader mappedFuture)
+domNodeFutureMap futureChange domElementToMap =
+    case domElementToMap of
+        DomHeaderText text ->
+            DomHeaderText text
+
+        DomElementHeader domElementHeader ->
+            domElementHeader |> domElementHeaderFutureMap futureChange |> DomElementHeader
+
+
+httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
+httpRequestFutureMap futureChange request =
+    { url = request.url
+    , method = request.method
+    , headers = request.headers
+    , body = request.body
+    , expect =
+        case request.expect of
+            HttpExpectWhatever expectWhatever ->
+                (\unit -> expectWhatever unit |> futureChange) |> HttpExpectWhatever
+
+            HttpExpectString expectString ->
+                (\string -> expectString string |> futureChange) |> HttpExpectString
+
+            HttpExpectBytes expectBytes ->
+                (\bytes -> expectBytes bytes |> futureChange) |> HttpExpectBytes
+    }
 
 
 domElementHeaderFutureMap : (future -> mappedFuture) -> (DomElementHeader future -> DomElementHeader mappedFuture)
@@ -773,35 +1129,6 @@ sortedKeyValueListMap elementChange (SortedKeyValueList sortedKeyValueList) =
                     { key = entry.key, value = elementChange entry }
                 )
         )
-
-
-domNodeFutureMap : (future -> mappedFuture) -> (DomTextOrElementHeader future -> DomTextOrElementHeader mappedFuture)
-domNodeFutureMap futureChange domElementToMap =
-    case domElementToMap of
-        DomText text ->
-            DomText text
-
-        DomElementHeader domElement ->
-            domElement |> domElementHeaderFutureMap futureChange |> DomElementHeader
-
-
-httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
-httpRequestFutureMap futureChange httpRequest =
-    { url = httpRequest.url
-    , method = httpRequest.method
-    , headers = httpRequest.headers
-    , body = httpRequest.body
-    , expect =
-        case httpRequest.expect of
-            HttpExpectWhatever expectWhatever ->
-                (\unit -> expectWhatever unit |> futureChange) |> HttpExpectWhatever
-
-            HttpExpectString expectString ->
-                (\string -> expectString string |> futureChange) |> HttpExpectString
-
-            HttpExpectBytes expectBytes ->
-                (\bytes -> expectBytes bytes |> futureChange) |> HttpExpectBytes
-    }
 
 
 {-| The "msg" in a [`Web.program`](#program)
@@ -1001,7 +1328,7 @@ domTextOrElementHeaderDiffMap :
         )
 domTextOrElementHeaderDiffMap fromDomEdit nodes =
     case nodes.old of
-        DomText oldText ->
+        DomHeaderText oldText ->
             case nodes.updated of
                 DomElementHeader updatedElement ->
                     [ updatedElement
@@ -1011,22 +1338,22 @@ domTextOrElementHeaderDiffMap fromDomEdit nodes =
                         |> fromDomEdit
                     ]
 
-                DomText updatedText ->
+                DomHeaderText updatedText ->
                     if oldText == updatedText ++ "" then
                         []
 
                     else
                         [ updatedText
-                            |> DomText
+                            |> DomHeaderText
                             |> ReplacementDomNode
                             |> fromDomEdit
                         ]
 
         DomElementHeader oldElement ->
             case nodes.updated of
-                DomText updatedText ->
+                DomHeaderText updatedText ->
                     [ updatedText
-                        |> DomText
+                        |> DomHeaderText
                         |> ReplacementDomNode
                         |> fromDomEdit
                     ]
@@ -1034,11 +1361,6 @@ domTextOrElementHeaderDiffMap fromDomEdit nodes =
                 DomElementHeader updatedElement ->
                     { old = oldElement, updated = updatedElement }
                         |> domElementHeaderDiffMap fromDomEdit
-
-
-sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
-sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
-    sortedKeyValueList
 
 
 domElementHeaderDiffMap :
@@ -1156,65 +1478,6 @@ replacementDomElementScrollPositionRequest =
     ReplacementDomElementScrollPositionRequest ()
 
 
-namespacedKeyToComparable : { namespace : String, key : String } -> String
-namespacedKeyToComparable =
-    \namespacedKey -> namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
-
-
-{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
-The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
--}
-sortedKeyValueListMergeBy :
-    (key -> comparable_)
-    -> ({ key : key, value : a } -> folded -> folded)
-    -> (a -> { key : key, value : b } -> folded -> folded)
-    -> ({ key : key, value : b } -> folded -> folded)
-    -> List { key : key, value : a }
-    -> List { key : key, value : b }
-    -> folded
-    -> folded
-sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
-    case aSortedKeyValueList of
-        [] ->
-            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry soFar) initialFolded
-
-        aLowest :: aWithoutLowest ->
-            case bSortedKeyValueList of
-                [] ->
-                    aWithoutLowest
-                        |> List.foldl (\entry soFar -> onlyA entry soFar)
-                            (onlyA aLowest initialFolded)
-
-                bLowest :: bWithoutLowest ->
-                    case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
-                        EQ ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bWithoutLowest
-                                (bothAB aLowest.value bLowest initialFolded)
-
-                        LT ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bSortedKeyValueList
-                                (onlyA aLowest initialFolded)
-
-                        GT ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aSortedKeyValueList
-                                bWithoutLowest
-                                (onlyB bLowest initialFolded)
-
-
 sortedKeyValueListEditAndRemoveDiffMapBy :
     (key -> comparable_)
     -> ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
@@ -1303,6 +1566,70 @@ audioDiffMap fromAudioEdit audios =
             )
 
 
+namespacedKeyToComparable : { namespace : String, key : String } -> String
+namespacedKeyToComparable =
+    \namespacedKey -> namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
+
+
+sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
+sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
+    sortedKeyValueList
+
+
+{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
+The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
+-}
+sortedKeyValueListMergeBy :
+    (key -> comparable_)
+    -> ({ key : key, value : a } -> folded -> folded)
+    -> (a -> { key : key, value : b } -> folded -> folded)
+    -> ({ key : key, value : b } -> folded -> folded)
+    -> List { key : key, value : a }
+    -> List { key : key, value : b }
+    -> folded
+    -> folded
+sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
+    case aSortedKeyValueList of
+        [] ->
+            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry soFar) initialFolded
+
+        aLowest :: aWithoutLowest ->
+            case bSortedKeyValueList of
+                [] ->
+                    aWithoutLowest
+                        |> List.foldl (\entry soFar -> onlyA entry soFar)
+                            (onlyA aLowest initialFolded)
+
+                bLowest :: bWithoutLowest ->
+                    case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
+                        EQ ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bWithoutLowest
+                                (bothAB aLowest.value bLowest initialFolded)
+
+                        LT ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bSortedKeyValueList
+                                (onlyA aLowest initialFolded)
+
+                        GT ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aSortedKeyValueList
+                                bWithoutLowest
+                                (onlyB bLowest initialFolded)
+
+
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
 -}
 interfaceSingleEdits :
@@ -1332,45 +1659,6 @@ interfaceSingleDiffToJson diff =
 
             Remove () ->
                 { tag = "Remove", value = Json.Encode.null }
-        )
-
-
-audioParameterTimelineToJson : AudioParameterTimeline -> Json.Encode.Value
-audioParameterTimelineToJson timeline =
-    Json.Encode.object
-        [ ( "startValue", timeline.startValue |> Json.Encode.float )
-        , ( "keyFrames"
-          , timeline.keyFrames
-                |> List.sortBy (\keyFrame -> keyFrame.time |> Time.posixToMillis)
-                |> Json.Encode.list
-                    (\keyFrame ->
-                        Json.Encode.object
-                            [ ( "time", keyFrame.time |> Time.posixToMillis |> Json.Encode.int )
-                            , ( "value", keyFrame.value |> Json.Encode.float )
-                            ]
-                    )
-          )
-        ]
-
-
-audioProcessingToJson : AudioProcessing -> Json.Encode.Value
-audioProcessingToJson processing =
-    Json.Encode.LocalExtra.variant
-        (case processing of
-            AudioLinearConvolution linearConvolution ->
-                { tag = "LinearConvolution"
-                , value = Json.Encode.object [ ( "sourceUrl", linearConvolution.sourceUrl |> Json.Encode.string ) ]
-                }
-
-            AudioLowpass lowpass ->
-                { tag = "Lowpass"
-                , value = Json.Encode.object [ ( "cutoffFrequency", lowpass.cutoffFrequency |> audioParameterTimelineToJson ) ]
-                }
-
-            AudioHighpass highpass ->
-                { tag = "highpasses"
-                , value = Json.Encode.object [ ( "cutoffFrequency", highpass.cutoffFrequency |> audioParameterTimelineToJson ) ]
-                }
         )
 
 
@@ -1424,174 +1712,6 @@ interfaceSingleEditToJson edit =
                         ]
                 }
         )
-
-
-domTextOrElementHeaderInfoToJson : DomTextOrElementHeader future_ -> Json.Encode.Value
-domTextOrElementHeaderInfoToJson domNodeId =
-    Json.Encode.LocalExtra.variant
-        (case domNodeId of
-            DomText text ->
-                { tag = "Text", value = text |> Json.Encode.string }
-
-            DomElementHeader element ->
-                { tag = "Element", value = element |> domElementHeaderInfoToJson }
-        )
-
-
-defaultActionHandlingToJson : DefaultActionHandling -> Json.Encode.Value
-defaultActionHandlingToJson =
-    \defaultActionHandling ->
-        Json.Encode.string
-            (case defaultActionHandling of
-                DefaultActionPrevent ->
-                    "DefaultActionPrevent"
-
-                DefaultActionExecute ->
-                    "DefaultActionExecute"
-            )
-
-
-domElementVisibilityAlignmentsToJson : { y : DomElementVisibilityAlignment, x : DomElementVisibilityAlignment } -> Json.Encode.Value
-domElementVisibilityAlignmentsToJson alignments =
-    Json.Encode.object
-        [ ( "x", alignments.x |> domElementVisibilityAlignmentToJson )
-        , ( "y", alignments.y |> domElementVisibilityAlignmentToJson )
-        ]
-
-
-domElementVisibilityAlignmentToJson : DomElementVisibilityAlignment -> Json.Encode.Value
-domElementVisibilityAlignmentToJson alignment =
-    Json.Encode.string
-        (case alignment of
-            DomElementStart ->
-                "start"
-
-            DomElementEnd ->
-                "end"
-
-            DomElementCenter ->
-                "center"
-        )
-
-
-domElementScrollPositionToJson : { fromLeft : Float, fromTop : Float } -> Json.Encode.Value
-domElementScrollPositionToJson position =
-    Json.Encode.object
-        [ ( "fromLeft", position.fromLeft |> Json.Encode.float )
-        , ( "fromTop", position.fromTop |> Json.Encode.float )
-        ]
-
-
-domElementHeaderInfoToJson : DomElementHeader future_ -> Json.Encode.Value
-domElementHeaderInfoToJson header =
-    Json.Encode.object
-        [ ( "namespace", header.namespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
-        , ( "tag", header.tag |> Json.Encode.string )
-        , ( "styles", header.styles |> domElementStylesToJson )
-        , ( "attributes", header.attributes |> domElementAttributesToJson )
-        , ( "attributesNamespaced", header.attributesNamespaced |> domElementAttributesNamespacedToJson )
-        , ( "stringProperties", header.stringProperties |> domElementStringPropertiesToJson )
-        , ( "boolProperties", header.boolProperties |> domElementBoolPropertiesToJson )
-        , ( "scrollToPosition"
-          , header.scrollToPosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
-          )
-        , ( "scrollToShow"
-          , header.scrollToShow |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
-          )
-        , ( "scrollPositionRequest"
-          , Json.Encode.bool
-                (case header.scrollPositionRequest of
-                    Nothing ->
-                        False
-
-                    Just _ ->
-                        True
-                )
-          )
-        , ( "eventListens"
-          , header.eventListens
-                |> sortedKeyValueListToList
-                |> Json.Encode.list
-                    (\entry ->
-                        Json.Encode.object
-                            [ ( "name", entry.key |> Json.Encode.string )
-                            , ( "defaultActionHandling", entry.value.defaultActionHandling |> defaultActionHandlingToJson )
-                            ]
-                    )
-          )
-        ]
-
-
-domElementAttributesNamespacedToJson :
-    SortedKeyValueList
-        { namespace : String, key : String }
-        String
-    -> Json.Encode.Value
-domElementAttributesNamespacedToJson attributes =
-    attributes
-        |> sortedKeyValueListToList
-        |> Json.Encode.list
-            (\entry ->
-                Json.Encode.object
-                    [ ( "namespace", entry.key.namespace |> Json.Encode.string )
-                    , ( "key", entry.key.key |> Json.Encode.string )
-                    , ( "value", entry.value |> Json.Encode.string )
-                    ]
-            )
-
-
-domElementAttributesToJson : SortedKeyValueList String String -> Json.Encode.Value
-domElementAttributesToJson attributes =
-    attributes
-        |> sortedKeyValueListToList
-        |> Json.Encode.list
-            (\entry ->
-                Json.Encode.object
-                    [ ( "key", entry.key |> Json.Encode.string )
-                    , ( "value", entry.value |> Json.Encode.string )
-                    ]
-            )
-
-
-domElementStylesToJson : SortedKeyValueList String String -> Json.Encode.Value
-domElementStylesToJson styles =
-    styles
-        |> sortedKeyValueListToList
-        |> Json.Encode.list
-            (\entry ->
-                Json.Encode.object
-                    [ ( "key", entry.key |> Json.Encode.string )
-                    , ( "value", entry.value |> Json.Encode.string )
-                    ]
-            )
-
-
-domElementBoolPropertiesToJson : SortedKeyValueList String Bool -> Json.Encode.Value
-domElementBoolPropertiesToJson =
-    \boolProperties ->
-        boolProperties
-            |> sortedKeyValueListToList
-            |> Json.Encode.list
-                (\entry ->
-                    Json.Encode.object
-                        [ ( "key", entry.key |> Json.Encode.string )
-                        , ( "value", entry.value |> Json.Encode.bool )
-                        ]
-                )
-
-
-domElementStringPropertiesToJson : SortedKeyValueList String String -> Json.Encode.Value
-domElementStringPropertiesToJson =
-    \stringProperties ->
-        stringProperties
-            |> sortedKeyValueListToList
-            |> Json.Encode.list
-                (\entry ->
-                    Json.Encode.object
-                        [ ( "key", entry.key |> Json.Encode.string )
-                        , ( "value", entry.value |> Json.Encode.string )
-                        ]
-                )
 
 
 editDomDiffToJson : DomEdit -> Json.Encode.Value
@@ -1826,8 +1946,8 @@ interfaceSingleToJson =
                             ]
                     }
 
-                AudioSourceLoad audioSourceLoad ->
-                    { tag = "AudioSourceLoad", value = audioSourceLoad.url |> Json.Encode.string }
+                AudioSourceLoad sourceLoad ->
+                    { tag = "AudioSourceLoad", value = sourceLoad.url |> Json.Encode.string }
 
                 SocketConnect connect ->
                     { tag = "SocketConnect"
@@ -2027,6 +2147,213 @@ audioToJson audio =
         ]
 
 
+audioParameterTimelineToJson : AudioParameterTimeline -> Json.Encode.Value
+audioParameterTimelineToJson timeline =
+    Json.Encode.object
+        [ ( "startValue", timeline.startValue |> Json.Encode.float )
+        , ( "keyFrames"
+          , timeline.keyFrames
+                |> List.sortBy (\keyFrame -> keyFrame.time |> Time.posixToMillis)
+                |> Json.Encode.list
+                    (\keyFrame ->
+                        Json.Encode.object
+                            [ ( "time", keyFrame.time |> Time.posixToMillis |> Json.Encode.int )
+                            , ( "value", keyFrame.value |> Json.Encode.float )
+                            ]
+                    )
+          )
+        ]
+
+
+audioProcessingToJson : AudioProcessing -> Json.Encode.Value
+audioProcessingToJson processing =
+    Json.Encode.LocalExtra.variant
+        (case processing of
+            AudioLinearConvolution linearConvolution ->
+                { tag = "LinearConvolution"
+                , value = Json.Encode.object [ ( "sourceUrl", linearConvolution.sourceUrl |> Json.Encode.string ) ]
+                }
+
+            AudioLowpass lowpass ->
+                { tag = "Lowpass"
+                , value = Json.Encode.object [ ( "cutoffFrequency", lowpass.cutoffFrequency |> audioParameterTimelineToJson ) ]
+                }
+
+            AudioHighpass highpass ->
+                { tag = "highpasses"
+                , value = Json.Encode.object [ ( "cutoffFrequency", highpass.cutoffFrequency |> audioParameterTimelineToJson ) ]
+                }
+        )
+
+
+domTextOrElementHeaderInfoToJson : DomTextOrElementHeader future_ -> Json.Encode.Value
+domTextOrElementHeaderInfoToJson domNodeId =
+    Json.Encode.LocalExtra.variant
+        (case domNodeId of
+            DomHeaderText text ->
+                { tag = "Text", value = text |> Json.Encode.string }
+
+            DomElementHeader element ->
+                { tag = "Element", value = element |> domElementHeaderInfoToJson }
+        )
+
+
+domElementHeaderInfoToJson : DomElementHeader future_ -> Json.Encode.Value
+domElementHeaderInfoToJson header =
+    Json.Encode.object
+        [ ( "namespace", header.namespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+        , ( "tag", header.tag |> Json.Encode.string )
+        , ( "styles", header.styles |> domElementStylesToJson )
+        , ( "attributes", header.attributes |> domElementAttributesToJson )
+        , ( "attributesNamespaced", header.attributesNamespaced |> domElementAttributesNamespacedToJson )
+        , ( "stringProperties", header.stringProperties |> domElementStringPropertiesToJson )
+        , ( "boolProperties", header.boolProperties |> domElementBoolPropertiesToJson )
+        , ( "scrollToPosition"
+          , header.scrollToPosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
+          )
+        , ( "scrollToShow"
+          , header.scrollToShow |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
+          )
+        , ( "scrollPositionRequest"
+          , Json.Encode.bool
+                (case header.scrollPositionRequest of
+                    Nothing ->
+                        False
+
+                    Just _ ->
+                        True
+                )
+          )
+        , ( "eventListens"
+          , header.eventListens
+                |> sortedKeyValueListToList
+                |> Json.Encode.list
+                    (\entry ->
+                        Json.Encode.object
+                            [ ( "name", entry.key |> Json.Encode.string )
+                            , ( "defaultActionHandling", entry.value.defaultActionHandling |> defaultActionHandlingToJson )
+                            ]
+                    )
+          )
+        ]
+
+
+domElementAttributesNamespacedToJson :
+    SortedKeyValueList
+        { namespace : String, key : String }
+        String
+    -> Json.Encode.Value
+domElementAttributesNamespacedToJson attributes =
+    attributes
+        |> sortedKeyValueListToList
+        |> Json.Encode.list
+            (\entry ->
+                Json.Encode.object
+                    [ ( "namespace", entry.key.namespace |> Json.Encode.string )
+                    , ( "key", entry.key.key |> Json.Encode.string )
+                    , ( "value", entry.value |> Json.Encode.string )
+                    ]
+            )
+
+
+domElementAttributesToJson : SortedKeyValueList String String -> Json.Encode.Value
+domElementAttributesToJson attributes =
+    attributes
+        |> sortedKeyValueListToList
+        |> Json.Encode.list
+            (\entry ->
+                Json.Encode.object
+                    [ ( "key", entry.key |> Json.Encode.string )
+                    , ( "value", entry.value |> Json.Encode.string )
+                    ]
+            )
+
+
+domElementStylesToJson : SortedKeyValueList String String -> Json.Encode.Value
+domElementStylesToJson styles =
+    styles
+        |> sortedKeyValueListToList
+        |> Json.Encode.list
+            (\entry ->
+                Json.Encode.object
+                    [ ( "key", entry.key |> Json.Encode.string )
+                    , ( "value", entry.value |> Json.Encode.string )
+                    ]
+            )
+
+
+domElementBoolPropertiesToJson : SortedKeyValueList String Bool -> Json.Encode.Value
+domElementBoolPropertiesToJson =
+    \boolProperties ->
+        boolProperties
+            |> sortedKeyValueListToList
+            |> Json.Encode.list
+                (\entry ->
+                    Json.Encode.object
+                        [ ( "key", entry.key |> Json.Encode.string )
+                        , ( "value", entry.value |> Json.Encode.bool )
+                        ]
+                )
+
+
+domElementStringPropertiesToJson : SortedKeyValueList String String -> Json.Encode.Value
+domElementStringPropertiesToJson =
+    \stringProperties ->
+        stringProperties
+            |> sortedKeyValueListToList
+            |> Json.Encode.list
+                (\entry ->
+                    Json.Encode.object
+                        [ ( "key", entry.key |> Json.Encode.string )
+                        , ( "value", entry.value |> Json.Encode.string )
+                        ]
+                )
+
+
+defaultActionHandlingToJson : DefaultActionHandling -> Json.Encode.Value
+defaultActionHandlingToJson =
+    \defaultActionHandling ->
+        Json.Encode.string
+            (case defaultActionHandling of
+                DefaultActionPrevent ->
+                    "DefaultActionPrevent"
+
+                DefaultActionExecute ->
+                    "DefaultActionExecute"
+            )
+
+
+domElementVisibilityAlignmentsToJson : { y : DomElementVisibilityAlignment, x : DomElementVisibilityAlignment } -> Json.Encode.Value
+domElementVisibilityAlignmentsToJson alignments =
+    Json.Encode.object
+        [ ( "x", alignments.x |> domElementVisibilityAlignmentToJson )
+        , ( "y", alignments.y |> domElementVisibilityAlignmentToJson )
+        ]
+
+
+domElementVisibilityAlignmentToJson : DomElementVisibilityAlignment -> Json.Encode.Value
+domElementVisibilityAlignmentToJson alignment =
+    Json.Encode.string
+        (case alignment of
+            DomElementStart ->
+                "start"
+
+            DomElementEnd ->
+                "end"
+
+            DomElementCenter ->
+                "center"
+        )
+
+
+domElementScrollPositionToJson : { fromLeft : Float, fromTop : Float } -> Json.Encode.Value
+domElementScrollPositionToJson position =
+    Json.Encode.object
+        [ ( "fromLeft", position.fromLeft |> Json.Encode.float )
+        , ( "fromTop", position.fromTop |> Json.Encode.float )
+        ]
+
+
 interfaceSingleToStructuredId : InterfaceSingle future_ -> StructuredId
 interfaceSingleToStructuredId =
     \interfaceSingle ->
@@ -2121,9 +2448,9 @@ interfaceSingleToStructuredId =
                     , value = path.pathReverse |> StructuredId.ofList StructuredId.ofInt
                     }
 
-                AudioSourceLoad load ->
+                AudioSourceLoad sourceLoad ->
                     { tag = "AudioSourceLoad"
-                    , value = load.url |> StructuredId.ofString
+                    , value = sourceLoad.url |> StructuredId.ofString
                     }
 
                 SocketConnect connect ->
@@ -2393,9 +2720,9 @@ interfaceSingleFutureJsonDecoder interface =
         ClipboardRequest toFuture ->
             Json.Decode.string |> Json.Decode.map toFuture |> Just
 
-        AudioSourceLoad load ->
+        AudioSourceLoad sourceLoad ->
             Json.Decode.oneOf
-                [ Json.Decode.map (\duration -> Ok { url = load.url, duration = duration })
+                [ Json.Decode.map (\duration -> Ok { url = sourceLoad.url, duration = duration })
                     (Json.Decode.LocalExtra.variant "Success"
                         (Json.Decode.field "durationInSeconds"
                             (Json.Decode.map Duration.seconds Json.Decode.float)
@@ -2404,7 +2731,7 @@ interfaceSingleFutureJsonDecoder interface =
                 , Json.Decode.LocalExtra.variant "Error"
                     (Json.Decode.map Err audioSourceLoadErrorJsonDecoder)
                 ]
-                |> Json.Decode.map load.on
+                |> Json.Decode.map sourceLoad.on
                 |> Just
 
         AudioPlay _ ->
@@ -2412,10 +2739,10 @@ interfaceSingleFutureJsonDecoder interface =
 
         DomNodeRender toRender ->
             case toRender.node of
-                DomText _ ->
+                DomHeaderText _ ->
                     Nothing
 
-                DomElementHeader domElement ->
+                DomElementHeader element ->
                     let
                         eventListenDecoder : Json.Decode.Decoder future
                         eventListenDecoder =
@@ -2425,7 +2752,7 @@ interfaceSingleFutureJsonDecoder interface =
                                         (Json.Decode.string
                                             |> Json.Decode.andThen
                                                 (\specificEventName ->
-                                                    case domElement.eventListens |> sortedKeyValueListGet specificEventName of
+                                                    case element.eventListens |> sortedKeyValueListGet specificEventName of
                                                         Nothing ->
                                                             Json.Decode.fail "received event of a kind that isn't listened for"
 
@@ -2437,7 +2764,7 @@ interfaceSingleFutureJsonDecoder interface =
                                     (Json.Decode.field "event" Json.Decode.value)
                                 )
                     in
-                    (case domElement.scrollPositionRequest of
+                    (case element.scrollPositionRequest of
                         Nothing ->
                             eventListenDecoder
 
@@ -2459,11 +2786,11 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Json.Decode.map show.on
                 |> Just
 
-        HttpRequest httpRequest ->
+        HttpRequest request ->
             Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Success" (httpSuccessResponseJsonDecoder httpRequest.expect)
+                [ Json.Decode.LocalExtra.variant "Success" (httpSuccessResponseJsonDecoder request.expect)
                 , Json.Decode.LocalExtra.variant "Error" httpErrorJsonDecoder
-                    |> Json.Decode.map (httpExpectOnError httpRequest.expect)
+                    |> Json.Decode.map (httpExpectOnError request.expect)
                 ]
                 |> Just
 
@@ -2473,9 +2800,9 @@ interfaceSingleFutureJsonDecoder interface =
         TimezoneOffsetRequest toFuture ->
             Json.Decode.int |> Json.Decode.map toFuture |> Just
 
-        TimePeriodicallyListen timePeriodicallyListen ->
+        TimePeriodicallyListen periodicallyListen ->
             Time.LocalExtra.posixJsonDecoder
-                |> Json.Decode.map timePeriodicallyListen.on
+                |> Json.Decode.map periodicallyListen.on
                 |> Just
 
         TimeOnce once ->
@@ -2674,31 +3001,6 @@ gamepadsJsonDecoder =
                     )
         )
         (Json.Decode.list maybeGamepadJsonDecoder)
-
-
-{-| <https://www.w3.org/TR/gamepad/#remapping>
--}
-gamepadStandardButtonMap : GamepadButtonMap
-gamepadStandardButtonMap =
-    { primary = Just 0
-    , secondary = Just 1
-    , tertiary = Just 2
-    , quaternary = Just 3
-    , leftBumper = Just 4
-    , rightBumper = Just 5
-    , leftTrigger = Just 6
-    , rightTrigger = Just 7
-    , select = Just 8
-    , start = Just 9
-    , leftThumbstickButton = Just 10
-    , rightThumbstickButton = Just 11
-    , arrowUp = Just 12
-    , arrowDown = Just 13
-    , arrowLeft = Just 14
-    , arrowRight = Just 15
-    , homeButton = Just 16
-    , touchpad = Just 17
-    }
 
 
 maybeGamepadJsonDecoder : Json.Decode.Decoder (Maybe Gamepad)
@@ -3146,6 +3448,31 @@ windowVisibilityJsonDecoder =
         ]
 
 
+{-| <https://www.w3.org/TR/gamepad/#remapping>
+-}
+gamepadStandardButtonMap : GamepadButtonMap
+gamepadStandardButtonMap =
+    { primary = Just 0
+    , secondary = Just 1
+    , tertiary = Just 2
+    , quaternary = Just 3
+    , leftBumper = Just 4
+    , rightBumper = Just 5
+    , leftTrigger = Just 6
+    , rightTrigger = Just 7
+    , select = Just 8
+    , start = Just 9
+    , leftThumbstickButton = Just 10
+    , rightThumbstickButton = Just 11
+    , arrowUp = Just 12
+    , arrowDown = Just 13
+    , arrowLeft = Just 14
+    , arrowRight = Just 15
+    , homeButton = Just 16
+    , touchpad = Just 17
+    }
+
+
 {-| Controller information on button presses, thumbstick positions etc.
 
   - `primaryButton`: The most common action like "enter"/"confirm" or jump
@@ -3393,7 +3720,7 @@ type AudioEdit
     | ReplacementAudioProcessing (List AudioProcessing)
 
 
-{-| Some kind of sound we want to play. To create `Audio`, start with [`Web.Audio.fromSource`](Web-Audio#fromSource)
+{-| Some kind of sound we want to play. To create `Audio`, start with [`Web.audioFromSource`](Web#audioFromSource)
 -}
 type alias Audio =
     RecordWithoutConstructorFunction
@@ -3415,13 +3742,13 @@ type AudioProcessing
 
 
 {-| Audio data we can use to play sounds.
-Use [`Web.Audio.sourceLoad`](Web-Audio#sourceLoad) to fetch an [`AudioSource`](#AudioSource).
+Use [`Web.audioSourceLoad`](Web#audioSourceLoad) to fetch an [`AudioSource`](#AudioSource).
 
 You can also use the contained source `duration`, for example to find fade-out times or to create a loop:
 
     audioLoop : AudioSource -> Time.Posix -> Time.Posix -> Audio
     audioLoop source initialTime lastTick =
-        Web.Audio.fromSource source
+        Web.audioFromSource source
             (Duration.addTo
                 initialTime
                 (source.duration
@@ -3472,7 +3799,7 @@ type DomEdit
     And it always starts with a given `initialState`
 
   - The [`Interface`](#Interface) is the face to the outside world
-    and can be created using the helpers in [`Web.Dom`](Web-Dom), [`Web.Time`](Web-Time), [`Web.Http`](Web-Http) etc.
+    and can be created using the helpers in [time](#time), [DOM](#dom), [HTTP](#http) etc.
     The given `interface` function constructs these interfaces based on the current state
 
   - Connections to and from js
@@ -3505,3 +3832,1804 @@ produced by [`Web.program`](#program)
 -}
 type alias Program state =
     Platform.Program () (ProgramState state) (ProgramEvent state)
+
+
+{-| An [`Interface`](Web#Interface) for getting the current [POSIX time](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Posix).
+
+Replacement for [`elm/time`'s `Time.now`](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#now).
+
+-}
+timePosixRequest : Interface Time.Posix
+timePosixRequest =
+    TimePosixRequest identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for getting a [`Time.Zone`](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Zone)
+based on the current UTC offset.
+
+Replacement for [`elm/time`'s `Time.here`](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#here).
+
+-}
+timeZoneRequest : Interface Time.Zone
+timeZoneRequest =
+    TimezoneOffsetRequest (\offset -> Time.customZone -offset [])
+        |> Rope.singleton
+
+
+{-| Intended for package authors.
+An [`Interface`](Web#Interface) for using [`Intl.DateTimeFormat().resolvedOptions().timeZone`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/resolvedOptions#timezone)
+to get names like `Europe/Moscow` or `America/Havana`.
+From there you can look it up in any [IANA data](https://www.iana.org/time-zones) you loaded yourself.
+
+Replacement for [`elm/time`'s `Time.getZoneName`](https://package.elm-lang.org/packages/elm/time/latest/Time#getZoneName).
+
+-}
+timeZoneNameRequest : Interface String
+timeZoneNameRequest =
+    TimezoneNameRequest identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for getting a reminder
+once a given [point in time](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Posix) has been reached.
+
+This lets you for example wait until it's 15 minutes before the event,
+timeout a request or schedule a certain action to a specific time.
+
+    import Web
+
+    type RequestState result
+        = NotAsked
+        | BeforeTimeout { start : Time.Posix }
+        | TimedOut
+        | GotResult result
+
+    { initialState = NotAsked
+    , interface =
+        \state ->
+            [ case state of
+                NotAsked ->
+                    [ Web.timePosixRequest
+                        |> Web.interfaceFutureMap BeforeTimeout
+                    , ..request.. |> Web.futureMap GotResult
+                    ]
+
+                BeforeTimeout requestTime ->
+                    -- timeout after 10 seconds
+                    Web.timeOnceAt (Duration.addTo requestTime (Duration.seconds 10))
+                        |> Web.interfaceFutureMap (\_ -> TimedOut)
+
+                TimedOut ->
+                    ...
+
+                GotResult result ->
+                    ...
+            ]
+    }
+
+  - 🧩 [`Duration` is from ianmackenzie/elm-units](https://dark.elm.dmy.fr/packages/ianmackenzie/elm-units/latest/Duration)
+
+You can abstract this in various ways like adding a
+
+    withTimeout :
+        ..Request result..
+        -> Web.Interface (RequestState result)
+
+where the result can be put into the "main state" and therefore cased on.
+
+-}
+timeOnceAt : Time.Posix -> Interface Time.Posix
+timeOnceAt pointInTime =
+    TimeOnce { pointInTime = pointInTime, on = identity }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for getting the current time
+every time a given [`Duration`](https://dark.elm.dmy.fr/packages/ianmackenzie/elm-units/latest/Duration) has passed.
+
+Note: Do not use it for animations.
+[`Web.animationFrameListen`](Web#animationFrameListen)
+syncs up with repaints and will end up being much smoother for any moving visuals.
+
+-}
+timePeriodicallyListen : Duration -> Interface Time.Posix
+timePeriodicallyListen intervalDuration =
+    TimePeriodicallyListen
+        { intervalDurationMilliSeconds = intervalDuration |> Duration.inMilliseconds |> Basics.round
+        , on = identity
+        }
+        |> Rope.singleton
+
+
+{-| Create an SVG element [`Web.DomNode`](Web#DomNode).
+with a given tag, [`DomModifier`](Web#DomModifier)s and sub-nodes
+-}
+svgElement : String -> List (DomModifier future) -> List (DomNode future) -> DomNode future
+svgElement tag modifiers subs =
+    domElementNamespaced "http://www.w3.org/2000/svg" tag modifiers subs
+
+
+{-| An [`Interface`](Web#Interface) for opening a connection on a given address,
+notifying you when it's [connected or disconnected](Web#SocketConnectionEvent)
+
+Once this detects it's available, make sure to set your state's [`SocketId`](Web#SocketId) so you can actually [send](#socketMessage)
+and [receive](#socketMessageListen) messages.
+And once it's disconnected, set your state's [`SocketId`](Web#SocketId) back to nothing:
+
+    case state.socketId of
+        Nothing ->
+            Web.socketConnectTo "ws://127.0.0.1:9000"
+                |> Web.interfaceMap
+                    (\connectionChanged ->
+                        case connectionChanged of
+                            Web.SocketConnected socketId ->
+                                { state | socketId = socketId |> Just }
+
+                            Web.SocketDisconnected ->
+                                { state | socketId = Nothing }
+                    )
+
+        Just socketId ->
+            Web.socketMessage socketId "Meow"
+
+-}
+socketConnectTo : String -> Interface SocketConnectionEvent
+socketConnectTo address =
+    SocketConnect { address = address, on = identity }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for closing a given connection
+-}
+socketDisconnect : SocketId -> Interface future_
+socketDisconnect id =
+    SocketDisconnect id
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for sending data to the server.
+
+It's common to pair this with [`Json.Encode.encode 0`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Encode#encode)
+to send json.
+
+-}
+socketMessage : SocketId -> String -> Interface future_
+socketMessage id data =
+    SocketMessage { id = id, data = data }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for detecting when data has been sent from the server
+-}
+socketMessageListen : SocketId -> Interface String
+socketMessageListen id =
+    SocketMessageListen { id = id, on = identity }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for generating a given count of cryptographically sound unsigned 32-bit `Int`s.
+You can use these in all kinds of packages that allow creating an initial seed
+from ints like [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packages/NoRedInk/elm-random-pcg-extended/latest/Random-Pcg-Extended#initialSeed)
+
+Note: uses [`window.crypto.getRandomValues`](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)
+
+-}
+randomUnsignedInt32s : Int -> Interface (List Int)
+randomUnsignedInt32s count =
+    RandomUnsignedInt32sRequest { count = count, on = identity }
+        |> Rope.singleton
+
+
+{-| Ask the user to consent to receiving notifications, if they haven't already.
+
+For security reasons, browsers require some kind of user interaction like a button click first.
+So you could for example add a toggle to send notifications and ask only for permission
+when the toggle is set.
+
+-}
+notificationAskForPermission : Interface future_
+notificationAskForPermission =
+    NotificationAskForPermission ()
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for pushing a notification to the user.
+Users can in the future [respond to it by clicking it](Web#NotificationClicked).
+
+To not notify users multiple times for multiple messages of the same kind,
+choose an `id` with a description for this kind
+so that the notification with the same kind gets silently replaced if it exists.
+
+    case messagesFromOpponent of
+        [] ->
+            Web.interfaceNone
+
+        [ onlyMessage ] ->
+            Web.notificationShow
+                { id = "opponent messages"
+                , message = "Your opponent left a message"
+                , details = "\"" ++ onlyMessage ++ "\""
+                }
+
+        _ :: _ :: message2Up ->
+            Web.notificationShow
+                { id = "opponent messages"
+                , message =
+                    [ "Your opponent left "
+                    , 2 + (message2Up |> List.length) |> String.fromInt
+                    , " messages"
+                    ]
+                        |> String.join
+                , details = ""
+                }
+
+Another example of a reminder shown in advance
+
+    let
+        untilMeeting : Duration
+        untilMeeting =
+            Duration.from meetingTime currentTime
+    in
+    if untilMeeting |> Quantity.isLessThan (Duration.minutes 10) then
+        Web.notificationShow
+            { id = "time until meeting"
+            , message =
+                [ "the meeting starts in "
+                , untilMeeting |> Duration.inMinutes |> Basics.ceiling |> String.fromInt)
+                , " minutes"
+                ]
+                    |> String.concat
+            , details = ""
+            }
+
+    else
+        Web.interfaceNone
+
+Note: If you haven't previously used [`notificationAskForPermission`](#notificationAskForPermission)
+it will request this permission now.
+
+-}
+notificationShow :
+    { message : String, details : String, id : String }
+    -> Interface NotificationClicked
+notificationShow content =
+    NotificationShow
+        { id = content.id
+        , message = content.message
+        , details = content.details
+        , on = identity
+        }
+        |> Rope.singleton
+
+
+{-| Put a given JSON value in the body of your request. This will automatically add the `Content-Type: application/json` header.
+-}
+httpBodyJson : Json.Encode.Value -> HttpBody
+httpBodyJson content =
+    HttpBodyString { mimeType = "application/json", content = Json.Encode.encode 0 content }
+
+
+{-| Put given [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/) in the body of your request.
+The string argument should be a [MIME type](https://en.wikipedia.org/wiki/Media_type) to be used in the `Content-Type` header
+
+    import Bytes exposing (Bytes)
+    import Bytes.Encode
+    import Time
+    import Web
+    import Zip
+    import Zip.Entry
+
+    exampleZipBody : Web.HttpBody
+    exampleZipBody =
+        Web.httpBodyBytes "application/zip"
+            (Zip.fromEntries
+                [ Bytes.Encode.string "Hello, World!"
+                    |> Bytes.Encode.encode
+                    |> Zip.Entry.store
+                        { path = "hello.txt"
+                        , lastModified = ( Time.utc, Time.millisToPosix 0 )
+                        , comment = Nothing
+                        }
+                ]
+                |> Zip.toBytes
+            )
+
+  - 🧩 [`Zip` and `Zip.Entry` are from `agu-z/elm-zip`](https://dark.elm.dmy.fr/packages/agu-z/elm-zip/latest/)
+
+-}
+httpBodyBytes : String -> (Bytes -> HttpBody)
+httpBodyBytes mimeType content =
+    HttpBodyUnsignedInt8s { mimeType = mimeType, content = content |> Bytes.LocalExtra.toUnsignedInt8List }
+
+
+{-| Expect the response body to be `JSON`, decode it using the given decoder.
+The result will either be
+
+  - `Err` with an [`HttpError`](Web#HttpError) if it didn't succeed
+  - `Ok` if there was a result with either
+      - `Ok` with the decoded value
+      - `Err` with a [`Json.Decode.Error`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Decode#Error)
+        and the actual text response
+
+-}
+httpExpectJson :
+    Json.Decode.Decoder future
+    ->
+        HttpExpect
+            (Result
+                HttpError
+                (Result { actualBody : String, jsonError : Json.Decode.Error } future)
+            )
+httpExpectJson stateDecoder =
+    HttpExpectString
+        (\result ->
+            case result of
+                Ok jsonString ->
+                    case jsonString |> Json.Decode.decodeString stateDecoder of
+                        Err jsonError ->
+                            Ok (Err { actualBody = jsonString, jsonError = jsonError })
+
+                        Ok json ->
+                            Ok (Ok json)
+
+                Err httpError ->
+                    Err httpError
+        )
+
+
+
+-- Expect
+
+
+{-| Expect the response body to be [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/).
+The result will either be
+
+  - `Err` with an [`HttpError`](Web#HttpError) if it didn't succeed
+  - `Ok` with the `Bytes`
+
+-}
+httpExpectBytes : HttpExpect (Result HttpError Bytes)
+httpExpectBytes =
+    HttpExpectBytes identity
+
+
+{-| Expect the response body to be a `String`.
+-}
+httpExpectString : HttpExpect (Result HttpError String)
+httpExpectString =
+    HttpExpectString identity
+
+
+{-| Discard the response body.
+-}
+httpExpectWhatever : HttpExpect (Result HttpError ())
+httpExpectWhatever =
+    HttpExpectWhatever identity
+
+
+{-| Create a `GET` [`HttpRequest`](Web#HttpRequest).
+
+Use [`Web.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
+Use [`Web.timeOnceAt`](Web#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
+
+-}
+httpGet :
+    { url : String
+    , expect : HttpExpect future
+    }
+    -> HttpRequest future
+httpGet options =
+    { url = options.url
+    , method = "GET"
+    , headers = []
+    , body = HttpBodyEmpty
+    , expect = options.expect
+    }
+
+
+
+-- request
+
+
+{-| Add custom headers to the [`Web.HttpRequest`](Web#HttpRequest).
+
+    request
+        |> Web.httpAddHeaders
+            [ ( "X-Custom-Header", "ProcessThisImmediately" )
+            ]
+
+-}
+httpAddHeaders : List ( String, String ) -> (HttpRequest future -> HttpRequest future)
+httpAddHeaders headers request =
+    { request
+        | headers =
+            (headers |> List.map (\( name, value ) -> { name = name, value = value }))
+                ++ request.headers
+    }
+
+
+{-| Create a `POST` [`HttpRequest`](Web#HttpRequest).
+
+Use [`Web.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
+Use [`Web.timeOnceAt`](Web#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
+
+-}
+httpPost :
+    { url : String
+    , body : HttpBody
+    , expect : HttpExpect future
+    }
+    -> HttpRequest future
+httpPost options =
+    { url = options.url
+    , method = "POST"
+    , headers = []
+    , body = options.body
+    , expect = options.expect
+    }
+
+
+{-| An [`Interface`](Web#Interface) for handling an [`HttpRequest`](Web#HttpRequest)
+using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
+-}
+httpRequest : HttpRequest future -> Interface future
+httpRequest request =
+    request |> HttpRequest |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for downloading a given file
+with [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/) as its content,
+a given type and and a given default name.
+
+Replacement for [`File.Download.bytes`](https://dark.elm.dmy.fr/packages/elm/file/latest/File-Download#bytes)
+
+-}
+fileDownloadBytes : { name : String, mimeType : String, content : Bytes } -> Interface future_
+fileDownloadBytes fileDownloadConfig =
+    FileDownloadUnsignedInt8s
+        { name = fileDownloadConfig.name
+        , mimeType = fileDownloadConfig.mimeType
+        , content = fileDownloadConfig.content |> Bytes.LocalExtra.toUnsignedInt8List
+        }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for printing a message with general information
+like if certain tasks have been successful
+
+> survey submitted and received successfully
+
+Depending on what minifying tools you use for your production build, these might get removed.
+
+Note: uses [`console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static),
+just like [`Debug.log`](https://dark.elm.dmy.fr/packages/elm/core/latest/Debug#log)
+
+-}
+consoleLog : String -> Interface future_
+consoleLog string =
+    ConsoleLog string
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for printing a message that something didn't succeed but you could recover from, for example
+
+> ⚠️ Unknown device - there may be compatibility issues.
+
+> ⚠️ Recoverable upload failure, will retry. Error was: no status.
+
+Note: uses [`console.warn`](https://developer.mozilla.org/en-US/docs/Web/API/console/warn_static)
+
+-}
+consoleWarn : String -> Interface future_
+consoleWarn string =
+    ConsoleWarn string
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for printing a message that something failed with bad consequences, for example
+
+> ❌ decoding the selected file failed. Please report this bug at ...
+
+Note: uses [`console.error`](https://developer.mozilla.org/en-US/docs/Web/API/console/error_static)
+
+-}
+consoleError : String -> Interface future_
+consoleError string =
+    ConsoleError string
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for reading the textual contents of the system clipboard.
+
+Note: uses [`navigator.clipboard.readText`](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/readText)
+
+-}
+clipboardRequest : Interface String
+clipboardRequest =
+    ClipboardRequest identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for setting the textual contents of the system clipboard.
+
+Note: uses [`navigator.clipboard.writeText`](https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/writeText)
+
+-}
+clipboardReplaceBy : String -> Interface future_
+clipboardReplaceBy replacement =
+    ClipboardReplaceBy replacement
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for reading the value of the entry with the given key.
+Comes back with `Nothing` if that key doesn't exist.
+
+    import Json.Decode
+    import Web
+
+    projectFromLocalStorageRequest : Web.Interface (Result String Project)
+    projectFromLocalStorageRequest =
+        Web.localStorageRequest "project"
+            |> Web.interfaceFutureMap
+                (\savedProject ->
+                    case savedProject of
+                        Nothing ->
+                            "nothing had been saved" |> Err
+
+                        Just savedProjectJsonString ->
+                            savedProjectJsonString
+                                |> Json.Decode.decodeString projectJsonDecoder
+                                |> Result.mapError Json.Decode.errorToString
+                )
+
+-}
+localStorageRequest : String -> Interface (Maybe String)
+localStorageRequest key =
+    LocalStorageRequest { key = key, on = identity }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for replacing the value of the entry with the given key
+or adding key and value as a new entry if the key doesn't exist.
+
+    import Json.Decode
+    import Web
+
+    projectSaveToLocalStorage : Project -> Web.Interface future_
+    projectSaveToLocalStorage =
+        \project ->
+            Web.localStorageSet "project"
+                (project |> projectJsonEncode |> Json.Encode.encode 0)
+
+Note: This will trigger an event for all other tabs of the same url origin
+that can be listened to using [`localStorageSetOnADifferentTabListen`](#localStorageSetOnADifferentTabListen)
+
+-}
+localStorageSet : String -> String -> Interface future_
+localStorageSet key newOrReplacementValue =
+    LocalStorageSet { key = key, value = Just newOrReplacementValue }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for deleting the entry with the given key if it exists.
+
+Note: This will trigger an event for all other tabs of the same url origin
+that can be listened to using [`localStorageRemoveOnADifferentTabListen`](#localStorageRemoveOnADifferentTabListen)
+
+-}
+localStorageRemove : String -> Interface future_
+localStorageRemove key =
+    LocalStorageSet { key = key, value = Nothing }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for keeping an eye on
+when the local storage on a different tab with the same url origin is removed.
+-}
+localStorageRemoveOnADifferentTabListen : String -> Interface AppUrl
+localStorageRemoveOnADifferentTabListen key =
+    LocalStorageRemoveOnADifferentTabListen { key = key, on = identity }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for keeping an eye on
+when the local storage on a different tab with the same url origin is set.
+
+When the `oldValue` is `Nothing`, no entry with that key existed.
+
+-}
+localStorageSetOnADifferentTabListen : String -> Interface { appUrl : AppUrl, oldValue : Maybe String, newValue : String }
+localStorageSetOnADifferentTabListen key =
+    LocalStorageSetOnADifferentTabListen { key = key, on = identity }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for setting the document's title
+-}
+titleReplaceBy : String -> Interface future_
+titleReplaceBy titleReplacement =
+    DocumentTitleReplaceBy titleReplacement
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for adding or replacing the document's author metadata
+-}
+authorSet : String -> Interface future_
+authorSet authorName =
+    DocumentAuthorSet authorName
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for adding or replacing the document's keywords metadata
+which should consist of words relevant to the page's content
+-}
+keywordsSet : List String -> Interface future_
+keywordsSet authorName =
+    DocumentKeywordsSet authorName
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for adding or replacing the document's description metadata
+which should be a short and accurate summary of the content of the page.
+Several browsers, like Firefox and Opera, use this as the default description of bookmarked pages.
+-}
+descriptionSet : String -> Interface future_
+descriptionSet authorName =
+    DocumentDescriptionSet authorName
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for detecting a specific [`document` event](https://developer.mozilla.org/en-US/docs/Web/API/Document#events)
+that has no native [`Interface`](Web#Interface), like like scroll, scrollend, selectionchange or paste
+-}
+documentListenTo : String -> Interface Json.Decode.Value
+documentListenTo eventName =
+    DocumentEventListen { eventName = eventName, on = Json.Decode.value }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for detecting a specific [`window` event](https://developer.mozilla.org/en-US/docs/Web/API/Window#events)
+-}
+windowListenTo : String -> Interface Json.Decode.Value
+windowListenTo eventName =
+    WindowEventListen { eventName = eventName, on = Json.Decode.value }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for detecting changes to the [visibility to the user](Web#WindowVisibility)
+
+You can use times where the page becomes hidden to for example pause a currently running game.
+These times will also be the last reliable observation you can make before a user might close the page, so treat it as the likely end of the user's session
+
+-}
+windowVisibilityChangeListen : Interface WindowVisibility
+windowVisibilityChangeListen =
+    WindowVisibilityChangeListen identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for getting the inner window width and height in pixels,
+not including toolbars/scrollbars
+-}
+windowSizeRequest : Interface { width : Int, height : Int }
+windowSizeRequest =
+    WindowSizeRequest identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for detecting changes to the inner window width and height
+-}
+windowResizeListen : Interface { width : Int, height : Int }
+windowResizeListen =
+    WindowEventListen
+        { eventName = "resize"
+        , on =
+            Json.Decode.field "target"
+                (Json.Decode.map2 (\width height -> { width = width, height = height })
+                    (Json.Decode.field "innerWidth" Json.Decode.int)
+                    (Json.Decode.field "innerHeight" Json.Decode.int)
+                )
+        }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for detecting when animation frames occur.
+This will be about 60 times per second, though 75, 120, and 144 are also widely used.
+To balance this out in your animation, the [current time](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Posix) is provided each frame.
+
+To get a delta, you could use [`Web.timePosixRequest`](Web#timePosixRequest)
+to get a start time and check with e.g. [`Duration.from`](https://dark.elm.dmy.fr/packages/ianmackenzie/elm-units/latest/Duration#from) how far you've progressed in the timeline.
+
+Note: To improve performance and battery life, most browsers pause these notifications when the app is running in a background tab or a hidden `<iframe>`.
+
+Replacement for [`Browser.Events.onAnimationFrame`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Events#onAnimationFrame)
+
+Note: uses [`window.requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame).
+
+-}
+animationFrameListen : Interface Time.Posix
+animationFrameListen =
+    WindowAnimationFrameListen identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for reading the languages the user prefers.
+Each described using language tags according to [RFC 5646: Tags for Identifying Languages (also known as BCP 47)](https://datatracker.ietf.org/doc/html/rfc5646).
+In the returned list they are ordered by preference with the most preferred language first.
+
+Note: uses [`window.navigator.languages`](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/languages)
+
+-}
+preferredLanguagesRequest : Interface (List String)
+preferredLanguagesRequest =
+    WindowPreferredLanguagesRequest identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for detecting changes to the languages the user prefers.
+Each described using language tags according to [RFC 5646: Tags for Identifying Languages (also known as BCP 47)](https://datatracker.ietf.org/doc/html/rfc5646).
+In the returned list they are ordered by preference with the most preferred language first.
+
+Note: uses [`window.onlanguagechange`](https://developer.mozilla.org/en-US/docs/Web/API/Window/languagechange_event)
+
+-}
+preferredLanguagesChangeListen : Interface (List String)
+preferredLanguagesChangeListen =
+    WindowPreferredLanguagesChangeListen identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for getting the current page's [app-specific URL](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/).
+Is usually used while starting up the app.
+
+Note: Uses [`window.location.href`](https://developer.mozilla.org/en-US/docs/Web/API/Window/location)
+
+-}
+urlRequest : Interface AppUrl
+urlRequest =
+    NavigationUrlRequest identity
+        |> Rope.singleton
+
+
+
+-- elm/browser on "How do I manage URL from a Browser.element?" https://github.com/elm/browser/blob/master/notes/navigation-in-elements.md
+
+
+{-| An [`Interface`](Web#Interface) for changing the [app-specific URL](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/),
+without triggering a page load or adding a new entry to the browser history.
+
+This can be useful if you have search box and you want the ?search=hats in the URL to match without adding a history entry for every single key stroke.
+Imagine how annoying it would be to click back thirty times and still be on the same page!
+
+Replacement for [`Browser.Navigation.replaceUrl`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#replaceUrl)
+
+-}
+replaceUrl : AppUrl -> Interface future_
+replaceUrl appUrl =
+    NavigationReplaceUrl appUrl
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for changing the [app-specific URL](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/)
+and adding a new entry to the browser history
+without triggering a page load.
+
+Replacement for [`Browser.Navigation.pushUrl`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#pushUrl)
+
+-}
+pushUrl : AppUrl -> Interface future_
+pushUrl appUrl =
+    NavigationPushUrl appUrl
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for going forward a given number of pages.
+If there are no more pages in the future, this will do nothing.
+
+Note: You only manage the browser history that you created.
+
+Replacement for [`Browser.Navigation.forward`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#forward)
+
+-}
+navigateForward : Int -> Interface future_
+navigateForward urlSteps =
+    NavigationGo urlSteps
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for going back a given number of pages.
+
+Note: You only manage the browser history that you created.
+
+Replacement for [`Browser.Navigation.back`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#back)
+
+-}
+navigateBack : Int -> Interface future_
+navigateBack urlSteps =
+    NavigationGo urlSteps
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for leaving the current page and loading the given [URL](https://dark.elm.dmy.fr/packages/elm/url/latest/).
+This always results in a page load, even if the provided URL is the same as the current one.
+
+    gotoElmWebsite : Web.Interface future_
+    gotoElmWebsite =
+        Web.navigateTo "https://elm-lang.org/"
+
+Replacement for [`Browser.Navigation.load`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#load)
+
+-}
+navigateTo : String -> Interface future_
+navigateTo url =
+    NavigationLoad url
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for reloading the current page.
+This always results in a page load!
+
+Note: This may grab resources from the browser cache.
+
+Replacement for [`Browser.Navigation.reload`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#reload)
+
+-}
+reload : Interface future_
+reload =
+    NavigationReload ()
+        |> Rope.singleton
+
+
+{-| If you used [`pushUrl`](#pushUrl) to update the URL with new history entries,
+when the user clicks ← or → buttons (or you call [`navigateForward`](#navigateForward) or [`navigateBack`](#navigateBack) yourself),
+the URL will change but your UI will not.
+
+[`navigationListen`](#navigationListen) is an [`Interface`](Web#Interface) for detecting those URL changes and making ui changes as needed.
+
+When the app itself initiates a url change with [`pushUrl`](#pushUrl) or [`replaceUrl`](#replaceUrl), no such event is triggered.
+
+Note: This event is called ["popstate"](https://developer.mozilla.org/en-US/docs/Web/API/Window/popstate_event) in js
+
+-}
+navigationListen : Interface AppUrl
+navigationListen =
+    WindowEventListen
+        { eventName = "popstate"
+        , on =
+            Json.Decode.field "state"
+                (Json.Decode.oneOf
+                    [ Json.Decode.field "appUrl" AppUrl.LocalExtra.jsonDecoder
+                    , Json.Decode.null () |> Json.Decode.map (\() -> AppUrl.fromPath [])
+                    ]
+                )
+        }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for getting which [gamepads](Web#Gamepad)
+are connected and in which ways buttons and axes are activated.
+
+The given `Dict` keys uniquely identify each device for the whole session.
+
+-}
+gamepadsRequest : Interface (Dict.Dict Int Gamepad)
+gamepadsRequest =
+    GamepadsRequest identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for detecting changes to which [gamepads](Web#Gamepad)
+are connected and in which ways buttons and axes are activated.
+
+The given `Dict` keys uniquely identify each device for the whole session,
+so you can for example check for removed and added gamepads using `Dict.diff`
+or track one host device in the state.
+
+Implementation note:
+The [web gamepad API](https://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API) does not offer a listener to detect changes.
+So instead, we poll every 14ms (a bit more often than 60 times/second)
+which is just a bit faster than Chrome's actual fetch rate (fetch rate is not part of the specification).
+
+We want to avoid missed inputs before your next simulation tick,
+so we just had to guess a good interval number.
+<https://stackoverflow.com/a/51483510>
+
+If you have issues with unresponsiveness, [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new)
+
+-}
+gamepadsChangeListen : Interface (Dict.Dict Int Gamepad)
+gamepadsChangeListen =
+    GamepadsChangeListen identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for getting the current [position of the device](Web#GeoLocation)
+-}
+geoLocationRequest : Interface GeoLocation
+geoLocationRequest =
+    GeoLocationRequest identity
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for detecting changes in the current [position of the device](Web#GeoLocation)
+-}
+geoLocationChangeListen : Interface GeoLocation
+geoLocationChangeListen =
+    GeoLocationChangeListen identity
+        |> Rope.singleton
+
+
+nodeFlattenToList :
+    List (InterfaceSingle future)
+    -> { path : List Int, node : DomNode future }
+    -> List { path : List Int, node : DomNode future }
+    -> List (InterfaceSingle future)
+nodeFlattenToList interfacesSoFar current nodesRemaining =
+    case current.node of
+        DomText string ->
+            flattenRemainingNodesToList
+                (({ pathReverse = current.path, node = DomHeaderText string }
+                    |> DomNodeRender
+                 )
+                    :: interfacesSoFar
+                )
+                nodesRemaining
+
+        DomElement element ->
+            let
+                updatedInterfaces : List (InterfaceSingle future)
+                updatedInterfaces =
+                    ({ pathReverse = current.path, node = DomElementHeader element.header }
+                        |> DomNodeRender
+                    )
+                        :: interfacesSoFar
+            in
+            case element.subs of
+                [] ->
+                    flattenRemainingNodesToList updatedInterfaces nodesRemaining
+
+                sub0 :: sub1Up ->
+                    let
+                        updatedRemaining : { index : Int, mapped : List { path : List Int, node : DomNode future } }
+                        updatedRemaining =
+                            sub1Up
+                                |> List.foldl
+                                    (\sub soFar ->
+                                        { index = soFar.index + 1
+                                        , mapped =
+                                            { path = soFar.index :: current.path
+                                            , node = sub
+                                            }
+                                                :: soFar.mapped
+                                        }
+                                    )
+                                    { index = 1, mapped = nodesRemaining }
+                    in
+                    nodeFlattenToList
+                        updatedInterfaces
+                        { path = 0 :: current.path, node = sub0 }
+                        updatedRemaining.mapped
+
+
+flattenRemainingNodesToList :
+    List (InterfaceSingle future)
+    -> List { path : List Int, node : DomNode future }
+    -> List (InterfaceSingle future)
+flattenRemainingNodesToList updatedInterfaces nodesRemaining =
+    case nodesRemaining of
+        [] ->
+            updatedInterfaces
+
+        next :: remainingWithoutNext ->
+            nodeFlattenToList updatedInterfaces next remainingWithoutNext
+
+
+{-| An [`Interface`](Web#Interface) for displaying a given [`Web.DomNode`](Web#DomNode)
+-}
+domRender : DomNode future -> Interface future
+domRender domNode =
+    nodeFlattenToList [] { path = [], node = domNode } []
+        |> Rope.fromList
+
+
+{-| Wire events from this [`Web.DomNode`](Web#DomNode) to a specific event, for example
+
+    buttonUi "start"
+        |> Web.domFutureMap (\Clicked -> StartButtonClicked)
+
+with
+
+    buttonUi : String -> Web.DomNode ButtonEvent
+    buttonUi label =
+        Web.domElement "button"
+            [ Web.domListenTo "click"
+                |> Web.domModifierFutureMap (\_ -> Clicked)
+            ]
+            [ Web.domText label ]
+
+    type ButtonEvent
+        = Clicked
+
+-}
+domFutureMap : (future -> mappedFuture) -> (DomNode future -> DomNode mappedFuture)
+domFutureMap futureChange domElementToMap =
+    case domElementToMap of
+        DomText string ->
+            DomText string
+
+        DomElement element ->
+            element |> elementFutureMap futureChange |> DomElement
+
+
+elementFutureMap : (future -> mappedFuture) -> (DomElement future -> DomElement mappedFuture)
+elementFutureMap futureChange domElementToMap =
+    { header = domElementToMap.header |> domElementHeaderFutureMap futureChange
+    , subs =
+        domElementToMap.subs |> List.map (\node -> node |> domFutureMap futureChange)
+    }
+
+
+{-| Plain text [`DomNode`](#DomNode)
+-}
+domText : String -> DomNode future_
+domText =
+    DomText
+
+
+elementWithMaybeNamespace :
+    Maybe String
+    -> String
+    -> List (DomModifier future)
+    -> List (DomNode future)
+    -> DomNode future
+elementWithMaybeNamespace maybeNamespace tag modifiers subs =
+    let
+        modifiersFlat :
+            { namespace : Maybe String
+            , tag : String
+            , scrollToPosition : Maybe { fromLeft : Float, fromTop : Float }
+            , scrollToShow : Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment }
+            , scrollPositionRequest : Maybe ({ fromLeft : Float, fromTop : Float } -> future)
+            , eventListens : List { key : String, value : { on : Json.Decode.Value -> future, defaultActionHandling : DefaultActionHandling } }
+            , styles : List { key : String, value : String }
+            , stringProperties : List { key : String, value : String }
+            , boolProperties : List { key : String, value : Bool }
+            , attributesNamespaced : List { key : { namespace : String, key : String }, value : String }
+            , attributes : List { key : String, value : String }
+            }
+        modifiersFlat =
+            modifiers
+                |> domModifierBatch
+                |> Rope.foldl
+                    (\modifier soFar ->
+                        case modifier of
+                            ScrollToPosition position ->
+                                { soFar | scrollToPosition = position |> Just }
+
+                            ScrollToShow alignment ->
+                                { soFar | scrollToShow = alignment |> Just }
+
+                            ScrollPositionRequest positionRequest ->
+                                { soFar | scrollPositionRequest = positionRequest |> Just }
+
+                            Listen listen ->
+                                { soFar
+                                    | eventListens =
+                                        { key = listen.eventName
+                                        , value =
+                                            { on = listen.on
+                                            , defaultActionHandling = listen.defaultActionHandling
+                                            }
+                                        }
+                                            :: soFar.eventListens
+                                }
+
+                            Style keyValue ->
+                                { soFar | styles = keyValue :: soFar.styles }
+
+                            StringProperty keyValue ->
+                                { soFar
+                                    | stringProperties =
+                                        keyValue :: soFar.stringProperties
+                                }
+
+                            BoolProperty keyValue ->
+                                { soFar
+                                    | boolProperties =
+                                        keyValue :: soFar.boolProperties
+                                }
+
+                            Attribute keyValue ->
+                                case keyValue.namespace of
+                                    Just namespace ->
+                                        { soFar
+                                            | attributesNamespaced =
+                                                { key = { namespace = namespace, key = keyValue.key }
+                                                , value = keyValue.value
+                                                }
+                                                    :: soFar.attributesNamespaced
+                                        }
+
+                                    Nothing ->
+                                        { soFar
+                                            | attributes =
+                                                { key = keyValue.key, value = keyValue.value }
+                                                    :: soFar.attributes
+                                        }
+                    )
+                    { namespace = maybeNamespace
+                    , tag = tag
+                    , scrollToPosition = Nothing
+                    , scrollToShow = Nothing
+                    , scrollPositionRequest = Nothing
+                    , eventListens = []
+                    , styles = []
+                    , stringProperties = []
+                    , boolProperties = []
+                    , attributes = []
+                    , attributesNamespaced = []
+                    }
+    in
+    { header =
+        { namespace = maybeNamespace
+        , tag = tag
+        , scrollToPosition = modifiersFlat.scrollToPosition
+        , scrollToShow = modifiersFlat.scrollToShow
+        , scrollPositionRequest = modifiersFlat.scrollPositionRequest
+        , eventListens =
+            modifiersFlat.eventListens |> sortedKeyValueListFromList
+        , styles =
+            modifiersFlat.styles |> sortedKeyValueListFromList
+        , stringProperties =
+            modifiersFlat.stringProperties |> sortedKeyValueListFromList
+        , boolProperties =
+            modifiersFlat.boolProperties |> sortedKeyValueListFromList
+        , attributes =
+            modifiersFlat.attributes |> sortedKeyValueListFromList
+        , attributesNamespaced =
+            modifiersFlat.attributesNamespaced |> sortedKeyValueListFromListBy namespacedKeyToComparable
+        }
+    , subs = subs
+    }
+        |> DomElement
+
+
+{-| Sort a given list of { key, value } elements
+by a given comparable representation of the key
+to create a [`SortedKeyValueList`](Web#SortedKeyValueList)
+-}
+sortedKeyValueListFromListBy :
+    (key -> comparable_)
+    -> (List { value : value, key : key } -> SortedKeyValueList key value)
+sortedKeyValueListFromListBy keyToComparable unsortedList =
+    SortedKeyValueList
+        (unsortedList
+            |> List.sortBy (\entry -> entry.key |> keyToComparable)
+        )
+
+
+{-| Create a DOM element with a given tag, [`DomModifier`](#DomModifier)s and sub-[node](Web#DomNode)s.
+For example to get `<p>flying</p>`
+
+    Web.domElement "p"
+        []
+        [ Web.domText "flying" ]
+
+To create SVG elements, use [`Web.svgElement`](Web#svgElement)
+
+-}
+domElement : String -> List (DomModifier future) -> List (DomNode future) -> DomNode future
+domElement tag modifiers subs =
+    elementWithMaybeNamespace Nothing tag modifiers subs
+
+
+{-| Create a DOM element with a given namespace, tag, [`DomModifier`](#DomModifier)s and sub-[node](Web#DomNode)s.
+For example, [`Web.svgElement`](Web#svgElement) is defined as
+
+    svgElement : String -> List (Modifier future) -> List (DomNode future) -> DomNode future
+    svgElement tag modifiers subs =
+        Web.domElementNamespaced "http://www.w3.org/2000/svg" tag modifiers subs
+
+-}
+domElementNamespaced :
+    String
+    -> String
+    -> List (DomModifier future)
+    -> List (DomNode future)
+    -> DomNode future
+domElementNamespaced namespace tag modifiers subs =
+    elementWithMaybeNamespace (namespace |> Just) tag modifiers subs
+
+
+{-| Setting of a [`Web.DomElement`](Web#DomElement).
+To create one, use [`domAttribute`](#domAttribute), [`domStyle`](#domStyle), [`domListenTo`](#domListenTo) etc.
+To combine multiple, use [`Web.domModifierBatch`](#domModifierBatch) and [`Web.domModifierNone`](#domModifierNone)
+
+For example to get `<a href="https://elm-lang.org">elm</a>`
+
+    Web.domElement "a"
+        [ Web.domAttribute "href" "https://elm-lang.org" ]
+        [ Web.domText "elm" ]
+
+Btw: If you can think of a nicer name for this like "customization", "characteristic" or "aspect",
+please [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new).
+
+
+## attribute vs property
+
+  - attribute: part of the HTML itself. E.g. `class` in `<div class="greeting"></div>`
+  - property: an actual field on that js DOM object. E.g. `className` in `div.className = "greeting"`
+
+But don't be surprised: There are cases where
+
+  - only a property _or_ an attribute of a name exists
+  - both exist but they have different effects
+
+For example, trying to reset the text inside a a text input with
+
+    Web.domAttribute "value" "user input"
+
+    -- then later replace it with
+    Web.domAttribute "value" ""
+
+will only provide a _default value_ and has no effect on the currently written text,
+so you'll have to use
+
+    Web.domStringProperty "value" ""
+
+Similarly for checkboxes:
+
+    Web.domBoolProperty "checked" False
+
+Maybe a rule of thumb is:
+Use properties to set anything related to interactivity
+and attributes for everything else.
+
+If you have some opinions or better explanations,
+please [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new).
+
+-}
+type alias DomModifier future =
+    Rope (DomModifierSingle future)
+
+
+{-| Combine multiple [`DomModifier`](#DomModifier)s into one.
+-}
+domModifierBatch : List (DomModifier future) -> DomModifier future
+domModifierBatch modifiers =
+    modifiers |> Rope.fromList |> Rope.concat
+
+
+{-| Doing nothing as a [`DomModifier`](#DomModifier). These two examples are equivalent:
+
+    Web.domModifierBatch
+        [ a, Web.domModifierNone, b ]
+
+and
+
+    Web.domModifierBatch
+        (List.filterMap identity
+            [ a |> Just, Nothing, b |> Just ]
+        )
+
+-}
+domModifierNone : DomModifier future_
+domModifierNone =
+    Rope.empty
+
+
+{-| An individual [`DomModifier`](#DomModifier).
+Create using [`domAttribute`](#domAttribute), [`domStyle`](#domStyle), [`domListenTo`](#domListenTo) etc.
+-}
+type DomModifierSingle future
+    = Attribute { namespace : Maybe String, key : String, value : String }
+    | StringProperty { key : String, value : String }
+    | BoolProperty { key : String, value : Bool }
+    | Style { key : String, value : String }
+    | ScrollToPosition { fromLeft : Float, fromTop : Float }
+    | ScrollToShow { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment }
+    | ScrollPositionRequest ({ fromLeft : Float, fromTop : Float } -> future)
+    | Listen
+        { eventName : String
+        , on : Json.Decode.Value -> future
+        , defaultActionHandling : DefaultActionHandling
+        }
+
+
+{-| A key-value attribute [`DomModifier`](#DomModifier)
+-}
+domAttribute : String -> String -> DomModifier future_
+domAttribute key value =
+    { namespace = Nothing, key = key, value = value } |> Attribute |> Rope.singleton
+
+
+{-| A key-string value DOM property [`DomModifier`](#DomModifier)
+-}
+domStringProperty : String -> String -> DomModifier future_
+domStringProperty key value =
+    { key = key, value = value } |> StringProperty |> Rope.singleton
+
+
+{-| A key-bool value DOM property [`DomModifier`](#DomModifier)
+-}
+domBoolProperty : String -> Bool -> DomModifier future_
+domBoolProperty key value =
+    { key = key, value = value } |> BoolProperty |> Rope.singleton
+
+
+{-| A namespaced key-value attribute [`DomModifier`](#DomModifier).
+For example, you could define an SVG xlink href attribute as
+
+    attributeXlinkHref : String -> Web.DomModifier msg
+    attributeXlinkHref value =
+        Web.domAttributeNamespaced "http://www.w3.org/1999/xlink" "xlink:href" value
+
+-}
+domAttributeNamespaced : String -> String -> String -> DomModifier future_
+domAttributeNamespaced namespace key value =
+    { namespace = namespace |> Just, key = key, value = value } |> Attribute |> Rope.singleton
+
+
+{-| A key-value style [`DomModifier`](#DomModifier)
+-}
+domStyle : String -> String -> DomModifier future_
+domStyle key value =
+    { key = key, value = value } |> Style |> Rope.singleton
+
+
+{-| Listen for a specific DOM event on the [`Web.DomElement`](Web#DomElement).
+Use [`domModifierFutureMap`](#domModifierFutureMap) to wire this to a specific event.
+
+If you want to override the browser's default behavior for that event,
+use [`domListenToPreventingDefaultAction`](#domListenToPreventingDefaultAction)
+
+-}
+domListenTo : String -> DomModifier Json.Decode.Value
+domListenTo eventName =
+    { eventName = eventName
+    , on = identity
+    , defaultActionHandling = DefaultActionExecute
+    }
+        |> Listen
+        |> Rope.singleton
+
+
+{-| Like [`domListenTo`](#domListenTo) but [preventing the browser's default action](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault).
+
+That's for example how elm's [`Browser.Events.onSubmit`](https://dark.elm.dmy.fr/packages/elm/html/latest/Html-Events#onSubmit)
+prevents the form from changing the page’s location:
+
+    submitListen : Web.DomModifier ()
+    submitListen =
+        Web.domListenToPreventingDefaultAction "submit"
+            |> Web.domModifierFutureMap (\_ -> ())
+
+-}
+domListenToPreventingDefaultAction : String -> DomModifier Json.Decode.Value
+domListenToPreventingDefaultAction eventName =
+    { eventName = eventName
+    , on = identity
+    , defaultActionHandling = DefaultActionPrevent
+    }
+        |> Listen
+        |> Rope.singleton
+
+
+{-| Wire events from this [`DomModifier`](#DomModifier) to a specific event.
+
+    Web.domListenTo "click" |> Web.domModifierFutureMap (\_ -> ButtonClicked)
+
+-}
+domModifierFutureMap :
+    (future -> mappedFuture)
+    -> (DomModifier future -> DomModifier mappedFuture)
+domModifierFutureMap futureChange modifier =
+    modifier
+        |> Rope.LocalExtra.mapFast
+            (\modifierSingle ->
+                modifierSingle |> domModifierSingleMap futureChange
+            )
+
+
+domModifierSingleMap :
+    (future -> mappedFuture)
+    -> (DomModifierSingle future -> DomModifierSingle mappedFuture)
+domModifierSingleMap futureChange modifier =
+    case modifier of
+        Attribute keyValue ->
+            keyValue |> Attribute
+
+        Style keyValue ->
+            keyValue |> Style
+
+        StringProperty keyValue ->
+            keyValue |> StringProperty
+
+        BoolProperty keyValue ->
+            keyValue |> BoolProperty
+
+        ScrollToPosition position ->
+            position |> ScrollToPosition
+
+        ScrollToShow alignment ->
+            alignment |> ScrollToShow
+
+        ScrollPositionRequest request ->
+            (\future -> future |> request |> futureChange) |> ScrollPositionRequest
+
+        Listen listen ->
+            { eventName = listen.eventName
+            , on = \json -> listen.on json |> futureChange
+            , defaultActionHandling = listen.defaultActionHandling
+            }
+                |> Listen
+
+
+{-| Getting the current scroll position from the left and top.
+
+Use in combination with [`domScrollToPosition`](#domScrollToPosition)
+to implement saving and restoring scroll position even when users had navigated off a URL.
+
+-}
+domScrollPositionRequest : DomModifier { fromLeft : Float, fromTop : Float }
+domScrollPositionRequest =
+    ScrollPositionRequest identity |> Rope.singleton
+
+
+{-| Ensure a given initial scroll position in both directions.
+To move to the edge in a direction, use [`domScrollToShow`](#domScrollToShow) instead.
+
+Unlike [`domStyle`](#domStyle)s,
+this is just an initial configuration
+which can be changed by user actions.
+So adding e.g. `scrollToPosition ...`
+will scroll once the next render happens
+but will not prevent users from scrolling away.
+
+-}
+domScrollToPosition :
+    { fromLeft : Float, fromTop : Float }
+    -> DomModifier future_
+domScrollToPosition position =
+    ScrollToPosition position |> Rope.singleton
+
+
+{-| Ensure a given initial [`DomElementVisibilityAlignment`](Web#DomElementVisibilityAlignment)
+in both directions.
+
+Unlike [`domStyle`](#domStyle)s,
+this is just an initial configuration
+which can be changed by user actions.
+So adding e.g. `scrollToShow { y = Web.DomElementStart, x = Web.DomElementStart }`
+will scroll to the top left once the next render happens
+but will not prevent users from scrolling away.
+
+Note: Uses [`Element.scrollIntoView`](https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView)
+
+-}
+domScrollToShow :
+    { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment }
+    -> DomModifier future_
+domScrollToShow preferredAlignment =
+    ScrollToShow preferredAlignment |> Rope.singleton
+
+
+{-| Plain text or an [`DomElement`](#DomElement). Create using [`domText`](#domText) and [`domElement`](#domElement)
+-}
+type DomNode future
+    = DomText String
+    | DomElement (DomElement future)
+
+
+{-| A tagged DOM node that can itself contain child [node](#DomNode)s
+-}
+type alias DomElement future =
+    RecordWithoutConstructorFunction
+        { header : DomElementHeader future
+        , subs : List (DomNode future)
+        }
+
+
+{-| Change the stereo panning with a given a signed percentage [parameter](Web#AudioParameterTimeline).
+
+`Web.audioStereoPan -0.9` for example means that the sound is almost fully balanced towards the left speaker
+
+-}
+audioStereoPan : AudioParameterTimeline -> (Audio -> Audio)
+audioStereoPan signedPercentageTimeline audio =
+    { audio
+        | stereoPan =
+            audio.stereoPan
+                |> audioParameterScaleAlongParameter audio.startTime
+                    signedPercentageTimeline
+    }
+
+
+{-| Scale the playback rate by a given factor. This will also affect pitch.
+
+For example, `Web.audioSpeedScaleBy 0.5` means playback will take twice as long and the pitch will be one octave lower, see [AudioBufferSourceNode.playbackRate](https://developer.mozilla.org/en-US/docs/Web/API/AudioBufferSourceNode/playbackRate)
+
+In general, to pitch by semitones:
+
+    Web.audioSpeedScaleBy
+        (Web.audioParameterAt (2 ^ (semitones / 12)))
+
+Note: It would be possible to modify the signal to compensate for the pitch change,
+see [Audio time stretching and pitch scaling](https://en.wikipedia.org/wiki/Audio_time_stretching_and_pitch_scaling).
+Help appreciated!
+
+-}
+audioSpeedScaleBy : AudioParameterTimeline -> (Audio -> Audio)
+audioSpeedScaleBy speedScaleFactorTimeline audio =
+    { audio
+        | speed =
+            audio.speed
+                |> audioParameterScaleAlongParameter audio.startTime
+                    speedScaleFactorTimeline
+    }
+
+
+{-| Scale how loud it is.
+1 preserves the current volume, 0.5 halves it, and 0 mutes it.
+If the the volume is less than 0, 0 will be used instead.
+-}
+audioVolumeScaleBy : AudioParameterTimeline -> (Audio -> Audio)
+audioVolumeScaleBy volumeScaleFactor audio =
+    { audio
+        | volume =
+            audio.volume
+                |> audioParameterScaleAlongParameter audio.startTime
+                    volumeScaleFactor
+    }
+
+
+audioAddProcessing : AudioProcessing -> (Audio -> Audio)
+audioAddProcessing newLastProcessing audio =
+    { audio
+        | processingLastToFirst = audio.processingLastToFirst |> (::) newLastProcessing
+    }
+
+
+{-| Usually used to apply reverb and or echo.
+Given a loaded [`AudioSource`](Web#AudioSource) containing the impulse response,
+it performs a [Convolution](https://en.wikipedia.org/wiki/Convolution) with the [`Audio`](Web#Audio)
+
+If you need some nice impulse wavs to try it out, there's a few at [`dhiogoboza/audio-convolution`](https://github.com/dhiogoboza/audio-convolution/tree/master/impulses).
+If you know more nice ones, don't hesitate to open an issue or a PR.
+
+-}
+audioAddLinearConvolutionWith : AudioSource -> (Audio -> Audio)
+audioAddLinearConvolutionWith bufferAudioSource audio =
+    audio |> audioAddProcessing (AudioLinearConvolution { sourceUrl = bufferAudioSource.url })
+
+
+{-| Frequencies below a given cutoff [parameter](Web#AudioParameterTimeline) pass through;
+frequencies above it are attenuated.
+
+Has a 12dB/octave rolloff and no peak at the cutoff.
+
+-}
+audioAddLowpassUntilFrequency : AudioParameterTimeline -> (Audio -> Audio)
+audioAddLowpassUntilFrequency cutoffFrequency audio =
+    audio |> audioAddProcessing (AudioLowpass { cutoffFrequency = cutoffFrequency })
+
+
+{-| Frequencies below a given cutoff [parameter](Web#AudioParameterTimeline) are attenuated;
+frequencies above it pass through.
+
+Has a 12dB/octave rolloff and no peak at the cutoff.
+
+-}
+audioAddHighpassFromFrequency : AudioParameterTimeline -> (Audio -> Audio)
+audioAddHighpassFromFrequency cutoffFrequency audio =
+    audio |> audioAddProcessing (AudioHighpass { cutoffFrequency = cutoffFrequency })
+
+
+{-| Create [`Audio`](Web#Audio) from an given loaded [source](Web#AudioSource)
+which will play at a given [time](https://dark.elm.dmy.fr/packages/elm/time/latest/)
+
+    -- play a song at half speed and wait 2 seconds after the usual song start time before starting
+    Web.audioFromSource
+        myCoolSong
+        (Duration.addTo usualSongStartTime (Duration.seconds 2))
+        |> Web.audioSpeedScaleBy (Web.audioParameterAt 0.5)
+
+Note that in some browsers audio will be muted until the user interacts with the webpage.
+
+-}
+audioFromSource : AudioSource -> Time.Posix -> Audio
+audioFromSource source startTime =
+    { url = source.url
+    , startTime = startTime
+    , volume = audioParameterAt 1
+    , speed = audioParameterAt 1
+    , stereoPan = audioParameterAt 0
+    , processingLastToFirst = []
+    }
+
+
+{-| An [`Interface`](Web#Interface) for fetching audio data from a given url
+and returning an [`AudioSource`](Web#AudioSource) to use with [`audioFromSource`](#audioFromSource).
+-}
+audioSourceLoad : String -> Interface (Result AudioSourceLoadError AudioSource)
+audioSourceLoad url =
+    AudioSourceLoad { url = url, on = identity }
+        |> Rope.singleton
+
+
+{-| An [`Interface`](Web#Interface) for playing [`Audio`](Web#Audio) created with [`audioFromSource`](#audioFromSource).
+
+To play multiple audios:
+
+    [ audio0, audio1, audio2 ]
+        |> List.map Web.audioPlay
+        |> Web.interfaceBatch
+
+-}
+audioPlay : Audio -> Interface future_
+audioPlay audio =
+    AudioPlay
+        { audio
+            | startTime = Duration.addTo audio.startTime (Duration.milliseconds 50)
+            , volume = audio.volume |> audioParameterValuesAlter (\value -> Basics.max 0 value)
+
+            -- negative speed values are supported by some browsers
+            -- https://stackoverflow.com/questions/9874167/how-can-i-play-audio-in-reverse-with-web-audio-api/9875011#9875011
+        }
+        |> Rope.singleton
+
+
+audioParameterValuesAlter : (Float -> Float) -> (AudioParameterTimeline -> AudioParameterTimeline)
+audioParameterValuesAlter valueAlter timeline =
+    { startValue = timeline.startValue |> valueAlter
+    , keyFrames =
+        timeline.keyFrames
+            |> List.map (\keyFrame -> { time = keyFrame.time, value = keyFrame.value |> valueAlter })
+    }
+
+
+{-| Set it to a constant value. Add [`audioParameterThrough`](#audioParameterThrough) to make it transition from this starting value over time
+-}
+audioParameterAt : Float -> AudioParameterTimeline
+audioParameterAt valueAtTheStart =
+    { startValue = valueAtTheStart, keyFrames = [] }
+
+
+{-| Specify a key value at a given absolute point in time.
+The parameter will then transition linearly between those points.
+
+Let's define an audio function that fades in to 1 and then fades out until it's 0 again.
+
+    import Duration
+    import Time
+    import Web
+
+
+    -- 1                ________
+    --                /         \
+    -- 0 ____________/           \_______
+    --    t ->    fade in     fade out
+    fadeInOut fadeInStartTime fadeOutEndTime audio =
+        Web.audioParameterAt 0
+            |> Web.audioParameterThrough fadeInStartTime 1
+            |> Web.audioParameterThrough (Duration.addTo fadeInStartTime Duration.second) 1
+            |> Web.audioParameterThrough (Duration.subtractFrom fadeOutEndTime Duration.second) 1
+            |> Web.audioParameterThrough fadeOutEndTime 0
+
+  - 🧩 `Duration` is from [ianmackenzie/elm-units](https://dark.elm.dmy.fr/packages/ianmackenzie/elm-units/latest/)
+  - 🧩 `Time` is from [elm/time](https://dark.elm.dmy.fr/packages/elm/time/latest/)
+
+You do not have to worry about order.
+
+-}
+audioParameterThrough : Time.Posix -> Float -> (AudioParameterTimeline -> AudioParameterTimeline)
+audioParameterThrough keyFrameMoment keyFrameValue audioParameterTimelineSoFar =
+    { startValue = audioParameterTimelineSoFar.startValue
+    , keyFrames =
+        { time = keyFrameMoment, value = keyFrameValue } :: audioParameterTimelineSoFar.keyFrames
+    }
+
+
+audioParameterScaleAlongParameter : Time.Posix -> AudioParameterTimeline -> (AudioParameterTimeline -> AudioParameterTimeline)
+audioParameterScaleAlongParameter startTime timelineToScaleBy audioParameterTimelineToScale =
+    let
+        startValue : Float
+        startValue =
+            audioParameterTimelineToScale.startValue * timelineToScaleBy.startValue
+    in
+    { startValue = startValue
+    , keyFrames =
+        audioParameterTimelineToScale.keyFrames
+            |> List.sortBy (\keyFrame -> keyFrame.time |> Time.posixToMillis)
+            |> audioParameterKeyFramesScaleAlong
+                { previous = { time = startTime, value = startValue }
+                , toScaleBy =
+                    timelineToScaleBy.keyFrames
+                        |> List.sortBy (\keyFrame -> keyFrame.time |> Time.posixToMillis)
+                }
+    }
+
+
+audioParameterKeyFramesScaleAlong :
+    { toScaleBy : List { time : Time.Posix, value : Float }
+    , previous : { time : Time.Posix, value : Float }
+    }
+    -> (List { time : Time.Posix, value : Float } -> List { time : Time.Posix, value : Float })
+audioParameterKeyFramesScaleAlong state toScale =
+    List.map2
+        (\keyFrameToScale keyFrameToScaleBy ->
+            { time = keyFrameToScale.time
+            , value = keyFrameToScale.value * keyFrameToScaleBy.value
+            }
+        )
+        (toScale |> audioParameterKeyFramesAddSubs { subs = state.toScaleBy |> List.map .time, previous = state.previous })
+        (state.toScaleBy |> audioParameterKeyFramesAddSubs { subs = toScale |> List.map .time, previous = state.previous })
+
+
+audioParameterKeyFramesAddSubs :
+    { subs : List Time.Posix
+    , previous : { time : Time.Posix, value : Float }
+    }
+    -> (List { time : Time.Posix, value : Float } -> List { time : Time.Posix, value : Float })
+audioParameterKeyFramesAddSubs state keyFrames =
+    -- IGNORE TCO
+    case state.subs of
+        [] ->
+            keyFrames
+
+        currentSub :: afterCurrentSub ->
+            case keyFrames of
+                [] ->
+                    (currentSub :: afterCurrentSub)
+                        |> List.map (\subTime -> { time = subTime, value = state.previous.value })
+
+                currentKeyFrame :: afterCurrentKeyFrame ->
+                    case compare (currentKeyFrame.time |> Time.posixToMillis) (currentSub |> Time.posixToMillis) of
+                        EQ ->
+                            currentKeyFrame
+                                :: (afterCurrentKeyFrame
+                                        |> audioParameterKeyFramesAddSubs
+                                            { subs = afterCurrentSub
+                                            , previous = currentKeyFrame
+                                            }
+                                   )
+
+                        LT ->
+                            currentKeyFrame
+                                :: (afterCurrentKeyFrame
+                                        |> audioParameterKeyFramesAddSubs
+                                            { subs = currentSub :: afterCurrentSub
+                                            , previous = currentKeyFrame
+                                            }
+                                   )
+
+                        GT ->
+                            let
+                                locationBetween : Float
+                                locationBetween =
+                                    ((currentKeyFrame.time |> Time.posixToMillis) - (currentSub |> Time.posixToMillis) |> Basics.toFloat)
+                                        / ((currentKeyFrame.time |> Time.posixToMillis) - (state.previous.time |> Time.posixToMillis) |> Basics.toFloat)
+
+                                subKeyFrame : { time : Time.Posix, value : Float }
+                                subKeyFrame =
+                                    { time = currentSub
+                                    , value = linearlyInterpolate state.previous.value currentKeyFrame.value locationBetween
+                                    }
+                            in
+                            subKeyFrame
+                                :: (afterCurrentKeyFrame
+                                        |> audioParameterKeyFramesAddSubs
+                                            { subs = currentSub :: afterCurrentSub
+                                            , previous = subKeyFrame
+                                            }
+                                   )
+
+
+linearlyInterpolate : Float -> Float -> Float -> Float
+linearlyInterpolate startValue endValue progress =
+    if Basics.isInfinite progress then
+        startValue
+
+    else
+        progress * (endValue - startValue) + startValue

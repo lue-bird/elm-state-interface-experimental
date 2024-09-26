@@ -4,8 +4,6 @@ import Color
 import Json.Encode
 import Random.Pcg.Extended
 import Web
-import Web.Dom
-import Web.Random
 
 
 main : Web.Program State
@@ -27,7 +25,7 @@ interface =
     \state ->
         case state of
             WaitingForInitialRandomness ->
-                Web.Random.unsignedInt32s 4
+                Web.randomUnsignedInt32s 4
                     |> Web.interfaceFutureMap
                         (\unsignedInt32s ->
                             let
@@ -42,29 +40,29 @@ interface =
                         )
 
             DiceUiState randomStuff ->
-                Web.Dom.element "div"
-                    [ Web.Dom.style "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
-                    , Web.Dom.style "color" (Color.rgb 1 1 1 |> Color.toCssString)
-                    , Web.Dom.style "padding-left" "80px"
-                    , Web.Dom.style "padding-right" "80px"
-                    , Web.Dom.style "position" "fixed"
-                    , Web.Dom.style "top" "0"
-                    , Web.Dom.style "right" "0"
-                    , Web.Dom.style "bottom" "0"
-                    , Web.Dom.style "left" "0"
+                Web.domElement "div"
+                    [ Web.domStyle "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
+                    , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
+                    , Web.domStyle "padding-left" "80px"
+                    , Web.domStyle "padding-right" "80px"
+                    , Web.domStyle "position" "fixed"
+                    , Web.domStyle "top" "0"
+                    , Web.domStyle "right" "0"
+                    , Web.domStyle "bottom" "0"
+                    , Web.domStyle "left" "0"
                     ]
-                    [ Web.Dom.element "span"
-                        [ Web.Dom.style "font-size" "24em"
+                    [ Web.domElement "span"
+                        [ Web.domStyle "font-size" "24em"
                         ]
-                        [ randomStuff.diceEyes |> diceEyesToSymbol |> Web.Dom.text ]
-                    , Web.Dom.element "br" [] []
+                        [ randomStuff.diceEyes |> diceEyesToSymbol |> Web.domText ]
+                    , Web.domElement "br" [] []
                     , buttonUi
-                        [ Web.Dom.style "font-size" "4em"
+                        [ Web.domStyle "font-size" "4em"
                         ]
-                        [ Web.Dom.text "roll the dice" ]
-                        |> Web.Dom.futureMap (\() -> RerollClicked)
+                        [ Web.domText "roll the dice" ]
+                        |> Web.domFutureMap (\() -> RerollClicked)
                     ]
-                    |> Web.Dom.render
+                    |> Web.domRender
                     |> Web.interfaceFutureMap
                         (\RerollClicked ->
                             let
@@ -80,20 +78,20 @@ diceEyesRandomGenerator =
     Random.Pcg.Extended.int 1 6
 
 
-buttonUi : List (Web.Dom.Modifier ()) -> List (Web.Dom.Node ()) -> Web.Dom.Node ()
+buttonUi : List (Web.DomModifier ()) -> List (Web.DomNode ()) -> Web.DomNode ()
 buttonUi modifiers subs =
-    Web.Dom.element "button"
-        ([ Web.Dom.listenTo "click"
-            |> Web.Dom.modifierFutureMap (\_ -> ())
-         , Web.Dom.style "background-color" (Color.rgba 0 0 0 0 |> Color.toCssString)
-         , Web.Dom.style "border-top" "none"
-         , Web.Dom.style "border-left" "none"
-         , Web.Dom.style "border-right" "none"
-         , Web.Dom.style "border-bottom" ("5px solid " ++ (Color.rgba 1 1 1 0.5 |> Color.toCssString))
-         , Web.Dom.style "border-radius" "20px"
-         , Web.Dom.style "color" "inherit"
-         , Web.Dom.style "padding" "4px 13px"
-         , Web.Dom.style "margin" "0px 0px"
+    Web.domElement "button"
+        ([ Web.domListenTo "click"
+            |> Web.domModifierFutureMap (\_ -> ())
+         , Web.domStyle "background-color" (Color.rgba 0 0 0 0 |> Color.toCssString)
+         , Web.domStyle "border-top" "none"
+         , Web.domStyle "border-left" "none"
+         , Web.domStyle "border-right" "none"
+         , Web.domStyle "border-bottom" ("5px solid " ++ (Color.rgba 1 1 1 0.5 |> Color.toCssString))
+         , Web.domStyle "border-radius" "20px"
+         , Web.domStyle "color" "inherit"
+         , Web.domStyle "padding" "4px 13px"
+         , Web.domStyle "margin" "0px 0px"
          ]
             ++ modifiers
         )

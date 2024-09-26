@@ -5,24 +5,7 @@
     "license": "MIT",
     "version": "1.0.0",
     "exposed-modules": [
-        "Web",
-        "Web.Http",
-        "Web.Dom",
-        "Web.Svg",
-        "Web.Time",
-        "Web.Console",
-        "Web.Window",
-        "Web.Navigation",
-        "Web.Random",
-        "Web.FileDownload",
-        "Web.Clipboard",
-        "Web.Audio",
-        "Web.Audio.Parameter",
-        "Web.Socket",
-        "Web.LocalStorage",
-        "Web.GeoLocation",
-        "Web.Gamepads",
-        "Web.Notification"
+        "Web"
     ],
     "elm-version": "0.19.1 <= v < 20.0.0",
     "dependencies": {
