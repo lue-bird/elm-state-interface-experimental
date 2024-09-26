@@ -2616,13 +2616,13 @@ programInit appConfig =
 {-| The fact that this can only be implemented linearly might seem shocking.
 In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
 -}
-sortedKeyValueListGet : key -> SortedKeyValueList key value -> Maybe value
-sortedKeyValueListGet keyToFind sortedKeyValueList =
+sortedKeyValueListGetAtStringKey : String -> SortedKeyValueList String value -> Maybe value
+sortedKeyValueListGetAtStringKey keyToFind sortedKeyValueList =
     sortedKeyValueList
         |> sortedKeyValueListToList
         |> List.LocalExtra.firstJustMap
             (\entry ->
-                if entry.key == keyToFind then
+                if entry.key == keyToFind ++ "" then
                     Just entry.value
 
                 else
@@ -2641,7 +2641,7 @@ programSubscriptions appConfig (State state) =
                     (Json.Decode.field "id" Json.Decode.string
                         |> Json.Decode.andThen
                             (\originalInterfaceId ->
-                                case state.interface |> sortedKeyValueListGet originalInterfaceId of
+                                case state.interface |> sortedKeyValueListGetAtStringKey originalInterfaceId of
                                     Just interfaceSingleAcceptingFuture ->
                                         case interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder of
                                             Just eventDataDecoder ->
@@ -2751,7 +2751,7 @@ interfaceSingleFutureJsonDecoder interface =
                                         (Json.Decode.string
                                             |> Json.Decode.andThen
                                                 (\specificEventName ->
-                                                    case element.eventListens |> sortedKeyValueListGet specificEventName of
+                                                    case element.eventListens |> sortedKeyValueListGetAtStringKey specificEventName of
                                                         Nothing ->
                                                             Json.Decode.fail "received event of a kind that isn't listened for"
 
@@ -4876,13 +4876,13 @@ domText =
     DomText
 
 
-elementWithMaybeNamespace :
+domElementWithMaybeNamespace :
     Maybe String
     -> String
     -> List (DomModifier future)
     -> List (DomNode future)
     -> DomNode future
-elementWithMaybeNamespace maybeNamespace tag modifiers subs =
+domElementWithMaybeNamespace maybeNamespace tag modifiers subs =
     let
         modifiersFlat :
             { namespace : Maybe String
@@ -5020,7 +5020,7 @@ To create SVG elements, use [`Web.svgElement`](Web#svgElement)
 -}
 domElement : String -> List (DomModifier future) -> List (DomNode future) -> DomNode future
 domElement tag modifiers subs =
-    elementWithMaybeNamespace Nothing tag modifiers subs
+    domElementWithMaybeNamespace Nothing tag modifiers subs
 
 
 {-| Create a DOM element with a given namespace, tag, [`DomModifier`](#DomModifier)s and sub-[node](Web#DomNode)s.
@@ -5038,7 +5038,7 @@ domElementNamespaced :
     -> List (DomNode future)
     -> DomNode future
 domElementNamespaced namespace tag modifiers subs =
-    elementWithMaybeNamespace (namespace |> Just) tag modifiers subs
+    domElementWithMaybeNamespace (namespace |> Just) tag modifiers subs
 
 
 {-| Setting of a [`Web.DomElement`](Web#DomElement).
