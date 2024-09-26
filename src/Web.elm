@@ -4904,57 +4904,146 @@ domElementWithMaybeNamespace maybeNamespace tag modifiers subs =
                     (\modifier soFar ->
                         case modifier of
                             ScrollToPosition position ->
-                                { soFar | scrollToPosition = position |> Just }
+                                { scrollToPosition = position |> Just
+                                , namespace = soFar.namespace
+                                , tag = soFar.tag
+                                , scrollToShow = soFar.scrollToShow
+                                , scrollPositionRequest = soFar.scrollPositionRequest
+                                , eventListens = soFar.eventListens
+                                , styles = soFar.styles
+                                , stringProperties = soFar.stringProperties
+                                , boolProperties = soFar.boolProperties
+                                , attributes = soFar.attributes
+                                , attributesNamespaced = soFar.attributesNamespaced
+                                }
 
                             ScrollToShow alignment ->
-                                { soFar | scrollToShow = alignment |> Just }
+                                { scrollToShow = alignment |> Just
+                                , namespace = soFar.namespace
+                                , tag = soFar.tag
+                                , scrollToPosition = soFar.scrollToPosition
+                                , scrollPositionRequest = soFar.scrollPositionRequest
+                                , eventListens = soFar.eventListens
+                                , styles = soFar.styles
+                                , stringProperties = soFar.stringProperties
+                                , boolProperties = soFar.boolProperties
+                                , attributes = soFar.attributes
+                                , attributesNamespaced = soFar.attributesNamespaced
+                                }
 
                             ScrollPositionRequest positionRequest ->
-                                { soFar | scrollPositionRequest = positionRequest |> Just }
+                                { scrollPositionRequest = positionRequest |> Just
+                                , namespace = soFar.namespace
+                                , tag = soFar.tag
+                                , scrollToPosition = soFar.scrollToPosition
+                                , scrollToShow = soFar.scrollToShow
+                                , eventListens = soFar.eventListens
+                                , styles = soFar.styles
+                                , stringProperties = soFar.stringProperties
+                                , boolProperties = soFar.boolProperties
+                                , attributes = soFar.attributes
+                                , attributesNamespaced = soFar.attributesNamespaced
+                                }
 
                             Listen listen ->
-                                { soFar
-                                    | eventListens =
-                                        { key = listen.eventName
-                                        , value =
-                                            { on = listen.on
-                                            , defaultActionHandling = listen.defaultActionHandling
-                                            }
+                                { eventListens =
+                                    { key = listen.eventName
+                                    , value =
+                                        { on = listen.on
+                                        , defaultActionHandling = listen.defaultActionHandling
                                         }
-                                            :: soFar.eventListens
+                                    }
+                                        :: soFar.eventListens
+                                , namespace = soFar.namespace
+                                , tag = soFar.tag
+                                , scrollToPosition = soFar.scrollToPosition
+                                , scrollToShow = soFar.scrollToShow
+                                , scrollPositionRequest = soFar.scrollPositionRequest
+                                , styles = soFar.styles
+                                , stringProperties = soFar.stringProperties
+                                , boolProperties = soFar.boolProperties
+                                , attributes = soFar.attributes
+                                , attributesNamespaced = soFar.attributesNamespaced
                                 }
 
                             Style keyValue ->
-                                { soFar | styles = keyValue :: soFar.styles }
+                                { styles = keyValue :: soFar.styles
+                                , namespace = soFar.namespace
+                                , tag = soFar.tag
+                                , scrollToPosition = soFar.scrollToPosition
+                                , scrollToShow = soFar.scrollToShow
+                                , scrollPositionRequest = soFar.scrollPositionRequest
+                                , eventListens = soFar.eventListens
+                                , stringProperties = soFar.stringProperties
+                                , boolProperties = soFar.boolProperties
+                                , attributes = soFar.attributes
+                                , attributesNamespaced = soFar.attributesNamespaced
+                                }
 
                             StringProperty keyValue ->
-                                { soFar
-                                    | stringProperties =
-                                        keyValue :: soFar.stringProperties
+                                { stringProperties =
+                                    keyValue :: soFar.stringProperties
+                                , namespace = soFar.namespace
+                                , tag = soFar.tag
+                                , scrollToPosition = soFar.scrollToPosition
+                                , scrollToShow = soFar.scrollToShow
+                                , scrollPositionRequest = soFar.scrollPositionRequest
+                                , eventListens = soFar.eventListens
+                                , styles = soFar.styles
+                                , boolProperties = soFar.boolProperties
+                                , attributes = soFar.attributes
+                                , attributesNamespaced = soFar.attributesNamespaced
                                 }
 
                             BoolProperty keyValue ->
-                                { soFar
-                                    | boolProperties =
-                                        keyValue :: soFar.boolProperties
+                                { boolProperties =
+                                    keyValue :: soFar.boolProperties
+                                , namespace = soFar.namespace
+                                , tag = soFar.tag
+                                , scrollToPosition = soFar.scrollToPosition
+                                , scrollToShow = soFar.scrollToShow
+                                , scrollPositionRequest = soFar.scrollPositionRequest
+                                , eventListens = soFar.eventListens
+                                , styles = soFar.styles
+                                , stringProperties = soFar.stringProperties
+                                , attributes = soFar.attributes
+                                , attributesNamespaced = soFar.attributesNamespaced
                                 }
 
                             Attribute keyValue ->
                                 case keyValue.namespace of
                                     Just namespace ->
-                                        { soFar
-                                            | attributesNamespaced =
-                                                { key = { namespace = namespace, key = keyValue.key }
-                                                , value = keyValue.value
-                                                }
-                                                    :: soFar.attributesNamespaced
+                                        { attributesNamespaced =
+                                            { key = { namespace = namespace, key = keyValue.key }
+                                            , value = keyValue.value
+                                            }
+                                                :: soFar.attributesNamespaced
+                                        , namespace = soFar.namespace
+                                        , tag = soFar.tag
+                                        , scrollToPosition = soFar.scrollToPosition
+                                        , scrollToShow = soFar.scrollToShow
+                                        , scrollPositionRequest = soFar.scrollPositionRequest
+                                        , eventListens = soFar.eventListens
+                                        , styles = soFar.styles
+                                        , stringProperties = soFar.stringProperties
+                                        , boolProperties = soFar.boolProperties
+                                        , attributes = soFar.attributes
                                         }
 
                                     Nothing ->
-                                        { soFar
-                                            | attributes =
-                                                { key = keyValue.key, value = keyValue.value }
-                                                    :: soFar.attributes
+                                        { attributes =
+                                            { key = keyValue.key, value = keyValue.value }
+                                                :: soFar.attributes
+                                        , namespace = soFar.namespace
+                                        , tag = soFar.tag
+                                        , scrollToPosition = soFar.scrollToPosition
+                                        , scrollToShow = soFar.scrollToShow
+                                        , scrollPositionRequest = soFar.scrollPositionRequest
+                                        , eventListens = soFar.eventListens
+                                        , styles = soFar.styles
+                                        , stringProperties = soFar.stringProperties
+                                        , boolProperties = soFar.boolProperties
+                                        , attributesNamespaced = soFar.attributesNamespaced
                                         }
                     )
                     { namespace = maybeNamespace
