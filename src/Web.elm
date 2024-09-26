@@ -1591,13 +1591,13 @@ sortedKeyValueListMergeBy :
 sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
     case aSortedKeyValueList of
         [] ->
-            bSortedKeyValueList |> List.foldl (\entry soFar -> onlyB entry soFar) initialFolded
+            bSortedKeyValueList |> List.foldl onlyB initialFolded
 
         aLowest :: aWithoutLowest ->
             case bSortedKeyValueList of
                 [] ->
                     aWithoutLowest
-                        |> List.foldl (\entry soFar -> onlyA entry soFar)
+                        |> List.foldl onlyA
                             (onlyA aLowest initialFolded)
 
                 bLowest :: bWithoutLowest ->
