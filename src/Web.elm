@@ -875,7 +875,7 @@ to a broader representation for the parent interface
 interfaceFutureMap : (future -> mappedFuture) -> (Interface future -> Interface mappedFuture)
 interfaceFutureMap futureChange interface =
     interface
-        |> Rope.LocalExtra.mapFast
+        |> Rope.LocalExtra.mapFastAnyOrder
             (\interfaceSingle ->
                 interfaceSingle |> interfaceSingleFutureMap futureChange
             )
