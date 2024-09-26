@@ -405,7 +405,7 @@ we have everything we need to update the state.
 
 If you want to learn a bit more about app url parsing and building, visit [lydell/elm-app-url](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/)
 
-And what's the deal with [`movementListen`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Navigation#movementListen) vs [`urlRequest`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web-Navigation#urlRequest)?
+And what's the deal with [`navigationListen`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web#navigationListen) vs [`urlRequest`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web#urlRequest)?
 Don't both just give you the latest url?
 
 > **an `Interface` that requests ≠ `Interface` that listens**
