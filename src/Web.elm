@@ -2359,19 +2359,19 @@ interfaceSingleToStructuredId =
     \interfaceSingle ->
         StructuredId.ofVariant
             (case interfaceSingle of
-                DocumentTitleReplaceBy title ->
-                    { tag = "DocumentTitleReplaceBy", value = title |> StructuredId.ofString }
+                DocumentTitleReplaceBy _ ->
+                    { tag = "DocumentTitleReplaceBy", value = StructuredId.ofUnit }
 
-                DocumentAuthorSet author ->
-                    { tag = "DocumentAuthorSet", value = author |> StructuredId.ofString }
+                DocumentAuthorSet _ ->
+                    { tag = "DocumentAuthorSet", value = StructuredId.ofUnit }
 
-                DocumentKeywordsSet keywords ->
+                DocumentKeywordsSet _ ->
                     { tag = "DocumentKeywordsSet"
-                    , value = keywords |> StructuredId.ofList StructuredId.ofString
+                    , value = StructuredId.ofUnit
                     }
 
-                DocumentDescriptionSet description ->
-                    { tag = "DocumentDescriptionSet", value = description |> StructuredId.ofString }
+                DocumentDescriptionSet _ ->
+                    { tag = "DocumentDescriptionSet", value = StructuredId.ofUnit }
 
                 ConsoleLog message ->
                     { tag = "ConsoleLog", value = message |> StructuredId.ofString }
@@ -2382,17 +2382,17 @@ interfaceSingleToStructuredId =
                 ConsoleError message ->
                     { tag = "ConsoleError", value = message |> StructuredId.ofString }
 
-                NavigationReplaceUrl appUrl ->
-                    { tag = "NavigationReplaceUrl", value = appUrl |> AppUrl.LocalExtra.toStructuredId }
+                NavigationReplaceUrl _ ->
+                    { tag = "NavigationReplaceUrl", value = StructuredId.ofUnit }
 
-                NavigationPushUrl appUrl ->
-                    { tag = "NavigationPushUrl", value = appUrl |> AppUrl.LocalExtra.toStructuredId }
+                NavigationPushUrl _ ->
+                    { tag = "NavigationPushUrl", value = StructuredId.ofUnit }
 
                 NavigationGo urlSteps ->
                     { tag = "NavigationGo", value = urlSteps |> StructuredId.ofInt }
 
-                NavigationLoad url ->
-                    { tag = "NavigationLoad", value = url |> StructuredId.ofString }
+                NavigationLoad _ ->
+                    { tag = "NavigationLoad", value = StructuredId.ofUnit }
 
                 NavigationReload () ->
                     { tag = "NavigationReload", value = StructuredId.ofUnit }
@@ -2403,12 +2403,11 @@ interfaceSingleToStructuredId =
                         StructuredId.ofParts
                             [ config.name |> StructuredId.ofString
                             , config.mimeType |> StructuredId.ofString
-                            , config.content |> StructuredId.ofList StructuredId.ofInt
                             ]
                     }
 
-                ClipboardReplaceBy replacement ->
-                    { tag = "ClipboardReplaceBy", value = replacement |> StructuredId.ofString }
+                ClipboardReplaceBy _ ->
+                    { tag = "ClipboardReplaceBy", value = StructuredId.ofUnit }
 
                 AudioPlay audio ->
                     { tag = "AudioPlay"
@@ -2443,9 +2442,9 @@ interfaceSingleToStructuredId =
                 NotificationAskForPermission () ->
                     { tag = "NotificationAskForPermission", value = StructuredId.ofUnit }
 
-                DomNodeRender path ->
+                DomNodeRender render ->
                     { tag = "DomNodeRender"
-                    , value = path.pathReverse |> StructuredId.ofList StructuredId.ofInt
+                    , value = render.pathReverse |> StructuredId.ofList StructuredId.ofInt
                     }
 
                 AudioSourceLoad sourceLoad ->
