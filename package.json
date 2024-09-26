@@ -24,7 +24,6 @@
         "runner-compiled"
     ],
     "devDependencies": {
-        "@typescript/lib-dom": "npm:@types/web@^0.0.142",
-        "typescript": "^5.4.3"
+        "typescript": "^5.6.2"
     }
 }
