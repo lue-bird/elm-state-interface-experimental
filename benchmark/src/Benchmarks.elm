@@ -55,6 +55,12 @@ benchmarks =
             , ( "String.fromInt |> Json.Encode.string |> Json.Encode.encode 0", stringFromIntJsonEncode0 )
             , ( "base36 |> Json.Encode.string |> Json.Encode.encode 0", base36IndexIntToJsonString )
             ]
+        , Benchmark.Alternative.rank "comma separated map"
+            (\commaSeparate -> exampleListOfIndexInts |> commaSeparate String.fromInt)
+            [ ( "List.map |> String.join", commaSeparatedStringJoinListMap )
+            , ( "List.map |> String.concat", commaSeparatedStringConcatListMap )
+            , ( "recursive", commaSeparatedRecursive )
+            ]
         , Benchmark.Alternative.rank "List index Int -> json String"
             (\listOfStringToString -> listOfStringToString exampleListOfIndexInts)
             [ ( "map String.fromInt |> join |> Json.Encode.string", listOfIntToJsonStringUsingMapJoin )
@@ -85,7 +91,7 @@ benchmarks =
             ]
         , Benchmark.Alternative.rank "dom render"
             (\domRender -> domRender exampleDom)
-            [ ( "nested recursion given pathReverse", domRenderUsingNestedRecursionWithPath )
+            [ ( "nested recursion given path", domRenderUsingNestedRecursionWithPath )
             , ( "nested recursion with subs map, final List.map", domRenderUsingNestedRecursionWithSubsMapAndFinalListMap )
             , ( "TCO", domRenderUsingTCO )
             , ( "TCO but paths reversed", domRenderUsingTCOButReversedPath )
@@ -126,6 +132,48 @@ benchmarks =
             , ( "recursion |> List.reverse", listJustsUsingRecursion )
             ]
         ]
+
+
+commaSeparatedStringJoinListMap : (a -> String) -> List a -> String
+commaSeparatedStringJoinListMap elementToString list =
+    list |> List.map elementToString |> String.join ","
+
+
+commaSeparatedStringConcatListMap : (a -> String) -> List a -> String
+commaSeparatedStringConcatListMap elementToString list =
+    case list of
+        [] ->
+            ""
+
+        head :: tail ->
+            elementToString head
+                ++ (tail
+                        |> List.map (\tailElement -> "," ++ (tailElement |> elementToString))
+                        |> String.concat
+                   )
+
+
+commaSeparatedRecursive : (a -> String) -> List a -> String
+commaSeparatedRecursive elementToString list =
+    case list of
+        [] ->
+            ""
+
+        element0 :: element1Up ->
+            elementToString element0
+                ++ commaPrefixedMap elementToString element1Up
+
+
+commaPrefixedMap : (a -> String) -> List a -> String
+commaPrefixedMap elementToString list =
+    case list of
+        [] ->
+            ""
+
+        element0 :: element1Up ->
+            ","
+                ++ elementToString element0
+                ++ commaPrefixedMap elementToString element1Up
 
 
 stringFirstCharUsingStringUncons : String -> Result String Char
@@ -815,14 +863,14 @@ toStringUsingToJson =
 
 domRenderUsingTCOButReversedPath :
     Web.DomNode future
-    -> Web.Interface future
+    -> List (Web.InterfaceSingle future)
 domRenderUsingTCOButReversedPath =
-    \node -> nodeFlattenToListUsingTCOButReversedPath [] { pathReverse = [], node = node } [] |> Rope.fromList
+    \node -> nodeFlattenToListUsingTCOButReversedPath [] { path = [], node = node } []
 
 
 flattenRemainingNodesToListUsingTCOButReversedPath :
     List (Web.InterfaceSingle future)
-    -> List { pathReverse : List Int, node : Web.DomNode future }
+    -> List { path : List Int, node : Web.DomNode future }
     -> List (Web.InterfaceSingle future)
 flattenRemainingNodesToListUsingTCOButReversedPath updatedInterfaces nodesRemaining =
     case nodesRemaining of
@@ -835,25 +883,25 @@ flattenRemainingNodesToListUsingTCOButReversedPath updatedInterfaces nodesRemain
 
 nodeFlattenToListUsingTCOButReversedPath :
     List (Web.InterfaceSingle future)
-    -> { pathReverse : List Int, node : Web.DomNode future }
-    -> List { pathReverse : List Int, node : Web.DomNode future }
+    -> { path : List Int, node : Web.DomNode future }
+    -> List { path : List Int, node : Web.DomNode future }
     -> List (Web.InterfaceSingle future)
 nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining =
     case current.node of
-        Web.Dom.Text string ->
+        Web.DomText string ->
             flattenRemainingNodesToListUsingTCOButReversedPath
-                (({ pathReverse = current.pathReverse, node = Web.DomText string }
+                (({ path = current.path, node = Web.DomHeaderText string }
                     |> Web.DomNodeRender
                  )
                     :: interfacesSoFar
                 )
                 nodesRemaining
 
-        Web.Dom.Element element_ ->
+        Web.DomElement element_ ->
             let
                 updatedInterfaces : List (Web.InterfaceSingle future)
                 updatedInterfaces =
-                    ({ pathReverse = current.pathReverse, node = Web.DomElementHeader element_.header }
+                    ({ path = current.path, node = Web.DomElementHeader element_.header }
                         |> Web.DomNodeRender
                     )
                         :: interfacesSoFar
@@ -864,14 +912,14 @@ nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining 
 
                 sub0 :: sub1Up ->
                     let
-                        updatedRemaining : { index : Int, mapped : List { pathReverse : List Int, node : Web.DomNode future } }
+                        updatedRemaining : { index : Int, mapped : List { path : List Int, node : Web.DomNode future } }
                         updatedRemaining =
                             sub1Up
                                 |> List.foldl
                                     (\sub soFar ->
                                         { index = soFar.index + 1
                                         , mapped =
-                                            { pathReverse = soFar.index :: current.pathReverse
+                                            { path = soFar.index :: current.path
                                             , node = sub
                                             }
                                                 :: soFar.mapped
@@ -881,20 +929,20 @@ nodeFlattenToListUsingTCOButReversedPath interfacesSoFar current nodesRemaining 
                     in
                     nodeFlattenToListUsingTCOButReversedPath
                         updatedInterfaces
-                        { pathReverse = 0 :: current.pathReverse, node = sub0 }
+                        { path = 0 :: current.path, node = sub0 }
                         updatedRemaining.mapped
 
 
 domRenderUsingTCO :
     Web.DomNode future
-    -> Web.Interface future
+    -> List (Web.InterfaceSingle future)
 domRenderUsingTCO =
-    \node -> nodeFlattenToListUsingTCO [] { pathReverse = [], node = node } [] |> Rope.fromList
+    \node -> nodeFlattenToListUsingTCO [] { path = [], node = node } []
 
 
 flattenRemainingNodesToListUsingTCO :
     List (Web.InterfaceSingle future)
-    -> List { pathReverse : List Int, node : Web.DomNode future }
+    -> List { path : List Int, node : Web.DomNode future }
     -> List (Web.InterfaceSingle future)
 flattenRemainingNodesToListUsingTCO updatedInterfaces nodesRemaining =
     case nodesRemaining of
@@ -907,25 +955,25 @@ flattenRemainingNodesToListUsingTCO updatedInterfaces nodesRemaining =
 
 nodeFlattenToListUsingTCO :
     List (Web.InterfaceSingle future)
-    -> { pathReverse : List Int, node : Web.DomNode future }
-    -> List { pathReverse : List Int, node : Web.DomNode future }
+    -> { path : List Int, node : Web.DomNode future }
+    -> List { path : List Int, node : Web.DomNode future }
     -> List (Web.InterfaceSingle future)
 nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
     case current.node of
-        Web.Dom.Text string ->
+        Web.DomText string ->
             flattenRemainingNodesToListUsingTCO
-                (({ pathReverse = List.reverse current.pathReverse, node = Web.DomText string }
+                (({ path = List.reverse current.path, node = Web.DomHeaderText string }
                     |> Web.DomNodeRender
                  )
                     :: interfacesSoFar
                 )
                 nodesRemaining
 
-        Web.Dom.Element element_ ->
+        Web.DomElement element_ ->
             let
                 updatedInterfaces : List (Web.InterfaceSingle future)
                 updatedInterfaces =
-                    ({ pathReverse = List.reverse current.pathReverse, node = Web.DomElementHeader element_.header }
+                    ({ path = List.reverse current.path, node = Web.DomElementHeader element_.header }
                         |> Web.DomNodeRender
                     )
                         :: interfacesSoFar
@@ -936,14 +984,14 @@ nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
 
                 sub0 :: sub1Up ->
                     let
-                        updatedRemaining : { index : Int, mapped : List { pathReverse : List Int, node : Web.DomNode future } }
+                        updatedRemaining : { index : Int, mapped : List { path : List Int, node : Web.DomNode future } }
                         updatedRemaining =
                             sub1Up
                                 |> List.foldl
                                     (\sub soFar ->
                                         { index = soFar.index + 1
                                         , mapped =
-                                            { pathReverse = soFar.index :: current.pathReverse
+                                            { path = soFar.index :: current.path
                                             , node = sub
                                             }
                                                 :: soFar.mapped
@@ -953,31 +1001,31 @@ nodeFlattenToListUsingTCO interfacesSoFar current nodesRemaining =
                     in
                     nodeFlattenToListUsingTCO
                         updatedInterfaces
-                        { pathReverse = 0 :: current.pathReverse, node = sub0 }
+                        { path = 0 :: current.path, node = sub0 }
                         updatedRemaining.mapped
 
 
-domRenderUsingNestedRecursionWithPath : Web.DomNode future -> Web.Interface future
+domRenderUsingNestedRecursionWithPath : Web.DomNode future -> List (Web.InterfaceSingle future)
 domRenderUsingNestedRecursionWithPath =
     \domNode ->
-        domNode |> nodeFlattenToRopeUsingNestedRecursionWithPath []
+        domNode |> nodeFlattenToRopeUsingNestedRecursionWithPath [] |> Rope.toList
 
 
 nodeFlattenToRopeUsingNestedRecursionWithPath :
     List Int
     -> Web.DomNode future
     -> Rope (Web.InterfaceSingle future)
-nodeFlattenToRopeUsingNestedRecursionWithPath pathReverse =
+nodeFlattenToRopeUsingNestedRecursionWithPath path =
     \node ->
         case node of
-            Web.Dom.Text string ->
-                { pathReverse = List.reverse pathReverse, node = Web.DomText string }
+            Web.DomText string ->
+                { path = List.reverse path, node = Web.DomHeaderText string }
                     |> Web.DomNodeRender
                     |> Rope.singleton
 
-            Web.Dom.Element element_ ->
+            Web.DomElement element_ ->
                 Rope.prepend
-                    ({ pathReverse = List.reverse pathReverse, node = Web.DomElementHeader element_.header }
+                    ({ path = List.reverse path, node = Web.DomElementHeader element_.header }
                         |> Web.DomNodeRender
                     )
                     (List.foldl
@@ -985,7 +1033,7 @@ nodeFlattenToRopeUsingNestedRecursionWithPath pathReverse =
                             { subIndex = soFar.subIndex + 1
                             , rope =
                                 Rope.appendTo soFar.rope
-                                    (nodeFlattenToRopeUsingNestedRecursionWithPath (soFar.subIndex :: pathReverse) sub)
+                                    (nodeFlattenToRopeUsingNestedRecursionWithPath (soFar.subIndex :: path) sub)
                             }
                         )
                         { subIndex = 0, rope = Rope.empty }
@@ -993,37 +1041,36 @@ nodeFlattenToRopeUsingNestedRecursionWithPath pathReverse =
                     ).rope
 
 
-domRenderUsingNestedRecursionWithSubsMapAndFinalListMap : Web.DomNode future -> Web.Interface future
+domRenderUsingNestedRecursionWithSubsMapAndFinalListMap : Web.DomNode future -> List (Web.InterfaceSingle future)
 domRenderUsingNestedRecursionWithSubsMapAndFinalListMap =
     \domNode ->
         domNode
             |> nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap
             |> List.map (\nodeAndPath -> nodeAndPath |> Web.DomNodeRender)
-            |> Rope.fromList
 
 
-nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap : Web.DomNode future -> List { pathReverse : List Int, node : Web.DomTextOrElementHeader future }
+nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap : Web.DomNode future -> List { path : List Int, node : Web.DomTextOrElementHeader future }
 nodeFlattenUsingNestedRecursionWithSubsMapAndFinalListMap =
     \node -> node |> nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap |> Rope.toList
 
 
-nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap : Web.DomNode future -> Rope { pathReverse : List Int, node : Web.DomTextOrElementHeader future }
+nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap : Web.DomNode future -> Rope { path : List Int, node : Web.DomTextOrElementHeader future }
 nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap =
     \node ->
         case node of
-            Web.Dom.Text string ->
-                { pathReverse = [], node = Web.DomText string } |> Rope.singleton
+            Web.DomText string ->
+                { path = [], node = Web.DomHeaderText string } |> Rope.singleton
 
-            Web.Dom.Element element_ ->
+            Web.DomElement element_ ->
                 Rope.prepend
-                    { pathReverse = [], node = Web.DomElementHeader element_.header }
+                    { path = [], node = Web.DomElementHeader element_.header }
                     (List.foldl
                         (\sub soFar ->
                             { subIndex = soFar.subIndex + 1
                             , rope =
                                 Rope.appendTo
                                     soFar.rope
-                                    (Rope.map (\layerPart -> { layerPart | pathReverse = soFar.subIndex :: layerPart.pathReverse })
+                                    (Rope.map (\layerPart -> { layerPart | path = soFar.subIndex :: layerPart.path })
                                         (nodeFlattenToRopeUsingNestedRecursionWithSubsMapAndFinalListMap sub)
                                     )
                             }
