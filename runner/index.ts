@@ -123,8 +123,8 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                     warn("tried to play audio from source that isn't loaded. Did you use Web.audioSourceLoad?")
                 }
             }
-            case "DomNodeRender": return (config: { pathReverse: number[], node: any }) => {
-                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), config.pathReverse)
+            case "DomNodeRender": return (config: { path: number[], node: any }) => {
+                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), config.path)
                 const newDomNode = createDomNode(id, config.node, oldDomNodeToEdit.childNodes, sendToElm)
                 oldDomNodeToEdit.parentElement?.replaceChild(newDomNode, oldDomNodeToEdit)
                 abortSignal.addEventListener("abort", _event => {
@@ -136,7 +136,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                         appConfigDomELementChildElementOnDelete === null ?
                             null
                             :
-                            domInElementAt(appConfigDomELementChildElementOnDelete, config.pathReverse)
+                            domInElementAt(appConfigDomELementChildElementOnDelete, config.path)
                     if (toRemove !== null) {
                         while (toRemove.nextSibling !== null) {
                             toRemove.nextSibling.remove()
@@ -375,8 +375,8 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     }
     function interfaceEditImplementation(id: string, tag: string, sendToElm: (v: any) => void): ((config: any) => void) {
         switch (tag) {
-            case "EditDom": return (config: { pathReverse: number[], replacement: any }) => {
-                editDom(id, config.pathReverse, config.replacement, sendToElm)
+            case "EditDom": return (config: { path: number[], replacement: any }) => {
+                editDom(id, config.path, config.replacement, sendToElm)
             }
             case "EditAudio": return (config: any) => {
                 editAudio(id, config)
@@ -397,12 +397,12 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
         }
     }
 
-    function domElementAtIndex(parent: Element, index: number) {
-        const childNode = parent.childNodes.item(index)
-        if (parent === null || (!(childNode instanceof Element))) {
+    function domElementAtIndex(parent: Element | null, index: number) {
+        if (parent === null) {
             return null
         } else {
-            return childNode
+            const childNode = parent.childNodes.item(index)
+            return (childNode instanceof Element) ? childNode : null
         }
     }
 
@@ -424,41 +424,36 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
         }
     }
 
-    function domInElementAt(overallParent: Element, pathReverse: number[]): ChildNode | null {
-        let lastVisitedDom = overallParent
-        for (let i = pathReverse.length - 1; i >= 0; i--) {
-            const currentDom = domElementAtIndex(lastVisitedDom, pathReverse[i] ?? 0)
-            if (currentDom === null) {
-                return null
-            } else {
-                lastVisitedDom = currentDom
-            }
-        }
-        return lastVisitedDom
+    function domInElementAt(overallParent: Element, path: number[]): ChildNode | null {
+        return path.reduce(
+            (lastVisitedDom, pathIndex) =>
+                domElementAtIndex(lastVisitedDom, pathIndex),
+            overallParent
+        )
     }
-    function domElementOrDummyInElementAt(overallParent: Element, pathReverse: number[]): ChildNode {
-        let lastVisitedDom = overallParent
-        for (let i = pathReverse.length - 1; i >= 0; i--) {
-            lastVisitedDom = domElementOrDummyAtIndex(lastVisitedDom, pathReverse[i] ?? 0)
-        }
-        return lastVisitedDom
+    function domElementOrDummyInElementAt(overallParent: Element, path: number[]): ChildNode {
+        return path.reduce(
+            (lastVisitedDom, pathIndex) =>
+                domElementOrDummyAtIndex(lastVisitedDom, pathIndex),
+            overallParent
+        )
     }
 
     function editDom(
         id: string,
-        pathReverse: number[],
+        path: number[],
         replacement: { tag: "Node" | "Styles" | "Attributes" | "AttributesNamespaced" | "StringProperties" | "BoolProperties" | "ScrollToPosition" | "ScrollToShow" | "ScrollPositionRequest" | "EventListens", value: any },
         sendToElm: (v: any) => void
     ) {
         switch (replacement.tag) {
             case "Node": {
-                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), pathReverse)
+                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), path)
                 const newDomNode = createDomNode(id, replacement.value, oldDomNodeToEdit.childNodes, sendToElm)
                 oldDomNodeToEdit.parentElement?.replaceChild(newDomNode, oldDomNodeToEdit)
                 break
             }
             case "Styles": case "Attributes": case "AttributesNamespaced": case "StringProperties": case "BoolProperties": case "ScrollToPosition": case "ScrollToShow": case "ScrollPositionRequest": case "EventListens": {
-                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), pathReverse)
+                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), path)
                 if (oldDomNodeToEdit instanceof Element) {
                     editDomModifiers(
                         id,

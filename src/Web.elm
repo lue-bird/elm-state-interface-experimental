@@ -46,6 +46,7 @@ module Web exposing
     , DomModifierSingle(..)
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..)
     , SortedKeyValueList(..)
+    , InternalFastDict(..), InternalFastDictInner(..), InternalFastDictNColor(..)
     , interfaceSingleEdits, InterfaceSingleEdit(..), AudioEdit(..), DomEdit(..)
     )
 
@@ -437,6 +438,8 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 
 @docs SortedKeyValueList
 
+@docs InternalFastDict, InternalFastDictInner, InternalFastDictNColor
+
 @docs interfaceSingleEdits, InterfaceSingleEdit, AudioEdit, DomEdit
 
 If you need more things like json encoders/decoders, [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new)
@@ -525,16 +528,108 @@ import Url.LocalExtra
 -}
 type ProgramState appState
     = State
-        { interface : SortedKeyValueList String (InterfaceSingle appState)
+        { interface : Interface appState
         , appState : appState
         }
 
 
-{-| Alternative to `Dict` optimized for fast merge and fast creation.
-Would be a terrible fit if we needed fast insert and get.
+
+{-
+
+   The vast majority of InternalFastDict-related code is copied from [miniBill/elm-fast-dict](https://dark.elm.dmy.fr/packages/miniBill/elm-fast-dict/latest/)
+   with below license
+
+
+
+   Copyright 2023-present Leonardo Taglialegne
+   Copyright 2014-present Evan Czaplicki
+
+   Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+   1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+   2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+   3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 -}
-type SortedKeyValueList key value
-    = SortedKeyValueList (List { key : key, value : value })
+
+
+{-| Alternative to `Dict` that internally allows fast creation from already sorted elements
+which significantly speeds up DOM interface creation.
+-}
+type InternalFastDict key value
+    = InternalFastDict Int (InternalFastDictInner key value)
+
+
+{-| The color of an [`InternalFastDictInner`](#InternalFastDictInner) node. Leaves are considered Black.
+-}
+type InternalFastDictNColor
+    = InternalFastDictRed
+    | InternalFastDictBlack
+
+
+{-| Structure of an [`InternalFastDict`](#InternalFastDict)
+-}
+type InternalFastDictInner key value
+    = InternalFastDictInnerNode InternalFastDictNColor key value (InternalFastDictInner key value) (InternalFastDictInner key value)
+    | InternalFastDictLeaf
+
+
+{-| Create an empty dictionary.
+-}
+internalFastDictEmpty : InternalFastDict key_ value_
+internalFastDictEmpty =
+    InternalFastDict 0 InternalFastDictLeaf
+
+
+internalFastDictBalance : InternalFastDictNColor -> k -> v -> InternalFastDictInner k v -> InternalFastDictInner k v -> InternalFastDictInner k v
+internalFastDictBalance color key value left right =
+    case right of
+        InternalFastDictInnerNode InternalFastDictRed rK rV rLeft rRight ->
+            case left of
+                InternalFastDictInnerNode InternalFastDictRed lK lV lLeft lRight ->
+                    InternalFastDictInnerNode
+                        InternalFastDictRed
+                        key
+                        value
+                        (InternalFastDictInnerNode InternalFastDictBlack lK lV lLeft lRight)
+                        (InternalFastDictInnerNode InternalFastDictBlack rK rV rLeft rRight)
+
+                _ ->
+                    InternalFastDictInnerNode color rK rV (InternalFastDictInnerNode InternalFastDictRed key value left rLeft) rRight
+
+        _ ->
+            case left of
+                InternalFastDictInnerNode InternalFastDictRed lK lV (InternalFastDictInnerNode InternalFastDictRed llK llV llLeft llRight) lRight ->
+                    InternalFastDictInnerNode
+                        InternalFastDictRed
+                        lK
+                        lV
+                        (InternalFastDictInnerNode InternalFastDictBlack llK llV llLeft llRight)
+                        (InternalFastDictInnerNode InternalFastDictBlack key value lRight right)
+
+                _ ->
+                    InternalFastDictInnerNode color key value left right
+
+
+{-| Fold over the key-value pairs in a dictionary from lowest key to highest key.
+-}
+internalFastDictFoldl : (k -> v -> b -> b) -> b -> InternalFastDict k v -> b
+internalFastDictFoldl func acc (InternalFastDict _ dict) =
+    internalFastDictInnerFoldl func acc dict
+
+
+internalFastDictInnerFoldl : (k -> v -> b -> b) -> b -> InternalFastDictInner k v -> b
+internalFastDictInnerFoldl func acc dict =
+    case dict of
+        InternalFastDictLeaf ->
+            acc
+
+        InternalFastDictInnerNode _ key value left right ->
+            internalFastDictInnerFoldl func (func key value (internalFastDictInnerFoldl func acc left)) right
 
 
 {-| What's needed to create a state-interface [`program`](#program)
@@ -558,7 +653,7 @@ To change the value that comes back in the future, use [`Web.interfaceFutureMap`
 
 -}
 type alias Interface future =
-    Rope (InterfaceSingle future)
+    InternalFastDict String (InterfaceSingle future)
 
 
 {-| A "non-batched" [`Interface`](#Interface).
@@ -585,8 +680,8 @@ type InterfaceSingle future
     | AudioSourceLoad { url : String, on : Result AudioSourceLoadError AudioSource -> future }
     | AudioPlay Audio
     | DomNodeRender
-        { pathReverse :
-            -- from inner parent to outer parent index
+        { path :
+            -- from outer parent to inner parent index
             List Int
         , node : DomTextOrElementHeader future
         }
@@ -800,7 +895,126 @@ type SocketId
 -}
 interfaceBatch : List (Interface future) -> Interface future
 interfaceBatch interfaces =
-    interfaces |> Rope.fromList |> Rope.concat
+    interfaces |> List.foldl internalFastDictUnion internalFastDictEmpty
+
+
+{-| Combine two dictionaries. If there is a collision, preference is given
+to the first dictionary.
+-}
+internalFastDictUnion : InternalFastDict comparable v -> InternalFastDict comparable v -> InternalFastDict comparable v
+internalFastDictUnion ((InternalFastDict s1 _) as t1) ((InternalFastDict s2 _) as t2) =
+    if s1 > s2 then
+        internalFastDictFoldl internalFastDictInsertNoReplace t1 t2
+
+    else
+        internalFastDictFoldl internalFastDictInsert t2 t1
+
+
+{-| Insert a key-value pair into a dictionary. Replaces value when there is
+a collision.
+-}
+internalFastDictInsert : comparable -> v -> InternalFastDict comparable v -> InternalFastDict comparable v
+internalFastDictInsert key value (InternalFastDict sz dict) =
+    let
+        ( result, isNew ) =
+            internalFastDictInnerInsert key value dict
+    in
+    if isNew then
+        InternalFastDict (sz + 1) result
+
+    else
+        InternalFastDict sz result
+
+
+internalFastDictInnerInsert : comparable -> v -> InternalFastDictInner comparable v -> ( InternalFastDictInner comparable v, Bool )
+internalFastDictInnerInsert key value dict =
+    -- Root node is always Black
+    case internalFastDictInsertHelp key value dict of
+        ( InternalFastDictInnerNode InternalFastDictRed k v l r, isNew ) ->
+            ( InternalFastDictInnerNode InternalFastDictBlack k v l r, isNew )
+
+        x ->
+            x
+
+
+internalFastDictInsertHelp : comparable -> v -> InternalFastDictInner comparable v -> ( InternalFastDictInner comparable v, Bool )
+internalFastDictInsertHelp key value dict =
+    case dict of
+        InternalFastDictLeaf ->
+            -- New nodes are always red. If it violates the rules, it will be fixed
+            -- when balancing.
+            ( InternalFastDictInnerNode InternalFastDictRed key value InternalFastDictLeaf InternalFastDictLeaf, True )
+
+        InternalFastDictInnerNode nColor nKey nValue nLeft nRight ->
+            case compare key nKey of
+                LT ->
+                    let
+                        ( newLeft, isNew ) =
+                            internalFastDictInsertHelp key value nLeft
+                    in
+                    ( internalFastDictBalance nColor nKey nValue newLeft nRight, isNew )
+
+                EQ ->
+                    ( InternalFastDictInnerNode nColor nKey value nLeft nRight, False )
+
+                GT ->
+                    let
+                        ( newRight, isNew ) =
+                            internalFastDictInsertHelp key value nRight
+                    in
+                    ( internalFastDictBalance nColor nKey nValue nLeft newRight, isNew )
+
+
+internalFastDictInsertNoReplace : comparable -> v -> InternalFastDict comparable v -> InternalFastDict comparable v
+internalFastDictInsertNoReplace key value (InternalFastDict sz dict) =
+    let
+        ( result, isNew ) =
+            internalFastDictInnerInsertNoReplace key value dict
+    in
+    if isNew then
+        InternalFastDict (sz + 1) result
+
+    else
+        InternalFastDict sz result
+
+
+internalFastDictInnerInsertNoReplace : comparable -> v -> InternalFastDictInner comparable v -> ( InternalFastDictInner comparable v, Bool )
+internalFastDictInnerInsertNoReplace key value dict =
+    -- Root node is always Black
+    case internalFastDictInsertHelpNoReplace key value dict of
+        ( InternalFastDictInnerNode InternalFastDictRed k v l r, isNew ) ->
+            ( InternalFastDictInnerNode InternalFastDictBlack k v l r, isNew )
+
+        x ->
+            x
+
+
+internalFastDictInsertHelpNoReplace : comparable -> v -> InternalFastDictInner comparable v -> ( InternalFastDictInner comparable v, Bool )
+internalFastDictInsertHelpNoReplace key value dict =
+    case dict of
+        InternalFastDictLeaf ->
+            -- New nodes are always red. If it violates the rules, it will be fixed
+            -- when balancing.
+            ( InternalFastDictInnerNode InternalFastDictRed key value InternalFastDictLeaf InternalFastDictLeaf, True )
+
+        InternalFastDictInnerNode nColor nKey nValue nLeft nRight ->
+            case compare key nKey of
+                LT ->
+                    let
+                        ( newLeft, isNew ) =
+                            internalFastDictInsertHelpNoReplace key value nLeft
+                    in
+                    ( internalFastDictBalance nColor nKey nValue newLeft nRight, isNew )
+
+                EQ ->
+                    ( dict, False )
+
+                GT ->
+                    let
+                        ( newRight, isNew ) =
+                            internalFastDictInsertHelpNoReplace key value nRight
+                    in
+                    ( internalFastDictBalance nColor nKey nValue nLeft newRight, isNew )
 
 
 {-| Doing nothing as an [`Interface`](#Interface). These two examples are equivalent:
@@ -817,7 +1031,7 @@ and
 -}
 interfaceNone : Interface future_
 interfaceNone =
-    Rope.empty
+    internalFastDictEmpty
 
 
 {-| Take what the [`Interface`](#Interface) can come back with and return a different future value.
@@ -875,10 +1089,25 @@ to a broader representation for the parent interface
 interfaceFutureMap : (future -> mappedFuture) -> (Interface future -> Interface mappedFuture)
 interfaceFutureMap futureChange interface =
     interface
-        |> Rope.LocalExtra.mapFastAnyOrder
+        |> internalFastDictMap
             (\interfaceSingle ->
                 interfaceSingle |> interfaceSingleFutureMap futureChange
             )
+
+
+internalFastDictMap : (a -> b) -> InternalFastDict k a -> InternalFastDict k b
+internalFastDictMap func (InternalFastDict sz dict) =
+    InternalFastDict sz (internalFastDictInnerMap func dict)
+
+
+internalFastDictInnerMap : (a -> b) -> InternalFastDictInner k a -> InternalFastDictInner k b
+internalFastDictInnerMap func dict =
+    case dict of
+        InternalFastDictLeaf ->
+            InternalFastDictLeaf
+
+        InternalFastDictInnerNode color key value left right ->
+            InternalFastDictInnerNode color key (func value) (internalFastDictInnerMap func left) (internalFastDictInnerMap func right)
 
 
 interfaceSingleFutureMap : (future -> mappedFuture) -> (InterfaceSingle future -> InterfaceSingle mappedFuture)
@@ -942,7 +1171,7 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             notificationAskForPermissionSingle
 
         DomNodeRender toRender ->
-            { pathReverse = toRender.pathReverse
+            { path = toRender.path
             , node = toRender.node |> domNodeFutureMap futureChange
             }
                 |> DomNodeRender
@@ -1152,7 +1381,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
                     { old = domElementPreviouslyRendered.node, updated = domElementToRender.node }
                         |> domTextOrElementHeaderDiffMap
                             (\diff ->
-                                { pathReverse = domElementPreviouslyRendered.pathReverse
+                                { path = domElementPreviouslyRendered.path
                                 , replacement = diff
                                 }
                                     |> EditDom
@@ -1529,53 +1758,6 @@ sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDif
             { remove = removeFilled, edit = diff.edit } |> fromEditAndRemove |> Just
 
 
-audioDiffMap :
-    (AudioEdit -> fromAudioEdit)
-    -> ({ old : Audio, updated : Audio } -> List fromAudioEdit)
-audioDiffMap fromAudioEdit audios =
-    (if audios.old.volume == audios.updated.volume then
-        []
-
-     else
-        [ ReplacementAudioVolume audios.updated.volume |> fromAudioEdit ]
-    )
-        |> List.LocalExtra.consJust
-            (if audios.old.speed == audios.updated.speed then
-                Nothing
-
-             else
-                ReplacementAudioSpeed audios.updated.speed |> fromAudioEdit |> Just
-            )
-        |> List.LocalExtra.consJust
-            (if audios.old.stereoPan == audios.updated.stereoPan then
-                Nothing
-
-             else
-                ReplacementAudioStereoPan audios.updated.stereoPan |> fromAudioEdit |> Just
-            )
-        |> List.LocalExtra.consJust
-            (if audios.old.processingLastToFirst == audios.updated.processingLastToFirst then
-                Nothing
-
-             else
-                audios.updated.processingLastToFirst
-                    |> List.reverse
-                    |> ReplacementAudioProcessing
-                    |> fromAudioEdit
-                    |> Just
-            )
-
-
-namespacedKeyToComparable : { namespace : String, key : String } -> String
-namespacedKeyToComparable =
-    \namespacedKey -> namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
-
-
-sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
-sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
-    sortedKeyValueList
-
-
 {-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
 The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
 -}
@@ -1630,6 +1812,60 @@ sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList
                                 (onlyB bLowest initialFolded)
 
 
+audioDiffMap :
+    (AudioEdit -> fromAudioEdit)
+    -> ({ old : Audio, updated : Audio } -> List fromAudioEdit)
+audioDiffMap fromAudioEdit audios =
+    (if audios.old.volume == audios.updated.volume then
+        []
+
+     else
+        [ ReplacementAudioVolume audios.updated.volume |> fromAudioEdit ]
+    )
+        |> List.LocalExtra.consJust
+            (if audios.old.speed == audios.updated.speed then
+                Nothing
+
+             else
+                ReplacementAudioSpeed audios.updated.speed |> fromAudioEdit |> Just
+            )
+        |> List.LocalExtra.consJust
+            (if audios.old.stereoPan == audios.updated.stereoPan then
+                Nothing
+
+             else
+                ReplacementAudioStereoPan audios.updated.stereoPan |> fromAudioEdit |> Just
+            )
+        |> List.LocalExtra.consJust
+            (if audios.old.processingLastToFirst == audios.updated.processingLastToFirst then
+                Nothing
+
+             else
+                audios.updated.processingLastToFirst
+                    |> List.reverse
+                    |> ReplacementAudioProcessing
+                    |> fromAudioEdit
+                    |> Just
+            )
+
+
+namespacedKeyToComparable : { namespace : String, key : String } -> String
+namespacedKeyToComparable =
+    \namespacedKey -> namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
+
+
+{-| Alternative to `Dict` optimized for fast merge and fast creation.
+Would be a terrible fit if we needed fast insert and get.
+-}
+type SortedKeyValueList key value
+    = SortedKeyValueList (List { key : key, value : value })
+
+
+sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
+sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
+    sortedKeyValueList
+
+
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
 -}
 interfaceSingleEdits :
@@ -1670,7 +1906,7 @@ interfaceSingleEditToJson edit =
                 { tag = "EditDom"
                 , value =
                     Json.Encode.object
-                        [ ( "pathReverse", editDomDiff.pathReverse |> Json.Encode.list Json.Encode.int )
+                        [ ( "path", editDomDiff.path |> Json.Encode.list Json.Encode.int )
                         , ( "replacement", editDomDiff.replacement |> editDomDiffToJson )
                         ]
                 }
@@ -1941,7 +2177,7 @@ interfaceSingleToJson =
                     { tag = "DomNodeRender"
                     , value =
                         Json.Encode.object
-                            [ ( "pathReverse", render.pathReverse |> Json.Encode.list Json.Encode.int )
+                            [ ( "path", render.path |> Json.Encode.list Json.Encode.int )
                             , ( "node", render.node |> domTextOrElementHeaderInfoToJson )
                             ]
                     }
@@ -2444,7 +2680,8 @@ interfaceSingleToStructuredId =
 
                 DomNodeRender render ->
                     { tag = "DomNodeRender"
-                    , value = render.pathReverse |> StructuredId.ofList StructuredId.ofInt
+                    , value =
+                        render.path |> indexListToDigitCountPrefixedStructureId
                     }
 
                 AudioSourceLoad sourceLoad ->
@@ -2554,6 +2791,85 @@ interfaceSingleToStructuredId =
             )
 
 
+{-| See indexToDigitCountPrefixed.
+Orders index lists more nicely so that e.g. [] < [0] < [0,0].
+
+The problem with StructuredId.ofList is: that with e.g. `"[]"` vs `"[0]"` any digit is < `']'`.
+So we instead represent it as `"\"\""` vs `"\"0\""` because any digit is > `'"'`
+
+-}
+indexListToDigitCountPrefixedStructureId : List Int -> StructuredId
+indexListToDigitCountPrefixedStructureId indexes =
+    StructuredId.ofString
+        (indexes
+            |> commaSeparatedMap (\index -> index |> indexToDigitCountPrefixed |> String.fromInt)
+        )
+
+
+{-| Crazy idea this one!
+
+We all know the problem that sorting strings
+will sort "20" and "110" as `["110","20"]` which means
+indexes do not get sorted in the order we create them.
+
+To fix this, we could pad the numbers with 0s left:
+"020" and "110" will be sorted as `["020","110"]`.
+This however only works if we know how much to pad.
+For the DOM, this would be roughly padding up to 5 digits.
+
+A nicer (shorter and less max-digit-strict)
+approach is to first prepend the number of digits to pre-sort based on that
+and only then follow up with the precise number
+which can now be correctly compared digit by digit since the digit count is the same:
+"220" and "3110" will be sorted as `["220","3110"]`.
+(This approach only works because we can assume that indexes are < 999999999)
+
+---
+
+Why make this whole roundabout encoding?
+A DOM Interface is represented as a bunch of headers for all it's sub-paths.
+Instead of inserting the pieces one-by-one into an interface dictionary,
+we have a fast "from sorted list" constructor.
+That one needs already sorted entries!
+
+-}
+indexToDigitCountPrefixed : Int -> Int
+indexToDigitCountPrefixed int =
+    if int <= 9 then
+        int
+
+    else
+        let
+            digitCount : Int
+            digitCount =
+                (int |> Basics.toFloat) |> Basics.logBase 10 |> Basics.ceiling
+        in
+        digitCount * 10 ^ digitCount + int
+
+
+commaSeparatedMap : (a -> String) -> List a -> String
+commaSeparatedMap elementToString list =
+    case list of
+        [] ->
+            ""
+
+        element0 :: element1Up ->
+            elementToString element0
+                ++ commaPrefixedMap elementToString element1Up
+
+
+commaPrefixedMap : (a -> String) -> List a -> String
+commaPrefixedMap elementToString list =
+    case list of
+        [] ->
+            ""
+
+        element0 :: element1Up ->
+            ","
+                ++ elementToString element0
+                ++ commaPrefixedMap elementToString element1Up
+
+
 socketIdToStructuredId : SocketId -> StructuredId
 socketIdToStructuredId =
     \(SocketId raw) -> raw |> StructuredId.ofInt
@@ -2567,67 +2883,30 @@ sortedKeyValueListFromList =
         SortedKeyValueList (unsortedList |> List.sortBy .key)
 
 
-interfacesFromRope : Rope (InterfaceSingle future) -> SortedKeyValueList String (InterfaceSingle future)
-interfacesFromRope rope =
-    let
-        flattened : List { key : String, value : InterfaceSingle future }
-        flattened =
-            rope
-                |> Rope.foldl
-                    (\interfaceSingle soFar ->
-                        { key = interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
-                        , value = interfaceSingle
-                        }
-                            :: soFar
-                    )
-                    []
-    in
-    flattened |> sortedKeyValueListFromList
-
-
 {-| The "init" part for an embedded program
 -}
 programInit : ProgramConfig state -> ( ProgramState state, Cmd (ProgramEvent state) )
 programInit appConfig =
     let
-        initialInterface : SortedKeyValueList String (InterfaceSingle state)
+        initialInterface : Interface state
         initialInterface =
             appConfig.initialState
                 |> appConfig.interface
-                |> interfacesFromRope
     in
     ( State
         { interface = initialInterface
         , appState = appConfig.initialState
         }
     , initialInterface
-        |> sortedKeyValueListToList
-        |> List.LocalExtra.mapAnyOrder
-            (\new ->
+        |> internalFastDictFoldl
+            (\id new soFar ->
                 appConfig.ports.toJs
-                    ({ id = new.key, diff = new.value |> Add }
-                        |> toJsToJson
-                    )
+                    ({ id = id, diff = new |> Add } |> toJsToJson)
+                    :: soFar
             )
+            []
         |> Cmd.batch
     )
-
-
-{-| The fact that this can only be implemented linearly might seem shocking.
-In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
--}
-sortedKeyValueListGetAtStringKey : String -> SortedKeyValueList String value -> Maybe value
-sortedKeyValueListGetAtStringKey keyToFind sortedKeyValueList =
-    sortedKeyValueList
-        |> sortedKeyValueListToList
-        |> List.LocalExtra.firstJustMap
-            (\entry ->
-                if entry.key == keyToFind ++ "" then
-                    Just entry.value
-
-                else
-                    Nothing
-            )
 
 
 {-| The "subscriptions" part for an embedded program
@@ -2641,7 +2920,7 @@ programSubscriptions appConfig (State state) =
                     (Json.Decode.field "id" Json.Decode.string
                         |> Json.Decode.andThen
                             (\originalInterfaceId ->
-                                case state.interface |> sortedKeyValueListGetAtStringKey originalInterfaceId of
+                                case state.interface |> internalFastDictGet originalInterfaceId of
                                     Just interfaceSingleAcceptingFuture ->
                                         case interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder of
                                             Just eventDataDecoder ->
@@ -2651,12 +2930,41 @@ programSubscriptions appConfig (State state) =
                                                 "interface did not expect any events" |> Json.Decode.fail
 
                                     Nothing ->
-                                        "no associated interface found" |> Json.Decode.fail
+                                        "no associated interface found among ids\n"
+                                            ++ (state.interface
+                                                    |> internalFastDictToList
+                                                    |> List.map Tuple.first
+                                                    |> String.join "\n"
+                                               )
+                                            |> Json.Decode.fail
                             )
                         |> Json.Decode.map JsEventEnabledConstructionOfNewAppState
                     )
                 |> Result.LocalExtra.valueOrOnError JsEventFailedToDecode
         )
+
+
+internalFastDictGet : comparable -> InternalFastDict comparable value -> Maybe value
+internalFastDictGet targetKey (InternalFastDict _ dict) =
+    getInner targetKey dict
+
+
+getInner : comparable -> InternalFastDictInner comparable v -> Maybe v
+getInner targetKey dict =
+    case dict of
+        InternalFastDictLeaf ->
+            Nothing
+
+        InternalFastDictInnerNode _ key value left right ->
+            case compare targetKey key of
+                LT ->
+                    getInner targetKey left
+
+                EQ ->
+                    Just value
+
+                GT ->
+                    getInner targetKey right
 
 
 {-| [json `Decoder`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Decode#Decoder)
@@ -2895,6 +3203,23 @@ interfaceSingleFutureJsonDecoder interface =
 
         GamepadsChangeListen toFuture ->
             gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
+
+
+{-| The fact that this can only be implemented linearly might seem shocking.
+In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
+-}
+sortedKeyValueListGetAtStringKey : String -> SortedKeyValueList String value -> Maybe value
+sortedKeyValueListGetAtStringKey keyToFind sortedKeyValueList =
+    sortedKeyValueList
+        |> sortedKeyValueListToList
+        |> List.LocalExtra.firstJustMap
+            (\entry ->
+                if entry.key == keyToFind ++ "" then
+                    Just entry.value
+
+                else
+                    Nothing
+            )
 
 
 audioSourceLoadErrorJsonDecoder : Json.Decode.Decoder AudioSourceLoadError
@@ -3606,9 +3931,9 @@ programUpdate appConfig event state =
                 (State oldState) =
                     state
 
-                updatedInterface : SortedKeyValueList String (InterfaceSingle state)
+                updatedInterface : Interface state
                 updatedInterface =
-                    updatedAppState |> appConfig.interface |> interfacesFromRope
+                    updatedAppState |> appConfig.interface
             in
             ( State { interface = updatedInterface, appState = updatedAppState }
             , { old = oldState.interface, updated = updatedInterface }
@@ -3623,36 +3948,99 @@ programUpdate appConfig event state =
 interfacesDiffMap :
     ({ id : String, diff : InterfaceSingleDiff future } -> combined)
     ->
-        ({ old : SortedKeyValueList String (InterfaceSingle future)
-         , updated : SortedKeyValueList String (InterfaceSingle future)
+        ({ old : Interface future
+         , updated : Interface future
          }
          -> List combined
         )
 interfacesDiffMap idAndDiffCombine interfaces =
-    sortedKeyValueListMergeBy Basics.identity
-        (\removed soFar ->
-            idAndDiffCombine { id = removed.key, diff = remove } :: soFar
+    internalFastDictMerge
+        (\removedId _ soFar ->
+            idAndDiffCombine { id = removedId, diff = remove } :: soFar
         )
-        (\old updated soFar ->
+        (\id old updated soFar ->
             List.LocalExtra.appendFast
-                ({ old = old, updated = updated.value }
+                ({ old = old, updated = updated }
                     |> interfaceSingleEditsMap
-                        (\edit -> idAndDiffCombine { id = updated.key, diff = edit |> Edit })
+                        (\edit -> idAndDiffCombine { id = id, diff = edit |> Edit })
                 )
                 soFar
         )
-        (\onlyNew soFar ->
-            idAndDiffCombine { id = onlyNew.key, diff = onlyNew.value |> Add }
+        (\addedId onlyNew soFar ->
+            idAndDiffCombine { id = addedId, diff = onlyNew |> Add }
                 :: soFar
         )
-        (interfaces.old |> sortedKeyValueListToList)
-        (interfaces.updated |> sortedKeyValueListToList)
+        interfaces.old
+        interfaces.updated
         []
+
+
+{-| The most general way of combining two dictionaries. You provide three
+accumulators for when a given key appears:
+
+1.  Only in the left dictionary.
+2.  In both dictionaries.
+3.  Only in the right dictionary.
+
+You then traverse all the keys from lowest to highest, building up whatever
+you want.
+
+-}
+internalFastDictMerge :
+    (comparable -> a -> result -> result)
+    -> (comparable -> a -> b -> result -> result)
+    -> (comparable -> b -> result -> result)
+    -> InternalFastDict comparable a
+    -> InternalFastDict comparable b
+    -> result
+    -> result
+internalFastDictMerge leftStep bothStep rightStep leftDict rightDict initialResult =
+    let
+        stepState : comparable -> b -> ( List ( comparable, a ), result ) -> ( List ( comparable, a ), result )
+        stepState rKey rValue ( list, result ) =
+            case list of
+                [] ->
+                    ( [], rightStep rKey rValue result )
+
+                ( lKey, lValue ) :: rest ->
+                    if lKey < rKey then
+                        stepState rKey rValue ( rest, leftStep lKey lValue result )
+
+                    else if lKey > rKey then
+                        ( list, rightStep rKey rValue result )
+
+                    else
+                        ( rest, bothStep lKey lValue rValue result )
+
+        ( leftovers, intermediateResult ) =
+            internalFastDictFoldl stepState ( internalFastDictToList leftDict, initialResult ) rightDict
+    in
+    List.foldl (\( k, v ) result -> leftStep k v result) intermediateResult leftovers
 
 
 remove : InterfaceSingleDiff irrelevantFuture_
 remove =
     Remove ()
+
+
+internalFastDictToList : InternalFastDict k v -> List ( k, v )
+internalFastDictToList dict =
+    internalFastDictFoldr (\key value list -> ( key, value ) :: list) [] dict
+
+
+internalFastDictFoldr : (k -> v -> b -> b) -> b -> InternalFastDict k v -> b
+internalFastDictFoldr func acc (InternalFastDict _ dict) =
+    internalFastDictFoldrInner func acc dict
+
+
+internalFastDictFoldrInner : (k -> v -> b -> b) -> b -> InternalFastDictInner k v -> b
+internalFastDictFoldrInner func acc t =
+    case t of
+        InternalFastDictLeaf ->
+            acc
+
+        InternalFastDictInnerNode _ key value left right ->
+            internalFastDictFoldrInner func (func key value (internalFastDictFoldrInner func acc right)) left
 
 
 {-| A Request can fail in a couple ways:
@@ -3705,7 +4093,7 @@ type InterfaceSingleDiff irrelevantFuture
 describing changes to an existing interface with the same identity
 -}
 type InterfaceSingleEdit
-    = EditDom { pathReverse : List Int, replacement : DomEdit }
+    = EditDom { path : List Int, replacement : DomEdit }
     | EditAudio { url : String, startTime : Time.Posix, replacement : AudioEdit }
     | EditNotification { id : String, message : String, details : String }
 
@@ -3833,6 +4221,21 @@ type alias Program state =
     Platform.Program () (ProgramState state) (ProgramEvent state)
 
 
+interfaceFromSingle : InterfaceSingle future -> Interface future
+interfaceFromSingle interfaceSingle =
+    internalFastDictOne
+        (interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString)
+        interfaceSingle
+
+
+{-| Create a dictionary with one key-value pair.
+-}
+internalFastDictOne : key -> value -> InternalFastDict key value
+internalFastDictOne key value =
+    -- Root node is always Black
+    InternalFastDict 1 (InternalFastDictInnerNode InternalFastDictBlack key value InternalFastDictLeaf InternalFastDictLeaf)
+
+
 {-| An [`Interface`](Web#Interface) for getting the current [POSIX time](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Posix).
 
 Replacement for [`elm/time`'s `Time.now`](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#now).
@@ -3841,7 +4244,7 @@ Replacement for [`elm/time`'s `Time.now`](https://dark.elm.dmy.fr/packages/elm/t
 timePosixRequest : Interface Time.Posix
 timePosixRequest =
     TimePosixRequest identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for getting a [`Time.Zone`](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Zone)
@@ -3853,7 +4256,7 @@ Replacement for [`elm/time`'s `Time.here`](https://dark.elm.dmy.fr/packages/elm/
 timeZoneRequest : Interface Time.Zone
 timeZoneRequest =
     TimezoneOffsetRequest (\offset -> Time.customZone -offset [])
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| Intended for package authors.
@@ -3867,7 +4270,7 @@ Replacement for [`elm/time`'s `Time.getZoneName`](https://package.elm-lang.org/p
 timeZoneNameRequest : Interface String
 timeZoneNameRequest =
     TimezoneNameRequest identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for getting a reminder
@@ -3921,7 +4324,7 @@ where the result can be put into the "main state" and therefore cased on.
 timeOnceAt : Time.Posix -> Interface Time.Posix
 timeOnceAt pointInTime =
     TimeOnce { pointInTime = pointInTime, on = identity }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for getting the current time
@@ -3938,7 +4341,7 @@ timePeriodicallyListen intervalDuration =
         { intervalDurationMilliSeconds = intervalDuration |> Duration.inMilliseconds |> Basics.round
         , on = identity
         }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| Create an SVG element [`Web.DomNode`](Web#DomNode).
@@ -3976,7 +4379,7 @@ And once it's disconnected, set your state's [`SocketId`](Web#SocketId) back to 
 socketConnectTo : String -> Interface SocketConnectionEvent
 socketConnectTo address =
     SocketConnect { address = address, on = identity }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for closing a given connection
@@ -3984,7 +4387,7 @@ socketConnectTo address =
 socketDisconnect : SocketId -> Interface future_
 socketDisconnect id =
     SocketDisconnect id
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for sending data to the server.
@@ -3996,7 +4399,7 @@ to send json.
 socketMessage : SocketId -> String -> Interface future_
 socketMessage id data =
     SocketMessage { id = id, data = data }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for detecting when data has been sent from the server
@@ -4004,7 +4407,7 @@ socketMessage id data =
 socketMessageListen : SocketId -> Interface String
 socketMessageListen id =
     SocketMessageListen { id = id, on = identity }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for generating a given count of cryptographically sound unsigned 32-bit `Int`s.
@@ -4017,7 +4420,7 @@ Note: uses [`window.crypto.getRandomValues`](https://developer.mozilla.org/en-US
 randomUnsignedInt32s : Int -> Interface (List Int)
 randomUnsignedInt32s count =
     RandomUnsignedInt32sRequest { count = count, on = identity }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| Ask the user to consent to receiving notifications, if they haven't already.
@@ -4030,7 +4433,7 @@ when the toggle is set.
 notificationAskForPermission : Interface future_
 notificationAskForPermission =
     NotificationAskForPermission ()
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for pushing a notification to the user.
@@ -4099,7 +4502,7 @@ notificationShow content =
         , details = content.details
         , on = identity
         }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| Put a given JSON value in the body of your request. This will automatically add the `Content-Type: application/json` header.
@@ -4177,10 +4580,6 @@ httpExpectJson stateDecoder =
         )
 
 
-
--- Expect
-
-
 {-| Expect the response body to be [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/).
 The result will either be
 
@@ -4191,6 +4590,10 @@ The result will either be
 httpExpectBytes : HttpExpect (Result HttpError Bytes)
 httpExpectBytes =
     HttpExpectBytes identity
+
+
+
+-- Expect
 
 
 {-| Expect the response body to be a `String`.
@@ -4227,10 +4630,6 @@ httpGet options =
     }
 
 
-
--- request
-
-
 {-| Add custom headers to the [`Web.HttpRequest`](Web#HttpRequest).
 
     request
@@ -4246,6 +4645,10 @@ httpAddHeaders headers request =
             (headers |> List.map (\( name, value ) -> { name = name, value = value }))
                 ++ request.headers
     }
+
+
+
+-- request
 
 
 {-| Create a `POST` [`HttpRequest`](Web#HttpRequest).
@@ -4274,7 +4677,7 @@ using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API
 -}
 httpRequest : HttpRequest future -> Interface future
 httpRequest request =
-    request |> HttpRequest |> Rope.singleton
+    request |> HttpRequest |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for downloading a given file
@@ -4291,7 +4694,7 @@ fileDownloadBytes fileDownloadConfig =
         , mimeType = fileDownloadConfig.mimeType
         , content = fileDownloadConfig.content |> Bytes.LocalExtra.toUnsignedInt8List
         }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for printing a message with general information
@@ -4308,7 +4711,7 @@ just like [`Debug.log`](https://dark.elm.dmy.fr/packages/elm/core/latest/Debug#l
 consoleLog : String -> Interface future_
 consoleLog string =
     ConsoleLog string
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for printing a message that something didn't succeed but you could recover from, for example
@@ -4323,7 +4726,7 @@ Note: uses [`console.warn`](https://developer.mozilla.org/en-US/docs/Web/API/con
 consoleWarn : String -> Interface future_
 consoleWarn string =
     ConsoleWarn string
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for printing a message that something failed with bad consequences, for example
@@ -4336,7 +4739,7 @@ Note: uses [`console.error`](https://developer.mozilla.org/en-US/docs/Web/API/co
 consoleError : String -> Interface future_
 consoleError string =
     ConsoleError string
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for reading the textual contents of the system clipboard.
@@ -4347,7 +4750,7 @@ Note: uses [`navigator.clipboard.readText`](https://developer.mozilla.org/en-US/
 clipboardRequest : Interface String
 clipboardRequest =
     ClipboardRequest identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for setting the textual contents of the system clipboard.
@@ -4358,7 +4761,7 @@ Note: uses [`navigator.clipboard.writeText`](https://developer.mozilla.org/en-US
 clipboardReplaceBy : String -> Interface future_
 clipboardReplaceBy replacement =
     ClipboardReplaceBy replacement
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for reading the value of the entry with the given key.
@@ -4386,7 +4789,7 @@ Comes back with `Nothing` if that key doesn't exist.
 localStorageRequest : String -> Interface (Maybe String)
 localStorageRequest key =
     LocalStorageRequest { key = key, on = identity }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for replacing the value of the entry with the given key
@@ -4408,7 +4811,7 @@ that can be listened to using [`localStorageSetOnADifferentTabListen`](#localSto
 localStorageSet : String -> String -> Interface future_
 localStorageSet key newOrReplacementValue =
     LocalStorageSet { key = key, value = Just newOrReplacementValue }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for deleting the entry with the given key if it exists.
@@ -4420,7 +4823,7 @@ that can be listened to using [`localStorageRemoveOnADifferentTabListen`](#local
 localStorageRemove : String -> Interface future_
 localStorageRemove key =
     LocalStorageSet { key = key, value = Nothing }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for keeping an eye on
@@ -4429,7 +4832,7 @@ when the local storage on a different tab with the same url origin is removed.
 localStorageRemoveOnADifferentTabListen : String -> Interface AppUrl
 localStorageRemoveOnADifferentTabListen key =
     LocalStorageRemoveOnADifferentTabListen { key = key, on = identity }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for keeping an eye on
@@ -4441,7 +4844,7 @@ When the `oldValue` is `Nothing`, no entry with that key existed.
 localStorageSetOnADifferentTabListen : String -> Interface { appUrl : AppUrl, oldValue : Maybe String, newValue : String }
 localStorageSetOnADifferentTabListen key =
     LocalStorageSetOnADifferentTabListen { key = key, on = identity }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for setting the document's title
@@ -4449,7 +4852,7 @@ localStorageSetOnADifferentTabListen key =
 titleReplaceBy : String -> Interface future_
 titleReplaceBy titleReplacement =
     DocumentTitleReplaceBy titleReplacement
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for adding or replacing the document's author metadata
@@ -4457,7 +4860,7 @@ titleReplaceBy titleReplacement =
 authorSet : String -> Interface future_
 authorSet authorName =
     DocumentAuthorSet authorName
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for adding or replacing the document's keywords metadata
@@ -4466,7 +4869,7 @@ which should consist of words relevant to the page's content
 keywordsSet : List String -> Interface future_
 keywordsSet authorName =
     DocumentKeywordsSet authorName
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for adding or replacing the document's description metadata
@@ -4476,7 +4879,7 @@ Several browsers, like Firefox and Opera, use this as the default description of
 descriptionSet : String -> Interface future_
 descriptionSet authorName =
     DocumentDescriptionSet authorName
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for detecting a specific [`document` event](https://developer.mozilla.org/en-US/docs/Web/API/Document#events)
@@ -4485,7 +4888,7 @@ that has no native [`Interface`](Web#Interface), like like scroll, scrollend, se
 documentListenTo : String -> Interface Json.Decode.Value
 documentListenTo eventName =
     DocumentEventListen { eventName = eventName, on = Json.Decode.value }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for detecting a specific [`window` event](https://developer.mozilla.org/en-US/docs/Web/API/Window#events)
@@ -4493,7 +4896,7 @@ documentListenTo eventName =
 windowListenTo : String -> Interface Json.Decode.Value
 windowListenTo eventName =
     WindowEventListen { eventName = eventName, on = Json.Decode.value }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for detecting changes to the [visibility to the user](Web#WindowVisibility)
@@ -4505,7 +4908,7 @@ These times will also be the last reliable observation you can make before a use
 windowVisibilityChangeListen : Interface WindowVisibility
 windowVisibilityChangeListen =
     WindowVisibilityChangeListen identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for getting the inner window width and height in pixels,
@@ -4514,7 +4917,7 @@ not including toolbars/scrollbars
 windowSizeRequest : Interface { width : Int, height : Int }
 windowSizeRequest =
     WindowSizeRequest identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for detecting changes to the inner window width and height
@@ -4530,7 +4933,7 @@ windowResizeListen =
                     (Json.Decode.field "innerHeight" Json.Decode.int)
                 )
         }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for detecting when animation frames occur.
@@ -4550,7 +4953,7 @@ Note: uses [`window.requestAnimationFrame`](https://developer.mozilla.org/en-US/
 animationFrameListen : Interface Time.Posix
 animationFrameListen =
     WindowAnimationFrameListen identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for reading the languages the user prefers.
@@ -4563,7 +4966,7 @@ Note: uses [`window.navigator.languages`](https://developer.mozilla.org/en-US/do
 preferredLanguagesRequest : Interface (List String)
 preferredLanguagesRequest =
     WindowPreferredLanguagesRequest identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for detecting changes to the languages the user prefers.
@@ -4576,7 +4979,7 @@ Note: uses [`window.onlanguagechange`](https://developer.mozilla.org/en-US/docs/
 preferredLanguagesChangeListen : Interface (List String)
 preferredLanguagesChangeListen =
     WindowPreferredLanguagesChangeListen identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for getting the current page's [app-specific URL](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/).
@@ -4588,11 +4991,7 @@ Note: Uses [`window.location.href`](https://developer.mozilla.org/en-US/docs/Web
 urlRequest : Interface AppUrl
 urlRequest =
     NavigationUrlRequest identity
-        |> Rope.singleton
-
-
-
--- elm/browser on "How do I manage URL from a Browser.element?" https://github.com/elm/browser/blob/master/notes/navigation-in-elements.md
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for changing the [app-specific URL](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/),
@@ -4607,7 +5006,11 @@ Replacement for [`Browser.Navigation.replaceUrl`](https://dark.elm.dmy.fr/packag
 replaceUrl : AppUrl -> Interface future_
 replaceUrl appUrl =
     NavigationReplaceUrl appUrl
-        |> Rope.singleton
+        |> interfaceFromSingle
+
+
+
+-- elm/browser on "How do I manage URL from a Browser.element?" https://github.com/elm/browser/blob/master/notes/navigation-in-elements.md
 
 
 {-| An [`Interface`](Web#Interface) for changing the [app-specific URL](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/)
@@ -4620,7 +5023,7 @@ Replacement for [`Browser.Navigation.pushUrl`](https://dark.elm.dmy.fr/packages/
 pushUrl : AppUrl -> Interface future_
 pushUrl appUrl =
     NavigationPushUrl appUrl
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for going forward a given number of pages.
@@ -4634,7 +5037,7 @@ Replacement for [`Browser.Navigation.forward`](https://dark.elm.dmy.fr/packages/
 navigateForward : Int -> Interface future_
 navigateForward urlSteps =
     NavigationGo urlSteps
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for going back a given number of pages.
@@ -4647,7 +5050,7 @@ Replacement for [`Browser.Navigation.back`](https://dark.elm.dmy.fr/packages/elm
 navigateBack : Int -> Interface future_
 navigateBack urlSteps =
     NavigationGo urlSteps
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for leaving the current page and loading the given [URL](https://dark.elm.dmy.fr/packages/elm/url/latest/).
@@ -4663,7 +5066,7 @@ Replacement for [`Browser.Navigation.load`](https://dark.elm.dmy.fr/packages/elm
 navigateTo : String -> Interface future_
 navigateTo url =
     NavigationLoad url
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for reloading the current page.
@@ -4677,7 +5080,7 @@ Replacement for [`Browser.Navigation.reload`](https://dark.elm.dmy.fr/packages/e
 reload : Interface future_
 reload =
     NavigationReload ()
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| If you used [`pushUrl`](#pushUrl) to update the URL with new history entries,
@@ -4703,7 +5106,7 @@ navigationListen =
                     ]
                 )
         }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for getting which [gamepads](Web#Gamepad)
@@ -4715,7 +5118,7 @@ The given `Dict` keys uniquely identify each device for the whole session.
 gamepadsRequest : Interface (Dict.Dict Int Gamepad)
 gamepadsRequest =
     GamepadsRequest identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for detecting changes to which [gamepads](Web#Gamepad)
@@ -4740,7 +5143,7 @@ If you have issues with unresponsiveness, [open an issue](https://github.com/lue
 gamepadsChangeListen : Interface (Dict.Dict Int Gamepad)
 gamepadsChangeListen =
     GamepadsChangeListen identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for getting the current [position of the device](Web#GeoLocation)
@@ -4748,7 +5151,7 @@ gamepadsChangeListen =
 geoLocationRequest : Interface GeoLocation
 geoLocationRequest =
     GeoLocationRequest identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for detecting changes in the current [position of the device](Web#GeoLocation)
@@ -4756,46 +5159,37 @@ geoLocationRequest =
 geoLocationChangeListen : Interface GeoLocation
 geoLocationChangeListen =
     GeoLocationChangeListen identity
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 nodeFlattenToList :
-    List (InterfaceSingle future)
-    -> { path : List Int, node : DomNode future }
+    { path : List Int, node : DomNode future }
     -> List { path : List Int, node : DomNode future }
     -> List (InterfaceSingle future)
-nodeFlattenToList interfacesSoFar current nodesRemaining =
+nodeFlattenToList current nodesRemaining =
     case current.node of
         DomText string ->
-            flattenRemainingNodesToList
-                (({ pathReverse = current.path, node = DomHeaderText string }
-                    |> DomNodeRender
-                 )
-                    :: interfacesSoFar
-                )
-                nodesRemaining
+            ({ path = current.path |> List.reverse, node = DomHeaderText string }
+                |> DomNodeRender
+            )
+                :: flattenRemainingNodesToList nodesRemaining
 
         DomElement element ->
-            let
-                updatedInterfaces : List (InterfaceSingle future)
-                updatedInterfaces =
-                    ({ pathReverse = current.path, node = DomElementHeader element.header }
-                        |> DomNodeRender
-                    )
-                        :: interfacesSoFar
-            in
             case element.subs of
                 [] ->
-                    flattenRemainingNodesToList updatedInterfaces nodesRemaining
+                    ({ path = current.path |> List.reverse, node = DomElementHeader element.header }
+                        |> DomNodeRender
+                    )
+                        :: flattenRemainingNodesToList nodesRemaining
 
                 sub0 :: sub1Up ->
                     let
                         updatedRemaining : { index : Int, mapped : List { path : List Int, node : DomNode future } }
                         updatedRemaining =
                             sub1Up
-                                |> List.foldl
+                                |> List.foldr
                                     (\sub soFar ->
-                                        { index = soFar.index + 1
+                                        { index = soFar.index - 1
                                         , mapped =
                                             { path = soFar.index :: current.path
                                             , node = sub
@@ -4803,33 +5197,99 @@ nodeFlattenToList interfacesSoFar current nodesRemaining =
                                                 :: soFar.mapped
                                         }
                                     )
-                                    { index = 1, mapped = nodesRemaining }
+                                    { index = sub1Up |> List.length, mapped = nodesRemaining }
                     in
-                    nodeFlattenToList
-                        updatedInterfaces
-                        { path = 0 :: current.path, node = sub0 }
-                        updatedRemaining.mapped
+                    ({ path = current.path |> List.reverse, node = DomElementHeader element.header }
+                        |> DomNodeRender
+                    )
+                        :: nodeFlattenToList
+                            { path = 0 :: current.path, node = sub0 }
+                            updatedRemaining.mapped
 
 
 flattenRemainingNodesToList :
-    List (InterfaceSingle future)
-    -> List { path : List Int, node : DomNode future }
+    List { path : List Int, node : DomNode future }
     -> List (InterfaceSingle future)
-flattenRemainingNodesToList updatedInterfaces nodesRemaining =
+flattenRemainingNodesToList nodesRemaining =
     case nodesRemaining of
         [] ->
-            updatedInterfaces
+            []
 
         next :: remainingWithoutNext ->
-            nodeFlattenToList updatedInterfaces next remainingWithoutNext
+            nodeFlattenToList next remainingWithoutNext
 
 
 {-| An [`Interface`](Web#Interface) for displaying a given [`Web.DomNode`](Web#DomNode)
 -}
 domRender : DomNode future -> Interface future
 domRender domNode =
-    nodeFlattenToList [] { path = [], node = domNode } []
-        |> Rope.fromList
+    nodeFlattenToList { path = [], node = domNode } []
+        |> internalFastDictFromSortedListMap
+            (\interfaceSingle ->
+                ( interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
+                , interfaceSingle
+                )
+            )
+
+
+{-| Builds a Dict from an already sorted list.
+
+⚠️ DANGER ⚠️ This does _not_ check that the list is sorted.
+
+-}
+internalFastDictFromSortedListMap : (entry -> ( comparable, v )) -> List entry -> InternalFastDict comparable v
+internalFastDictFromSortedListMap entryToKeyValue entries =
+    let
+        elementCount : Int
+        elementCount =
+            entries |> List.length
+
+        redLayer : Int
+        redLayer =
+            toFloat elementCount |> logBase 2 |> floor
+
+        go : Int -> Int -> Int -> List entry -> ( InternalFastDictInner comparable v, List entry )
+        go layer fromIncluded toExcluded acc =
+            if fromIncluded >= toExcluded then
+                ( InternalFastDictLeaf, acc )
+
+            else
+                let
+                    mid : Int
+                    mid =
+                        fromIncluded + (toExcluded - fromIncluded) // 2
+
+                    ( lchild, accAfterLeft ) =
+                        go (layer + 1) fromIncluded mid acc
+                in
+                case accAfterLeft of
+                    [] ->
+                        ( InternalFastDictLeaf, acc )
+
+                    head :: tail ->
+                        let
+                            ( rchild, accAfterRight ) =
+                                go (layer + 1) (mid + 1) toExcluded tail
+
+                            color : InternalFastDictNColor
+                            color =
+                                if layer > 0 && layer == redLayer then
+                                    InternalFastDictRed
+
+                                else
+                                    InternalFastDictBlack
+
+                            ( k, v ) =
+                                head |> entryToKeyValue
+                        in
+                        ( InternalFastDictInnerNode color k v lchild rchild
+                        , accAfterRight
+                        )
+    in
+    InternalFastDict elementCount
+        (go 0 0 elementCount entries
+            |> Tuple.first
+        )
 
 
 {-| Wire events from this [`Web.DomNode`](Web#DomNode) to a specific event, for example
@@ -5543,7 +6003,7 @@ and returning an [`AudioSource`](Web#AudioSource) to use with [`audioFromSource`
 audioSourceLoad : String -> Interface (Result AudioSourceLoadError AudioSource)
 audioSourceLoad url =
     AudioSourceLoad { url = url, on = identity }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for playing [`Audio`](Web#Audio) created with [`audioFromSource`](#audioFromSource).
@@ -5565,7 +6025,7 @@ audioPlay audio =
             -- negative speed values are supported by some browsers
             -- https://stackoverflow.com/questions/9874167/how-can-i-play-audio-in-reverse-with-web-audio-api/9875011#9875011
         }
-        |> Rope.singleton
+        |> interfaceFromSingle
 
 
 audioParameterValuesAlter : (Float -> Float) -> (AudioParameterTimeline -> AudioParameterTimeline)

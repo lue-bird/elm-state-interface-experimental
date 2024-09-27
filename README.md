@@ -6,9 +6,7 @@
 > 
 >   - move all `Web.X.y` module members to `Web.xY`
 >   - internal: improve performance of identifying many interfaces that would accumulate over time
->   - internal: switch `interfaces` representation from `FastDict.Dict` to sorted assoc-list
->   - internal: switch `Dict` values to sorted assoc-list or `FastDict.Dict` (TODO test switching to custom `FastDict.Dict` that exposes `fromSortedList` with index lists as digit prefixed)
->   - internal: change representation of DOM path
+>   - internal: replace `Dict` values to sorted assoc-list, `FastDict.Dict` or in the case of Interface, a custom FastDict clone
 
 ### define an app in a simple, safe and declarative way
 
