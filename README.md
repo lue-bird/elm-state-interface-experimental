@@ -14,7 +14,7 @@
 
 > If you know TEA, [get quick overview of the differences](#comparison-to-the-elm-architecture)
 
-Here's a simple app that shows a number and a button that increments it
+↓ creates a number and a button that increments it
 
 ```elm
 import Web
@@ -35,31 +35,29 @@ app =
     }
 ```
 
-> To play around with the examples, set up a [playground](https://github.com/lue-bird/elm-state-interface-experimental-hello):
+> Set up a [playground](https://github.com/lue-bird/elm-state-interface-experimental-hello) to play around with the examples:
 > ```bash
 > git clone https://github.com/lue-bird/elm-state-interface-experimental-hello.git && cd elm-state-interface-experimental-hello && npm install && npx vite
 > ```
-> http://localhost:5173/ now shows your app. Open `src/App.elm` in your editor to paste in examples.
+> http://localhost:5173 shows your app. Open `src/App.elm` in your editor to paste in examples.
 
 The "state" is everything your app knows internally. Here it's the counter number, starting at 0.
 
-We build the interface to the outside world (html, audio, server communication, ...) based on our current state.
-In our example, this function has the type
+We build the interface to the outside world (html, audio, server communication, ...) based on our current state:
 ```elm
 interface : Int -> Interface Int
 ```
-`Interface Int` means that the interface can come back with an `Int` some time in the future,
-in our case an incremented counter state.
+`Interface Int` means that the interface can send an `Int` back to us some time in the future,
+in our case an incremented counter state once the user clicks the button.
 The app will use this result as the new state.
 
-We use [`Web.domListenTo`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web#domListenTo) to be notified when a user clicks the button.
-Without [`Web.domFutureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web#domFutureMap), our interface would have the type
+[`Web.domListenTo`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web#domListenTo) notifies us when a user clicks the button:
 ```elm
 Web.domElement "button" [ Web.domListenTo "click" ] []
     |> Web.domRender
 : Interface Json.Decode.Value
 ```
-which means this interface will on click come back with an event as [json](https://dark.elm.dmy.fr/packages/elm/json/latest/).
+→ on click, an event will be sent as [json](https://dark.elm.dmy.fr/packages/elm/json/latest/).
 Later, we'll see how to get information out of this kind of event.
 
 Right now, we use [`Web.domFutureMap`](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/Web#domFutureMap) to change the information the interface will send back to us in the future by just ignoring the event `\_ ->` and returning the incremented state.
@@ -83,17 +81,17 @@ Web.domElement "button"
     |> Web.domRender
 : Interface Int
 ```
-Basically anywhere a type used for an interface has data it can come back with.
+Anywhere a type used for an interface has data it can come back with.
 
-If we only perform actions without any events coming back, we get the type
+If we only "perform actions" without any events getting set back, we get the type
 ```elm
 "never change" |> Web.domText |> Web.domRender
-: Interface nothingEverComesBack
+: Interface nothingEverGetsSentBack
 
 "never change" |> Web.consoleLog
-: Interface nothingEverComesBack
+: Interface nothingEverGetsSentBack
 ```
-Because `nothingEverComesBack` is a variable, it will fit for any other interface type.
+`nothingEverGetsSentBack` is a variable, so it fits for any other interface type.
 
 
 It's nice to give this number state you pass around a name
@@ -161,7 +159,9 @@ app =
     }
 ```
 
-it can be nice to separate behavior from the interface by explicitly listing all the possible things we expect to see on the outside
+
+How the app _behaves_ on interaction is mixed with all the UI.
+It _can_ be nice to separate these by explicitly listing all the possible things on the outside we react to.
 
 ```elm
 import Web
@@ -205,12 +205,10 @@ app =
                     )
     }
 ```
-Now you just need a quick look at `Event` to see what kind of user interactions the app will react to.
+Now you just need a quick look at `Event` to see what our app will react to.
 
-Soon we'll extend this example app with the ability to manage its url.
-Before that, we have to know when anything from the interface actually triggers something on the outside.
-
-In this example we have a text input field together with
+Hmm... but when does anything from the interface actually trigger something on the outside?
+To explain, let's look at a text input field together with
 a text showing whether the entered text is a palindrome or not.
 
 ```elm
@@ -483,11 +481,11 @@ in js
 import * as Web from "@lue-bird/elm-state-interface-experimental";
 // import your Main.elm. Name and path depend on bundler+plugin
 
-const elmApp = Main.init();
+const elmApp = Main.init()
 Web.programStart({
-    elmPorts : elmApp.ports,
-    domElement : document.getElementById("your-app-element-id")
-});
+    ports : elmApp.ports,
+    domElement : document.getElementById(...)
+})
 ```
 
 If you're not familiar with The Elm Architecture, skip to ["future"](#future)
@@ -521,33 +519,34 @@ type alias State =
 type Event
     = IconAndContentArrived (Result Http.Error { icon : Image, content : String })
 
-{ init =
-    \() ->
-        ( Err Http.NotAsked
-        , ConcurrentTask.succeed (\icon content -> { icon = icon, content = content })
-            |> ConcurrentTask.andMap
-                (Http.request { url = "...", decoder = Image.jsonDecoder })
-            |> ConcurrentTask.andMap
-                (Http.request { url = "...", decoder = Json.Decode.string })
-            |> ConcurrentTask.attempt { onComplete = IconAndContentArrived }
-        )
-, update =
-    \event state ->
-        case event of
-            IconAndContentArrived iconAndContent ->
-                ( iconAndContent |> Result.mapError Http.Error
-                , Cmd.none
-                )
-, view =
-    \state ->
-        case state of
-            Ok iconAndContent ->
-                ..your ui using iconAndContent..
-            
-            Err ... ->
-                ..error ui..
-, subscriptions = ...
-}
+init () =
+    ( Err Http.NotAsked
+    , ConcurrentTask.succeed (\icon content -> { icon = icon, content = content })
+        |> ConcurrentTask.andMap
+            (Http.request { url = "...", decoder = Image.jsonDecoder })
+        |> ConcurrentTask.andMap
+            (Http.request { url = "...", decoder = Json.Decode.string })
+        |> ConcurrentTask.attempt { onComplete = IconAndContentArrived }
+    )
+
+update event state =
+    case event of
+        IconAndContentArrived iconAndContent ->
+            ( iconAndContent |> Result.mapError Http.Error
+            , Cmd.none
+            )
+
+view state =
+    case state of
+        Ok iconAndContent ->
+            ..your ui using iconAndContent..
+        
+        Err ... ->
+            ..error ui..
+
+subscriptions =
+    ...
+
 ```
 with state-interface:
 ```elm
@@ -556,30 +555,30 @@ type alias State =
     , content : Result Http.NonSuccessStatus String
     }
 
-{ initialState = { icon = Err Http.NotAsked, content = Err Http.NotAsked }
-, interface =
-    \state ->
-        case ( state.icon, state.content ) of
-            ( Ok icon, Ok content ) ->
-                ..your ui using icon and content..
-            
-            _ ->
-                [ case state.icon of
-                    Ok _ ->
-                        Web.interfaceNone
-                    Err _ ->
-                        Http.request { url = "...", decoder = Image.jsonDecoder }
-                            |> Web.interfaceFutureMap (\result -> { state | icon = result })
-                , case state.content of
-                    Ok _ ->
-                        Web.interfaceNone
-                    Err _ ->
-                        Http.request { url = "...", decoder = Json.Decode.string }
-                            |> Web.interfaceFutureMap (\result -> { state | content = result })
-                , ..error ui..
-                ]
-                    |> Web.interfaceBatch
-}
+initialState =
+    { icon = Err Http.NotAsked, content = Err Http.NotAsked }
+
+interface state =
+    case ( state.icon, state.content ) of
+        ( Ok icon, Ok content ) ->
+            ..your ui using icon and content..
+        
+        _ ->
+            [ case state.icon of
+                Ok _ ->
+                    Web.interfaceNone
+                Err _ ->
+                    Http.request { url = "...", decoder = Image.jsonDecoder }
+                        |> Web.interfaceFutureMap (\result -> { state | icon = result })
+            , case state.content of
+                Ok _ ->
+                    Web.interfaceNone
+                Err _ ->
+                    Http.request { url = "...", decoder = Json.Decode.string }
+                        |> Web.interfaceFutureMap (\result -> { state | content = result })
+            , ..error ui..
+            ]
+                |> Web.interfaceBatch
 ```
 which feels a bit more explicit, declarative and less wiring-heavy at least.
 
