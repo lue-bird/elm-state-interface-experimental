@@ -5234,11 +5234,9 @@ flattenRemainingNodesToList soFar nodesRemaining =
 domRender : DomNode future -> Interface future
 domRender domNode =
     nodeFlattenToList [] { path = [], node = domNode } []
-        |> internalFastDictFromSortedListMap
+        |> internalFastDictFromSortedListBy
             (\interfaceSingle ->
-                ( interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
-                , interfaceSingle
-                )
+                interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
             )
 
 
@@ -5247,8 +5245,8 @@ domRender domNode =
 ⚠️ DANGER ⚠️ This does _not_ check that the list is sorted.
 
 -}
-internalFastDictFromSortedListMap : (entry -> ( comparable, v )) -> List entry -> InternalFastDict comparable v
-internalFastDictFromSortedListMap entryToKeyValue entries =
+internalFastDictFromSortedListBy : (v -> comparable) -> List v -> InternalFastDict comparable v
+internalFastDictFromSortedListBy entryToKeyValue entries =
     let
         elementCount : Int
         elementCount =
@@ -5258,7 +5256,7 @@ internalFastDictFromSortedListMap entryToKeyValue entries =
         redLayer =
             toFloat elementCount |> logBase 2 |> floor
 
-        go : Int -> Int -> Int -> List entry -> ( InternalFastDictInner comparable v, List entry )
+        go : Int -> Int -> Int -> List v -> ( InternalFastDictInner comparable v, List v )
         go layer fromIncluded toExcluded acc =
             if fromIncluded >= toExcluded then
                 ( InternalFastDictLeaf, acc )
@@ -5288,11 +5286,8 @@ internalFastDictFromSortedListMap entryToKeyValue entries =
 
                                 else
                                     InternalFastDictBlack
-
-                            ( k, v ) =
-                                head |> entryToKeyValue
                         in
-                        ( InternalFastDictInnerNode color k v lchild rchild
+                        ( InternalFastDictInnerNode color (head |> entryToKeyValue) head lchild rchild
                         , accAfterRight
                         )
     in
