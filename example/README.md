@@ -11,6 +11,7 @@ then open http://localhost:5173/
 Other projects using state-interface:
   - [jam game: tree scaler](https://lue-bird.itch.io/tree-scaler)
   - [visual programming language: lau](https://github.com/lue-bird/lau)
+  - [lue's coding blog](https://lue-bird.github.io/blog/)
   - [generative game: lider](https://github.com/lue-bird/lider)
   - add yours!
 
