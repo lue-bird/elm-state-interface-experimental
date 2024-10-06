@@ -5163,24 +5163,31 @@ geoLocationChangeListen =
 
 
 nodeFlattenToList :
-    { path : List Int, node : DomNode future }
+    List (InterfaceSingle future)
+    -> { path : List Int, node : DomNode future }
     -> List { path : List Int, node : DomNode future }
     -> List (InterfaceSingle future)
-nodeFlattenToList current nodesRemaining =
+nodeFlattenToList soFar current nodesRemaining =
     case current.node of
         DomText string ->
-            ({ path = current.path |> List.reverse, node = DomHeaderText string }
-                |> DomNodeRender
-            )
-                :: flattenRemainingNodesToList nodesRemaining
+            flattenRemainingNodesToList
+                (({ path = current.path |> List.reverse, node = DomHeaderText string }
+                    |> DomNodeRender
+                 )
+                    :: soFar
+                )
+                nodesRemaining
 
         DomElement element ->
             case element.subs of
                 [] ->
-                    ({ path = current.path |> List.reverse, node = DomElementHeader element.header }
-                        |> DomNodeRender
-                    )
-                        :: flattenRemainingNodesToList nodesRemaining
+                    flattenRemainingNodesToList
+                        (({ path = current.path |> List.reverse, node = DomElementHeader element.header }
+                            |> DomNodeRender
+                         )
+                            :: soFar
+                        )
+                        nodesRemaining
 
                 sub0 :: sub1Up ->
                     let
@@ -5188,42 +5195,45 @@ nodeFlattenToList current nodesRemaining =
                         updatedRemaining =
                             sub1Up
                                 |> List.foldr
-                                    (\sub soFar ->
-                                        { index = soFar.index - 1
+                                    (\sub subsSoFar ->
+                                        { index = subsSoFar.index - 1
                                         , mapped =
-                                            { path = soFar.index :: current.path
+                                            { path = subsSoFar.index :: current.path
                                             , node = sub
                                             }
-                                                :: soFar.mapped
+                                                :: subsSoFar.mapped
                                         }
                                     )
                                     { index = sub1Up |> List.length, mapped = nodesRemaining }
                     in
-                    ({ path = current.path |> List.reverse, node = DomElementHeader element.header }
-                        |> DomNodeRender
-                    )
-                        :: nodeFlattenToList
-                            { path = 0 :: current.path, node = sub0 }
-                            updatedRemaining.mapped
+                    nodeFlattenToList
+                        (({ path = current.path |> List.reverse, node = DomElementHeader element.header }
+                            |> DomNodeRender
+                         )
+                            :: soFar
+                        )
+                        { path = 0 :: current.path, node = sub0 }
+                        updatedRemaining.mapped
 
 
 flattenRemainingNodesToList :
-    List { path : List Int, node : DomNode future }
+    List (InterfaceSingle future)
+    -> List { path : List Int, node : DomNode future }
     -> List (InterfaceSingle future)
-flattenRemainingNodesToList nodesRemaining =
+flattenRemainingNodesToList soFar nodesRemaining =
     case nodesRemaining of
         [] ->
-            []
+            soFar |> List.reverse
 
         next :: remainingWithoutNext ->
-            nodeFlattenToList next remainingWithoutNext
+            nodeFlattenToList soFar next remainingWithoutNext
 
 
 {-| An [`Interface`](Web#Interface) for displaying a given [`Web.DomNode`](Web#DomNode)
 -}
 domRender : DomNode future -> Interface future
 domRender domNode =
-    nodeFlattenToList { path = [], node = domNode } []
+    nodeFlattenToList [] { path = [], node = domNode } []
         |> internalFastDictFromSortedListMap
             (\interfaceSingle ->
                 ( interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
