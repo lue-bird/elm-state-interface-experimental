@@ -5170,24 +5170,38 @@ nodeFlattenToList :
 nodeFlattenToList soFar current nodesRemaining =
     case current.node of
         DomText string ->
-            flattenRemainingNodesToList
-                (({ path = current.path |> List.reverse, node = DomHeaderText string }
-                    |> DomNodeRender
-                 )
-                    :: soFar
-                )
-                nodesRemaining
+            let
+                soFarWithText : List (InterfaceSingle future)
+                soFarWithText =
+                    ({ path = current.path |> List.reverse, node = DomHeaderText string }
+                        |> DomNodeRender
+                    )
+                        :: soFar
+            in
+            case nodesRemaining of
+                [] ->
+                    soFarWithText |> List.reverse
+
+                next :: remainingWithoutNext ->
+                    nodeFlattenToList soFarWithText next remainingWithoutNext
 
         DomElement element ->
             case element.subs of
                 [] ->
-                    flattenRemainingNodesToList
-                        (({ path = current.path |> List.reverse, node = DomElementHeader element.header }
-                            |> DomNodeRender
-                         )
-                            :: soFar
-                        )
-                        nodesRemaining
+                    let
+                        soFarWithElement : List (InterfaceSingle future)
+                        soFarWithElement =
+                            ({ path = current.path |> List.reverse, node = DomElementHeader element.header }
+                                |> DomNodeRender
+                            )
+                                :: soFar
+                    in
+                    case nodesRemaining of
+                        [] ->
+                            soFarWithElement |> List.reverse
+
+                        next :: remainingWithoutNext ->
+                            nodeFlattenToList soFarWithElement next remainingWithoutNext
 
                 sub0 :: sub1Up ->
                     let
@@ -5214,19 +5228,6 @@ nodeFlattenToList soFar current nodesRemaining =
                         )
                         { path = 0 :: current.path, node = sub0 }
                         updatedRemaining.mapped
-
-
-flattenRemainingNodesToList :
-    List (InterfaceSingle future)
-    -> List { path : List Int, node : DomNode future }
-    -> List (InterfaceSingle future)
-flattenRemainingNodesToList soFar nodesRemaining =
-    case nodesRemaining of
-        [] ->
-            soFar |> List.reverse
-
-        next :: remainingWithoutNext ->
-            nodeFlattenToList soFar next remainingWithoutNext
 
 
 {-| An [`Interface`](Web#Interface) for displaying a given [`Web.DomNode`](Web#DomNode)
