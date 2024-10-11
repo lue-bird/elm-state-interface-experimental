@@ -2854,20 +2854,19 @@ commaSeparatedMap elementToString list =
             ""
 
         element0 :: element1Up ->
-            elementToString element0
-                ++ commaPrefixedMap elementToString element1Up
+            commaPrefixedMap (elementToString element0) elementToString element1Up
 
 
-commaPrefixedMap : (a -> String) -> List a -> String
-commaPrefixedMap elementToString list =
+commaPrefixedMap : String -> (a -> String) -> List a -> String
+commaPrefixedMap soFar elementToString list =
     case list of
         [] ->
-            ""
+            soFar
 
         element0 :: element1Up ->
-            ","
-                ++ elementToString element0
-                ++ commaPrefixedMap elementToString element1Up
+            commaPrefixedMap (soFar ++ "," ++ elementToString element0)
+                elementToString
+                element1Up
 
 
 socketIdToStructuredId : SocketId -> StructuredId
