@@ -16,7 +16,6 @@ import Docs.ReviewAtDocs
 import Docs.ReviewLinksAndSections
 import Docs.UpToDateReadmeLinks
 import EqualsCaseable
-import MultipleAppendToConcat
 import NoAlways
 import NoDebug.Log
 import NoDebug.TodoOrToString
@@ -37,7 +36,6 @@ import NoSimpleLetBody
 import NoSinglePatternCase
 import NoUnnecessaryTrailingUnderscore
 import NoUnoptimizedRecursion
-import NoUnsafeDivision
 import NoUnsafePorts
 import NoUnsortedCases
 import NoUnsortedTopLevelDeclarations
@@ -96,7 +94,6 @@ config =
                         NoSinglePatternCase.createNewLet
                 )
         )
-    , MultipleAppendToConcat.rule MultipleAppendToConcat.PipeRightList
 
     -- ## sort
     , NoUnsortedCases.rule
@@ -208,7 +205,6 @@ config =
         |> Review.Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoSimpleLetBody.rule
     , NoUnnecessaryTrailingUnderscore.rule
-    , NoUnsafeDivision.rule
     , Review.Pattern.Record.forbid
     , Review.Pattern.As.forbid
     , Review.PhantomType.forbid
