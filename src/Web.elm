@@ -680,8 +680,8 @@ type InterfaceSingle future
     | AudioSourceLoad { url : String, on : Result AudioSourceLoadError AudioSource -> future }
     | AudioPlay Audio
     | DomNodeRender
-        { path :
-            -- from outer parent to inner parent index
+        { reversePath :
+            -- from outer inner to outer parent index
             List Int
         , node : DomTextOrElementHeader future
         }
@@ -1171,7 +1171,7 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             notificationAskForPermissionSingle
 
         DomNodeRender toRender ->
-            { path = toRender.path
+            { reversePath = toRender.reversePath
             , node = toRender.node |> domNodeFutureMap futureChange
             }
                 |> DomNodeRender
@@ -1381,7 +1381,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
                     { old = domElementPreviouslyRendered.node, updated = domElementToRender.node }
                         |> domTextOrElementHeaderDiffMap
                             (\diff ->
-                                { path = domElementPreviouslyRendered.path
+                                { reversePath = domElementPreviouslyRendered.reversePath
                                 , replacement = diff
                                 }
                                     |> EditDom
@@ -1906,7 +1906,7 @@ interfaceSingleEditToJson edit =
                 { tag = "EditDom"
                 , value =
                     Json.Encode.object
-                        [ ( "path", editDomDiff.path |> Json.Encode.list Json.Encode.int )
+                        [ ( "reversePath", editDomDiff.reversePath |> Json.Encode.list Json.Encode.int )
                         , ( "replacement", editDomDiff.replacement |> editDomDiffToJson )
                         ]
                 }
@@ -2177,7 +2177,7 @@ interfaceSingleToJson =
                     { tag = "DomNodeRender"
                     , value =
                         Json.Encode.object
-                            [ ( "path", render.path |> Json.Encode.list Json.Encode.int )
+                            [ ( "reversePath", render.reversePath |> Json.Encode.list Json.Encode.int )
                             , ( "node", render.node |> domTextOrElementHeaderInfoToJson )
                             ]
                     }
@@ -2681,7 +2681,7 @@ interfaceSingleToStructuredId =
                 DomNodeRender render ->
                     { tag = "DomNodeRender"
                     , value =
-                        render.path |> indexListToDigitCountPrefixedStructureId
+                        render.reversePath |> reverseIndexListToDigitCountPrefixedStructureId
                     }
 
                 AudioSourceLoad sourceLoad ->
@@ -2798,11 +2798,12 @@ The problem with StructuredId.ofList is: that with e.g. `"[]"` vs `"[0]"` any di
 So we instead represent it as `"\"\""` vs `"\"0\""` because any digit is > `'"'`
 
 -}
-indexListToDigitCountPrefixedStructureId : List Int -> StructuredId
-indexListToDigitCountPrefixedStructureId indexes =
+reverseIndexListToDigitCountPrefixedStructureId : List Int -> StructuredId
+reverseIndexListToDigitCountPrefixedStructureId indexes =
     StructuredId.ofString
         (indexes
-            |> commaSeparatedMap (\index -> index |> indexToDigitCountPrefixed |> String.fromInt)
+            |> commaSeparatedReverseMap
+                (\index -> index |> indexToDigitCountPrefixed |> String.fromInt)
         )
 
 
@@ -2847,8 +2848,8 @@ indexToDigitCountPrefixed int =
         digitCount * 10 ^ digitCount + int
 
 
-commaSeparatedMap : (a -> String) -> List a -> String
-commaSeparatedMap elementToString list =
+commaSeparatedReverseMap : (a -> String) -> List a -> String
+commaSeparatedReverseMap elementToString list =
     case list of
         [] ->
             ""
@@ -2864,7 +2865,7 @@ commaPrefixedMap soFar elementToString list =
             soFar
 
         element0 :: element1Up ->
-            commaPrefixedMap (soFar ++ "," ++ elementToString element0)
+            commaPrefixedMap (elementToString element0 ++ "," ++ soFar)
                 elementToString
                 element1Up
 
@@ -4092,7 +4093,7 @@ type InterfaceSingleDiff irrelevantFuture
 describing changes to an existing interface with the same identity
 -}
 type InterfaceSingleEdit
-    = EditDom { path : List Int, replacement : DomEdit }
+    = EditDom { reversePath : List Int, replacement : DomEdit }
     | EditAudio { url : String, startTime : Time.Posix, replacement : AudioEdit }
     | EditNotification { id : String, message : String, details : String }
 
@@ -5161,10 +5162,21 @@ geoLocationChangeListen =
         |> interfaceFromSingle
 
 
+{-| An [`Interface`](Web#Interface) for displaying a given [`Web.DomNode`](Web#DomNode)
+-}
+domRender : DomNode future -> Interface future
+domRender domNode =
+    nodeFlattenToList [] { reversePath = [], node = domNode } []
+        |> internalFastDictFromSortedListBy
+            (\interfaceSingle ->
+                interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
+            )
+
+
 nodeFlattenToList :
     List (InterfaceSingle future)
-    -> { path : List Int, node : DomNode future }
-    -> List { path : List Int, node : DomNode future }
+    -> { reversePath : List Int, node : DomNode future }
+    -> List { reversePath : List Int, node : DomNode future }
     -> List (InterfaceSingle future)
 nodeFlattenToList soFar current nodesRemaining =
     case current.node of
@@ -5172,7 +5184,7 @@ nodeFlattenToList soFar current nodesRemaining =
             let
                 soFarWithText : List (InterfaceSingle future)
                 soFarWithText =
-                    ({ path = current.path |> List.reverse, node = DomHeaderText string }
+                    ({ reversePath = current.reversePath, node = DomHeaderText string }
                         |> DomNodeRender
                     )
                         :: soFar
@@ -5190,7 +5202,7 @@ nodeFlattenToList soFar current nodesRemaining =
                     let
                         soFarWithElement : List (InterfaceSingle future)
                         soFarWithElement =
-                            ({ path = current.path |> List.reverse, node = DomElementHeader element.header }
+                            ({ reversePath = current.reversePath, node = DomElementHeader element.header }
                                 |> DomNodeRender
                             )
                                 :: soFar
@@ -5204,14 +5216,14 @@ nodeFlattenToList soFar current nodesRemaining =
 
                 sub0 :: sub1Up ->
                     let
-                        updatedRemaining : { index : Int, mapped : List { path : List Int, node : DomNode future } }
+                        updatedRemaining : { index : Int, mapped : List { reversePath : List Int, node : DomNode future } }
                         updatedRemaining =
                             sub1Up
                                 |> List.foldr
                                     (\sub subsSoFar ->
                                         { index = subsSoFar.index - 1
                                         , mapped =
-                                            { path = subsSoFar.index :: current.path
+                                            { reversePath = subsSoFar.index :: current.reversePath
                                             , node = sub
                                             }
                                                 :: subsSoFar.mapped
@@ -5220,24 +5232,13 @@ nodeFlattenToList soFar current nodesRemaining =
                                     { index = sub1Up |> List.length, mapped = nodesRemaining }
                     in
                     nodeFlattenToList
-                        (({ path = current.path |> List.reverse, node = DomElementHeader element.header }
+                        (({ reversePath = current.reversePath, node = DomElementHeader element.header }
                             |> DomNodeRender
                          )
                             :: soFar
                         )
-                        { path = 0 :: current.path, node = sub0 }
+                        { reversePath = 0 :: current.reversePath, node = sub0 }
                         updatedRemaining.mapped
-
-
-{-| An [`Interface`](Web#Interface) for displaying a given [`Web.DomNode`](Web#DomNode)
--}
-domRender : DomNode future -> Interface future
-domRender domNode =
-    nodeFlattenToList [] { path = [], node = domNode } []
-        |> internalFastDictFromSortedListBy
-            (\interfaceSingle ->
-                interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
-            )
 
 
 {-| Builds a Dict from an already sorted list.

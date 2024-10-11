@@ -123,8 +123,8 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                     warn("tried to play audio from source that isn't loaded. Did you use Web.audioSourceLoad?")
                 }
             }
-            case "DomNodeRender": return (config: { path: number[], node: any }) => {
-                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), config.path)
+            case "DomNodeRender": return (config: { reversePath: number[], node: any }) => {
+                const oldDomNodeToEdit = domElementOrDummyInElementAtReversePath(domElementOrDummyAtIndex(appConfig.domElement, 0), config.reversePath)
                 const newDomNode = createDomNode(id, config.node, oldDomNodeToEdit.childNodes, sendToElm)
                 oldDomNodeToEdit.parentElement?.replaceChild(newDomNode, oldDomNodeToEdit)
                 abortSignal.addEventListener("abort", _event => {
@@ -136,7 +136,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                         appConfigDomELementChildElementOnDelete === null ?
                             null
                             :
-                            domInElementAt(appConfigDomELementChildElementOnDelete, config.path)
+                            domInElementAtReversePath(appConfigDomELementChildElementOnDelete, config.reversePath)
                     if (toRemove !== null) {
                         while (toRemove.nextSibling !== null) {
                             toRemove.nextSibling.remove()
@@ -375,8 +375,8 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     }
     function interfaceEditImplementation(id: string, tag: string, sendToElm: (v: any) => void): ((config: any) => void) {
         switch (tag) {
-            case "EditDom": return (config: { path: number[], replacement: any }) => {
-                editDom(id, config.path, config.replacement, sendToElm)
+            case "EditDom": return (config: { reversePath: number[], replacement: any }) => {
+                editDom(id, config.reversePath, config.replacement, sendToElm)
             }
             case "EditAudio": return (config: any) => {
                 editAudio(id, config)
@@ -424,36 +424,36 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
         }
     }
 
-    function domInElementAt(overallParent: Element, path: number[]): ChildNode | null {
-        return path.reduce(
-            (lastVisitedDom, pathIndex) =>
-                domElementAtIndex(lastVisitedDom, pathIndex),
-            overallParent
-        )
+    function domInElementAtReversePath(overallParent: Element, reversePath: number[]): ChildNode | null {
+        let soFar: Element | null = overallParent
+        for (let pathIndex = reversePath.length - 1; pathIndex >= 0; pathIndex--) {
+            soFar = domElementAtIndex(soFar, reversePath[pathIndex] ?? 0)
+        }
+        return soFar
     }
-    function domElementOrDummyInElementAt(overallParent: Element, path: number[]): ChildNode {
-        return path.reduce(
-            (lastVisitedDom, pathIndex) =>
-                domElementOrDummyAtIndex(lastVisitedDom, pathIndex),
-            overallParent
-        )
+    function domElementOrDummyInElementAtReversePath(overallParent: Element, reversePath: number[]): ChildNode {
+        let soFar: Element | null = overallParent
+        for (let pathIndex = reversePath.length - 1; pathIndex >= 0; pathIndex--) {
+            soFar = domElementOrDummyAtIndex(soFar, reversePath[pathIndex] ?? 0)
+        }
+        return soFar
     }
 
     function editDom(
         id: string,
-        path: number[],
+        reversePath: number[],
         replacement: { tag: "Node" | "Styles" | "Attributes" | "AttributesNamespaced" | "StringProperties" | "BoolProperties" | "ScrollToPosition" | "ScrollToShow" | "ScrollPositionRequest" | "EventListens", value: any },
         sendToElm: (v: any) => void
     ) {
         switch (replacement.tag) {
             case "Node": {
-                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), path)
+                const oldDomNodeToEdit = domElementOrDummyInElementAtReversePath(domElementOrDummyAtIndex(appConfig.domElement, 0), reversePath)
                 const newDomNode = createDomNode(id, replacement.value, oldDomNodeToEdit.childNodes, sendToElm)
                 oldDomNodeToEdit.parentElement?.replaceChild(newDomNode, oldDomNodeToEdit)
                 break
             }
             case "Styles": case "Attributes": case "AttributesNamespaced": case "StringProperties": case "BoolProperties": case "ScrollToPosition": case "ScrollToShow": case "ScrollPositionRequest": case "EventListens": {
-                const oldDomNodeToEdit = domElementOrDummyInElementAt(domElementOrDummyAtIndex(appConfig.domElement, 0), path)
+                const oldDomNodeToEdit = domElementOrDummyInElementAtReversePath(domElementOrDummyAtIndex(appConfig.domElement, 0), reversePath)
                 if (oldDomNodeToEdit instanceof Element) {
                     editDomModifiers(
                         id,
