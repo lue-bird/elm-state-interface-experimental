@@ -5166,19 +5166,19 @@ geoLocationChangeListen =
 -}
 domRender : DomNode future -> Interface future
 domRender domNode =
-    nodeFlattenToList [] { reversePath = [], node = domNode } []
-        |> internalFastDictFromSortedListBy
+    nodeFlattenToReverseList [] { reversePath = [], node = domNode } []
+        |> internalFastDictFromReverseSortedListBy
             (\interfaceSingle ->
                 interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
             )
 
 
-nodeFlattenToList :
+nodeFlattenToReverseList :
     List (InterfaceSingle future)
     -> { reversePath : List Int, node : DomNode future }
     -> List { reversePath : List Int, node : DomNode future }
     -> List (InterfaceSingle future)
-nodeFlattenToList soFar current nodesRemaining =
+nodeFlattenToReverseList soFar current nodesRemaining =
     case current.node of
         DomText string ->
             let
@@ -5191,10 +5191,10 @@ nodeFlattenToList soFar current nodesRemaining =
             in
             case nodesRemaining of
                 [] ->
-                    soFarWithText |> List.reverse
+                    soFarWithText
 
                 next :: remainingWithoutNext ->
-                    nodeFlattenToList soFarWithText next remainingWithoutNext
+                    nodeFlattenToReverseList soFarWithText next remainingWithoutNext
 
         DomElement element ->
             case element.subs of
@@ -5209,10 +5209,10 @@ nodeFlattenToList soFar current nodesRemaining =
                     in
                     case nodesRemaining of
                         [] ->
-                            soFarWithElement |> List.reverse
+                            soFarWithElement
 
                         next :: remainingWithoutNext ->
-                            nodeFlattenToList soFarWithElement next remainingWithoutNext
+                            nodeFlattenToReverseList soFarWithElement next remainingWithoutNext
 
                 sub0 :: sub1Up ->
                     let
@@ -5231,7 +5231,7 @@ nodeFlattenToList soFar current nodesRemaining =
                                     )
                                     { index = sub1Up |> List.length, mapped = nodesRemaining }
                     in
-                    nodeFlattenToList
+                    nodeFlattenToReverseList
                         (({ reversePath = current.reversePath, node = DomElementHeader element.header }
                             |> DomNodeRender
                          )
@@ -5246,8 +5246,8 @@ nodeFlattenToList soFar current nodesRemaining =
 ⚠️ DANGER ⚠️ This does _not_ check that the list is sorted.
 
 -}
-internalFastDictFromSortedListBy : (v -> comparable) -> List v -> InternalFastDict comparable v
-internalFastDictFromSortedListBy entryToKeyValue entries =
+internalFastDictFromReverseSortedListBy : (v -> comparable) -> List v -> InternalFastDict comparable v
+internalFastDictFromReverseSortedListBy entryToKeyValue entries =
     let
         elementCount : Int
         elementCount =
@@ -5288,7 +5288,7 @@ internalFastDictFromSortedListBy entryToKeyValue entries =
                                 else
                                     InternalFastDictBlack
                         in
-                        ( InternalFastDictInnerNode color (head |> entryToKeyValue) head lchild rchild
+                        ( InternalFastDictInnerNode color (head |> entryToKeyValue) head rchild lchild
                         , accAfterRight
                         )
     in
