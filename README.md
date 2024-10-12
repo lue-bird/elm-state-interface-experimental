@@ -480,7 +480,7 @@ npm install @lue-bird/elm-state-interface-experimental
 ```
 in js
 ```javascript
-import * as Web from "@lue-bird/elm-state-interface-experimental";
+import * as Web from "@lue-bird/elm-state-interface-experimental/web";
 // import your Main.elm. Name and path depend on bundler+plugin
 
 const elmApp = Main.init()
