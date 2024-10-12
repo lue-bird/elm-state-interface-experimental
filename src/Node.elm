@@ -3,6 +3,7 @@ module Node exposing
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
+    , workingDirectoryPathRequest
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
     , httpRequest
     , httpGet, httpPost, httpAddHeaders
@@ -33,6 +34,11 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 @docs timePosixRequest, timeZoneRequest, timeZoneNameRequest
 @docs timePeriodicallyListen, timeOnceAt
+
+
+## process
+
+@docs workingDirectoryPathRequest
 
 
 ## HTTP
@@ -271,6 +277,7 @@ type InterfaceSingle future
     | FileDirectoryMake String
     | FileUtf8Write { content : String, path : String }
     | FileUtf8Request { path : String, on : String -> future }
+    | WorkingDirectoryPathRequest (String -> future)
 
 
 {-| An HTTP request for use in an [`Interface`](#Interface).
@@ -476,6 +483,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
                 , on = \content -> request.on content |> futureChange
                 }
 
+        WorkingDirectoryPathRequest on ->
+            WorkingDirectoryPathRequest (\path -> on path |> futureChange)
+
 
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
 httpRequestFutureMap futureChange request =
@@ -569,6 +579,9 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
                     []
 
         FileUtf8Request _ ->
+            []
+
+        WorkingDirectoryPathRequest _ ->
             []
 
 
@@ -694,6 +707,9 @@ interfaceSingleToJson interfaceSingle =
                         [ ( "path", request.path |> Json.Encode.string )
                         ]
                 }
+
+            WorkingDirectoryPathRequest _ ->
+                { tag = "WorkingDirectoryPathRequest", value = Json.Encode.null }
         )
 
 
@@ -829,6 +845,9 @@ interfaceSingleToStructuredId interfaceSingle =
                 { tag = "FileUtf8Request"
                 , value = request.path |> StructuredId.ofString
                 }
+
+            WorkingDirectoryPathRequest _ ->
+                { tag = "WorkingDirectoryPathRequest", value = StructuredId.ofUnit }
         )
 
 
@@ -961,6 +980,11 @@ interfaceSingleFutureJsonDecoder interface =
         FileUtf8Request request ->
             Json.Decode.string
                 |> Json.Decode.map request.on
+                |> Just
+
+        WorkingDirectoryPathRequest on ->
+            Json.Decode.string
+                |> Json.Decode.map on
                 |> Just
 
 
@@ -1347,6 +1371,17 @@ timePeriodicallyListen intervalDuration =
         { intervalDurationMilliSeconds = intervalDuration |> Duration.inMilliseconds |> Basics.round
         , on = identity
         }
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Web#Interface) for getting the current working directory.
+
+Note: Uses [`process.cwd`](https://nodejs.org/api/process.html#processcwd)
+
+-}
+workingDirectoryPathRequest : Interface String
+workingDirectoryPathRequest =
+    WorkingDirectoryPathRequest identity
         |> interfaceFromSingle
 
 

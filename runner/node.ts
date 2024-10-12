@@ -112,6 +112,9 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                     .then((content) => { sendToElm(content) })
                     .catch((err) => warn("failed to read file " + err))
             }
+            case "WorkingDirectoryPathRequest": return (_config: null) => {
+                sendToElm(process.cwd())
+            }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Add." + tag)
             }
