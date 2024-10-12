@@ -130,7 +130,7 @@ narrativeUiFrame modifiers subs =
 uiFrame : List (Web.DomModifier state) -> List (Web.DomNode state) -> Web.DomNode state
 uiFrame modifiers subs =
     Web.domElement "div"
-        ([ Web.domStyle "font-size" "2em"
+        ([ Web.domStyle "font-size" "1.7rem"
          , Web.domStyle "padding-left" "80px"
          , Web.domStyle "padding-right" "80px"
          , Web.domStyle "position" "fixed"
@@ -152,14 +152,17 @@ buttonUi modifiers subs =
         ([ Web.domListenTo "click"
             |> Web.domModifierFutureMap (\_ -> ())
          , Web.domStyle "background-color" "#000000"
-         , Web.domStyle "border" "3px solid"
-         , Web.domStyle "border-radius" "50px"
+         , Web.domStyle "border-top" "none"
+         , Web.domStyle "border-left" "none"
+         , Web.domStyle "border-right" "none"
+         , Web.domStyle "border-bottom" "2px solid"
+         , Web.domStyle "border-radius" "10px"
          , Web.domStyle "color" "#FFFFFF"
-         , Web.domStyle "padding" "5px 15px"
+         , Web.domStyle "padding" "2px 12px"
          , Web.domStyle "margin" "7px 0px"
          , Web.domStyle "text-align" "center"
          , Web.domStyle "display" "inline-block"
-         , Web.domStyle "font-size" "1em"
+         , Web.domStyle "font-size" "1.8rem"
          , Web.domStyle "font-family" "inherit"
          ]
             ++ modifiers
@@ -275,10 +278,11 @@ startingRoomInterface state =
                 , Web.domStyle "width" "60px"
                 , Web.domStyle "text-align" "center"
                 ]
-                [ "+" |> Web.domText ]
+                [ Web.domElement "b" [] [ "+" |> Web.domText ] ]
                 |> Web.domFutureMap (\() -> GemCountIncreaseClicked)
             , Web.domElement "b"
                 [ Web.domStyle "padding" "15px 15px"
+                , Web.domStyle "font-size" "2rem"
                 ]
                 [ "💎" ++ (state.gemCount |> String.fromInt) |> Web.domText ]
             , buttonUi
@@ -286,7 +290,7 @@ startingRoomInterface state =
                 , Web.domStyle "width" "60px"
                 , Web.domStyle "text-align" "center"
                 ]
-                [ "-" |> Web.domText ]
+                [ Web.domElement "b" [] [ "-" |> Web.domText ] ]
                 |> Web.domFutureMap (\() -> GemCountDecreaseClicked)
             ]
         , buttonUi []
@@ -378,7 +382,7 @@ textInputUi currentInputValue =
                 )
         , Web.domStyle "font-size" "1em"
         , Web.domStyle "background-color" "transparent"
-        , Web.domStyle "border-bottom" "3px solid white"
+        , Web.domStyle "border-bottom" "2px solid white"
         , Web.domStyle "border-top" "none"
         , Web.domStyle "border-left" "none"
         , Web.domStyle "border-right" "none"
@@ -559,6 +563,8 @@ atSignInterface state =
                             ]
                             [ "letter" |> Web.domText ]
                         ]
+                    , Web.domElement "br" [] []
+                    , Web.domElement "br" [] []
                     , buttonUi []
                         [ "Buy map with the exit" |> Web.domText
                         ]
@@ -587,6 +593,8 @@ atSignInterface state =
                     [ Web.domElement "q"
                         []
                         [ "Nah, I'm hungry, I will need more of these fresh 🍎s" |> Web.domText ]
+                    , Web.domElement "br" [] []
+                    , Web.domElement "br" [] []
                     , buttonUi []
                         [ "pick 🍎s" |> Web.domText
                         ]
