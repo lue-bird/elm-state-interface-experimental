@@ -19,7 +19,8 @@ module Node exposing
     , interfaceSingleEdits, InterfaceSingleEdit(..)
     )
 
-{-| A state-interface program that can run in the browser
+{-| A state-interface program that can run in [node.js](https://nodejs.org/en)
+which is commonly used to create command line tools, scripts and servers.
 
 @docs program, Program
 
