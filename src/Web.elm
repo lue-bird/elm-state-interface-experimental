@@ -1850,8 +1850,8 @@ audioDiffMap fromAudioEdit audios =
 
 
 namespacedKeyToComparable : { namespace : String, key : String } -> String
-namespacedKeyToComparable =
-    \namespacedKey -> namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
+namespacedKeyToComparable namespacedKey =
+    namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
 
 
 {-| Alternative to `Dict` optimized for fast merge and fast creation.
@@ -1951,372 +1951,369 @@ interfaceSingleEditToJson edit =
 
 
 editDomDiffToJson : DomEdit -> Json.Encode.Value
-editDomDiffToJson =
-    \replacementInEditDomDiff ->
-        Json.Encode.LocalExtra.variant
-            (case replacementInEditDomDiff of
-                ReplacementDomNode node ->
-                    { tag = "Node", value = node |> domTextOrElementHeaderInfoToJson }
+editDomDiffToJson replacementInEditDomDiff =
+    Json.Encode.LocalExtra.variant
+        (case replacementInEditDomDiff of
+            ReplacementDomNode node ->
+                { tag = "Node", value = node |> domTextOrElementHeaderInfoToJson }
 
-                ReplacementDomElementStyles styles ->
-                    { tag = "Styles"
-                    , value =
-                        Json.Encode.object
-                            [ ( "remove", styles.remove |> Json.Encode.list Json.Encode.string )
-                            , ( "edit"
-                              , styles.edit
-                                    |> Json.Encode.list
-                                        (\editSingle ->
-                                            Json.Encode.object
-                                                [ ( "key", editSingle.key |> Json.Encode.string )
-                                                , ( "value", editSingle.value |> Json.Encode.string )
-                                                ]
-                                        )
-                              )
-                            ]
-                    }
+            ReplacementDomElementStyles styles ->
+                { tag = "Styles"
+                , value =
+                    Json.Encode.object
+                        [ ( "remove", styles.remove |> Json.Encode.list Json.Encode.string )
+                        , ( "edit"
+                          , styles.edit
+                                |> Json.Encode.list
+                                    (\editSingle ->
+                                        Json.Encode.object
+                                            [ ( "key", editSingle.key |> Json.Encode.string )
+                                            , ( "value", editSingle.value |> Json.Encode.string )
+                                            ]
+                                    )
+                          )
+                        ]
+                }
 
-                ReplacementDomElementAttributes attributes ->
-                    { tag = "Attributes"
-                    , value =
-                        Json.Encode.object
-                            [ ( "remove", attributes.remove |> Json.Encode.list Json.Encode.string )
-                            , ( "edit"
-                              , attributes.edit
-                                    |> Json.Encode.list
-                                        (\editSingle ->
-                                            Json.Encode.object
-                                                [ ( "key", editSingle.key |> Json.Encode.string )
-                                                , ( "value", editSingle.value |> Json.Encode.string )
-                                                ]
-                                        )
-                              )
-                            ]
-                    }
+            ReplacementDomElementAttributes attributes ->
+                { tag = "Attributes"
+                , value =
+                    Json.Encode.object
+                        [ ( "remove", attributes.remove |> Json.Encode.list Json.Encode.string )
+                        , ( "edit"
+                          , attributes.edit
+                                |> Json.Encode.list
+                                    (\editSingle ->
+                                        Json.Encode.object
+                                            [ ( "key", editSingle.key |> Json.Encode.string )
+                                            , ( "value", editSingle.value |> Json.Encode.string )
+                                            ]
+                                    )
+                          )
+                        ]
+                }
 
-                ReplacementDomElementAttributesNamespaced attributesNamespaced ->
-                    { tag = "AttributesNamespaced"
-                    , value =
-                        Json.Encode.object
-                            [ ( "remove"
-                              , attributesNamespaced.remove
-                                    |> Json.Encode.list
-                                        (\removeSingle ->
-                                            Json.Encode.object
-                                                [ ( "namespace", removeSingle.namespace |> Json.Encode.string )
-                                                , ( "key", removeSingle.key |> Json.Encode.string )
-                                                ]
-                                        )
-                              )
-                            , ( "edit"
-                              , attributesNamespaced.edit
-                                    |> Json.Encode.list
-                                        (\editSingle ->
-                                            Json.Encode.object
-                                                [ ( "namespace", editSingle.namespace |> Json.Encode.string )
-                                                , ( "key", editSingle.key |> Json.Encode.string )
-                                                , ( "value", editSingle.value |> Json.Encode.string )
-                                                ]
-                                        )
-                              )
-                            ]
-                    }
+            ReplacementDomElementAttributesNamespaced attributesNamespaced ->
+                { tag = "AttributesNamespaced"
+                , value =
+                    Json.Encode.object
+                        [ ( "remove"
+                          , attributesNamespaced.remove
+                                |> Json.Encode.list
+                                    (\removeSingle ->
+                                        Json.Encode.object
+                                            [ ( "namespace", removeSingle.namespace |> Json.Encode.string )
+                                            , ( "key", removeSingle.key |> Json.Encode.string )
+                                            ]
+                                    )
+                          )
+                        , ( "edit"
+                          , attributesNamespaced.edit
+                                |> Json.Encode.list
+                                    (\editSingle ->
+                                        Json.Encode.object
+                                            [ ( "namespace", editSingle.namespace |> Json.Encode.string )
+                                            , ( "key", editSingle.key |> Json.Encode.string )
+                                            , ( "value", editSingle.value |> Json.Encode.string )
+                                            ]
+                                    )
+                          )
+                        ]
+                }
 
-                ReplacementDomElementStringProperties stringProperties ->
-                    { tag = "StringProperties"
-                    , value =
-                        Json.Encode.object
-                            [ ( "remove", stringProperties.remove |> Json.Encode.list Json.Encode.string )
-                            , ( "edit"
-                              , stringProperties.edit
-                                    |> Json.Encode.list
-                                        (\editSingle ->
-                                            Json.Encode.object
-                                                [ ( "key", editSingle.key |> Json.Encode.string )
-                                                , ( "value", editSingle.value |> Json.Encode.string )
-                                                ]
-                                        )
-                              )
-                            ]
-                    }
+            ReplacementDomElementStringProperties stringProperties ->
+                { tag = "StringProperties"
+                , value =
+                    Json.Encode.object
+                        [ ( "remove", stringProperties.remove |> Json.Encode.list Json.Encode.string )
+                        , ( "edit"
+                          , stringProperties.edit
+                                |> Json.Encode.list
+                                    (\editSingle ->
+                                        Json.Encode.object
+                                            [ ( "key", editSingle.key |> Json.Encode.string )
+                                            , ( "value", editSingle.value |> Json.Encode.string )
+                                            ]
+                                    )
+                          )
+                        ]
+                }
 
-                ReplacementDomElementBoolProperties boolProperties ->
-                    { tag = "StringProperties"
-                    , value =
-                        Json.Encode.object
-                            [ ( "remove", boolProperties.remove |> Json.Encode.list Json.Encode.string )
-                            , ( "edit"
-                              , boolProperties.edit
-                                    |> Json.Encode.list
-                                        (\editSingle ->
-                                            Json.Encode.object
-                                                [ ( "key", editSingle.key |> Json.Encode.string )
-                                                , ( "value", editSingle.value |> Json.Encode.bool )
-                                                ]
-                                        )
-                              )
-                            ]
-                    }
+            ReplacementDomElementBoolProperties boolProperties ->
+                { tag = "StringProperties"
+                , value =
+                    Json.Encode.object
+                        [ ( "remove", boolProperties.remove |> Json.Encode.list Json.Encode.string )
+                        , ( "edit"
+                          , boolProperties.edit
+                                |> Json.Encode.list
+                                    (\editSingle ->
+                                        Json.Encode.object
+                                            [ ( "key", editSingle.key |> Json.Encode.string )
+                                            , ( "value", editSingle.value |> Json.Encode.bool )
+                                            ]
+                                    )
+                          )
+                        ]
+                }
 
-                ReplacementDomElementScrollToPosition maybePosition ->
-                    { tag = "ScrollToPosition"
-                    , value = maybePosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
-                    }
+            ReplacementDomElementScrollToPosition maybePosition ->
+                { tag = "ScrollToPosition"
+                , value = maybePosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
+                }
 
-                ReplacementDomElementScrollToShow alignment ->
-                    { tag = "ScrollToShow"
-                    , value = alignment |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
-                    }
+            ReplacementDomElementScrollToShow alignment ->
+                { tag = "ScrollToShow"
+                , value = alignment |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
+                }
 
-                ReplacementDomElementScrollPositionRequest () ->
-                    { tag = "ScrollPositionRequest", value = Json.Encode.null }
+            ReplacementDomElementScrollPositionRequest () ->
+                { tag = "ScrollPositionRequest", value = Json.Encode.null }
 
-                ReplacementDomElementEventListens listens ->
-                    { tag = "EventListens"
-                    , value =
-                        listens
-                            |> Json.Encode.list
-                                (\entry ->
-                                    Json.Encode.object
-                                        [ ( "name", entry.key |> Json.Encode.string )
-                                        , ( "defaultActionHandling", entry.value |> defaultActionHandlingToJson )
-                                        ]
-                                )
-                    }
-            )
+            ReplacementDomElementEventListens listens ->
+                { tag = "EventListens"
+                , value =
+                    listens
+                        |> Json.Encode.list
+                            (\entry ->
+                                Json.Encode.object
+                                    [ ( "name", entry.key |> Json.Encode.string )
+                                    , ( "defaultActionHandling", entry.value |> defaultActionHandlingToJson )
+                                    ]
+                            )
+                }
+        )
 
 
 interfaceSingleToJson : InterfaceSingle future_ -> Json.Encode.Value
-interfaceSingleToJson =
-    \interfaceSingle ->
-        Json.Encode.LocalExtra.variant
-            (case interfaceSingle of
-                DocumentTitleReplaceBy replacement ->
-                    { tag = "DocumentTitleReplaceBy", value = replacement |> Json.Encode.string }
+interfaceSingleToJson interfaceSingle =
+    Json.Encode.LocalExtra.variant
+        (case interfaceSingle of
+            DocumentTitleReplaceBy replacement ->
+                { tag = "DocumentTitleReplaceBy", value = replacement |> Json.Encode.string }
 
-                DocumentAuthorSet new ->
-                    { tag = "DocumentAuthorSet", value = new |> Json.Encode.string }
+            DocumentAuthorSet new ->
+                { tag = "DocumentAuthorSet", value = new |> Json.Encode.string }
 
-                DocumentKeywordsSet new ->
-                    { tag = "DocumentKeywordsSet", value = new |> String.join "," |> Json.Encode.string }
+            DocumentKeywordsSet new ->
+                { tag = "DocumentKeywordsSet", value = new |> String.join "," |> Json.Encode.string }
 
-                DocumentDescriptionSet new ->
-                    { tag = "DocumentDescriptionSet", value = new |> Json.Encode.string }
+            DocumentDescriptionSet new ->
+                { tag = "DocumentDescriptionSet", value = new |> Json.Encode.string }
 
-                ConsoleLog string ->
-                    { tag = "ConsoleLog", value = string |> Json.Encode.string }
+            ConsoleLog string ->
+                { tag = "ConsoleLog", value = string |> Json.Encode.string }
 
-                ConsoleWarn string ->
-                    { tag = "ConsoleWarn", value = string |> Json.Encode.string }
+            ConsoleWarn string ->
+                { tag = "ConsoleWarn", value = string |> Json.Encode.string }
 
-                ConsoleError string ->
-                    { tag = "ConsoleError", value = string |> Json.Encode.string }
+            ConsoleError string ->
+                { tag = "ConsoleError", value = string |> Json.Encode.string }
 
-                NavigationPushUrl url ->
-                    { tag = "NavigationPushUrl", value = url |> AppUrl.toString |> Json.Encode.string }
+            NavigationPushUrl url ->
+                { tag = "NavigationPushUrl", value = url |> AppUrl.toString |> Json.Encode.string }
 
-                NavigationReplaceUrl url ->
-                    { tag = "NavigationReplaceUrl", value = url |> AppUrl.toString |> Json.Encode.string }
+            NavigationReplaceUrl url ->
+                { tag = "NavigationReplaceUrl", value = url |> AppUrl.toString |> Json.Encode.string }
 
-                NavigationGo urlSteps ->
-                    { tag = "NavigationGo", value = urlSteps |> Json.Encode.int }
+            NavigationGo urlSteps ->
+                { tag = "NavigationGo", value = urlSteps |> Json.Encode.int }
 
-                NavigationLoad url ->
-                    { tag = "NavigationLoad", value = url |> Json.Encode.string }
+            NavigationLoad url ->
+                { tag = "NavigationLoad", value = url |> Json.Encode.string }
 
-                NavigationReload () ->
-                    { tag = "NavigationReload", value = Json.Encode.null }
+            NavigationReload () ->
+                { tag = "NavigationReload", value = Json.Encode.null }
 
-                FileDownloadUnsignedInt8s config ->
-                    { tag = "FileDownloadUnsignedInt8s"
-                    , value =
-                        Json.Encode.object
-                            [ ( "name", config.name |> Json.Encode.string )
-                            , ( "mimeType", config.mimeType |> Json.Encode.string )
-                            , ( "content"
-                              , config.content |> Json.Encode.list Json.Encode.int
-                              )
-                            ]
-                    }
+            FileDownloadUnsignedInt8s config ->
+                { tag = "FileDownloadUnsignedInt8s"
+                , value =
+                    Json.Encode.object
+                        [ ( "name", config.name |> Json.Encode.string )
+                        , ( "mimeType", config.mimeType |> Json.Encode.string )
+                        , ( "content"
+                          , config.content |> Json.Encode.list Json.Encode.int
+                          )
+                        ]
+                }
 
-                ClipboardReplaceBy replacement ->
-                    { tag = "ClipboardReplaceBy"
-                    , value = replacement |> Json.Encode.string
-                    }
+            ClipboardReplaceBy replacement ->
+                { tag = "ClipboardReplaceBy"
+                , value = replacement |> Json.Encode.string
+                }
 
-                AudioPlay audio ->
-                    { tag = "AudioPlay", value = audio |> audioToJson }
+            AudioPlay audio ->
+                { tag = "AudioPlay", value = audio |> audioToJson }
 
-                SocketMessage message ->
-                    { tag = "SocketMessage"
-                    , value =
-                        Json.Encode.object
-                            [ ( "id", message.id |> socketIdToJson )
-                            , ( "data", message.data |> Json.Encode.string )
-                            ]
-                    }
+            SocketMessage message ->
+                { tag = "SocketMessage"
+                , value =
+                    Json.Encode.object
+                        [ ( "id", message.id |> socketIdToJson )
+                        , ( "data", message.data |> Json.Encode.string )
+                        ]
+                }
 
-                SocketDisconnect id ->
-                    { tag = "SocketDisconnect"
-                    , value = id |> socketIdToJson
-                    }
+            SocketDisconnect id ->
+                { tag = "SocketDisconnect"
+                , value = id |> socketIdToJson
+                }
 
-                LocalStorageSet set ->
-                    { tag = "LocalStorageSet"
-                    , value =
-                        Json.Encode.object
-                            [ ( "key", set.key |> Json.Encode.string )
-                            , ( "value", set.value |> Json.Encode.LocalExtra.nullable Json.Encode.string )
-                            ]
-                    }
+            LocalStorageSet set ->
+                { tag = "LocalStorageSet"
+                , value =
+                    Json.Encode.object
+                        [ ( "key", set.key |> Json.Encode.string )
+                        , ( "value", set.value |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        ]
+                }
 
-                NotificationAskForPermission () ->
-                    { tag = "NotificationAskForPermission", value = Json.Encode.null }
+            NotificationAskForPermission () ->
+                { tag = "NotificationAskForPermission", value = Json.Encode.null }
 
-                DomNodeRender render ->
-                    { tag = "DomNodeRender"
-                    , value =
-                        Json.Encode.object
-                            [ ( "reversePath", render.reversePath |> Json.Encode.list Json.Encode.int )
-                            , ( "node", render.node |> domTextOrElementHeaderInfoToJson )
-                            ]
-                    }
+            DomNodeRender render ->
+                { tag = "DomNodeRender"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", render.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "node", render.node |> domTextOrElementHeaderInfoToJson )
+                        ]
+                }
 
-                AudioSourceLoad sourceLoad ->
-                    { tag = "AudioSourceLoad", value = sourceLoad.url |> Json.Encode.string }
+            AudioSourceLoad sourceLoad ->
+                { tag = "AudioSourceLoad", value = sourceLoad.url |> Json.Encode.string }
 
-                SocketConnect connect ->
-                    { tag = "SocketConnect"
-                    , value = Json.Encode.object [ ( "address", connect.address |> Json.Encode.string ) ]
-                    }
+            SocketConnect connect ->
+                { tag = "SocketConnect"
+                , value = Json.Encode.object [ ( "address", connect.address |> Json.Encode.string ) ]
+                }
 
-                NotificationShow show ->
-                    { tag = "NotificationShow"
-                    , value =
-                        Json.Encode.object
-                            [ ( "id", show.id |> Json.Encode.string )
-                            , ( "message", show.message |> Json.Encode.string )
-                            , ( "details", show.details |> Json.Encode.string )
-                            ]
-                    }
+            NotificationShow show ->
+                { tag = "NotificationShow"
+                , value =
+                    Json.Encode.object
+                        [ ( "id", show.id |> Json.Encode.string )
+                        , ( "message", show.message |> Json.Encode.string )
+                        , ( "details", show.details |> Json.Encode.string )
+                        ]
+                }
 
-                HttpRequest httpRequestInfo ->
-                    { tag = "HttpRequest", value = httpRequestInfo |> httpRequestInfoToJson }
+            HttpRequest httpRequestInfo ->
+                { tag = "HttpRequest", value = httpRequestInfo |> httpRequestInfoToJson }
 
-                TimePosixRequest _ ->
-                    { tag = "TimePosixRequest", value = Json.Encode.null }
+            TimePosixRequest _ ->
+                { tag = "TimePosixRequest", value = Json.Encode.null }
 
-                TimezoneOffsetRequest _ ->
-                    { tag = "TimezoneOffsetRequest", value = Json.Encode.null }
+            TimezoneOffsetRequest _ ->
+                { tag = "TimezoneOffsetRequest", value = Json.Encode.null }
 
-                TimezoneNameRequest _ ->
-                    { tag = "TimezoneNameRequest", value = Json.Encode.null }
+            TimezoneNameRequest _ ->
+                { tag = "TimezoneNameRequest", value = Json.Encode.null }
 
-                TimeOnce once ->
-                    { tag = "TimeOnce"
-                    , value =
-                        Json.Encode.object
-                            [ ( "pointInTime", once.pointInTime |> Time.posixToMillis |> Json.Encode.int ) ]
-                    }
+            TimeOnce once ->
+                { tag = "TimeOnce"
+                , value =
+                    Json.Encode.object
+                        [ ( "pointInTime", once.pointInTime |> Time.posixToMillis |> Json.Encode.int ) ]
+                }
 
-                RandomUnsignedInt32sRequest request ->
-                    { tag = "RandomUnsignedInt32sRequest", value = request.count |> Json.Encode.int }
+            RandomUnsignedInt32sRequest request ->
+                { tag = "RandomUnsignedInt32sRequest", value = request.count |> Json.Encode.int }
 
-                WindowSizeRequest _ ->
-                    { tag = "WindowSizeRequest", value = Json.Encode.null }
+            WindowSizeRequest _ ->
+                { tag = "WindowSizeRequest", value = Json.Encode.null }
 
-                WindowPreferredLanguagesRequest _ ->
-                    { tag = "WindowPreferredLanguagesRequest", value = Json.Encode.null }
+            WindowPreferredLanguagesRequest _ ->
+                { tag = "WindowPreferredLanguagesRequest", value = Json.Encode.null }
 
-                NavigationUrlRequest _ ->
-                    { tag = "NavigationUrlRequest", value = Json.Encode.null }
+            NavigationUrlRequest _ ->
+                { tag = "NavigationUrlRequest", value = Json.Encode.null }
 
-                ClipboardRequest _ ->
-                    { tag = "ClipboardRequest", value = Json.Encode.null }
+            ClipboardRequest _ ->
+                { tag = "ClipboardRequest", value = Json.Encode.null }
 
-                LocalStorageRequest request ->
-                    { tag = "LocalStorageRequest"
-                    , value = Json.Encode.object [ ( "key", request.key |> Json.Encode.string ) ]
-                    }
+            LocalStorageRequest request ->
+                { tag = "LocalStorageRequest"
+                , value = Json.Encode.object [ ( "key", request.key |> Json.Encode.string ) ]
+                }
 
-                GeoLocationRequest _ ->
-                    { tag = "GeoLocationRequest", value = Json.Encode.null }
+            GeoLocationRequest _ ->
+                { tag = "GeoLocationRequest", value = Json.Encode.null }
 
-                GamepadsRequest _ ->
-                    { tag = "GamepadsRequest", value = Json.Encode.null }
+            GamepadsRequest _ ->
+                { tag = "GamepadsRequest", value = Json.Encode.null }
 
-                TimePeriodicallyListen intervalDuration ->
-                    { tag = "TimePeriodicallyListen"
-                    , value =
-                        Json.Encode.object
-                            [ ( "milliSeconds", intervalDuration.intervalDurationMilliSeconds |> Json.Encode.int ) ]
-                    }
+            TimePeriodicallyListen intervalDuration ->
+                { tag = "TimePeriodicallyListen"
+                , value =
+                    Json.Encode.object
+                        [ ( "milliSeconds", intervalDuration.intervalDurationMilliSeconds |> Json.Encode.int ) ]
+                }
 
-                WindowEventListen listen ->
-                    { tag = "WindowEventListen", value = listen.eventName |> Json.Encode.string }
+            WindowEventListen listen ->
+                { tag = "WindowEventListen", value = listen.eventName |> Json.Encode.string }
 
-                WindowVisibilityChangeListen _ ->
-                    { tag = "WindowVisibilityChangeListen", value = Json.Encode.null }
+            WindowVisibilityChangeListen _ ->
+                { tag = "WindowVisibilityChangeListen", value = Json.Encode.null }
 
-                WindowAnimationFrameListen _ ->
-                    { tag = "WindowAnimationFrameListen", value = Json.Encode.null }
+            WindowAnimationFrameListen _ ->
+                { tag = "WindowAnimationFrameListen", value = Json.Encode.null }
 
-                WindowPreferredLanguagesChangeListen _ ->
-                    { tag = "WindowPreferredLanguagesChangeListen", value = Json.Encode.null }
+            WindowPreferredLanguagesChangeListen _ ->
+                { tag = "WindowPreferredLanguagesChangeListen", value = Json.Encode.null }
 
-                DocumentEventListen listen ->
-                    { tag = "DocumentEventListen", value = listen.eventName |> Json.Encode.string }
+            DocumentEventListen listen ->
+                { tag = "DocumentEventListen", value = listen.eventName |> Json.Encode.string }
 
-                SocketMessageListen listen ->
-                    { tag = "SocketMessageListen", value = listen.id |> socketIdToJson }
+            SocketMessageListen listen ->
+                { tag = "SocketMessageListen", value = listen.id |> socketIdToJson }
 
-                LocalStorageRemoveOnADifferentTabListen listen ->
-                    { tag = "LocalStorageRemoveOnADifferentTabListen"
-                    , value =
-                        Json.Encode.object
-                            [ ( "key", listen.key |> Json.Encode.string ) ]
-                    }
+            LocalStorageRemoveOnADifferentTabListen listen ->
+                { tag = "LocalStorageRemoveOnADifferentTabListen"
+                , value =
+                    Json.Encode.object
+                        [ ( "key", listen.key |> Json.Encode.string ) ]
+                }
 
-                LocalStorageSetOnADifferentTabListen listen ->
-                    { tag = "LocalStorageSetOnADifferentTabListen"
-                    , value =
-                        Json.Encode.object
-                            [ ( "key", listen.key |> Json.Encode.string ) ]
-                    }
+            LocalStorageSetOnADifferentTabListen listen ->
+                { tag = "LocalStorageSetOnADifferentTabListen"
+                , value =
+                    Json.Encode.object
+                        [ ( "key", listen.key |> Json.Encode.string ) ]
+                }
 
-                GeoLocationChangeListen _ ->
-                    { tag = "GeoLocationChangeListen", value = Json.Encode.null }
+            GeoLocationChangeListen _ ->
+                { tag = "GeoLocationChangeListen", value = Json.Encode.null }
 
-                GamepadsChangeListen _ ->
-                    { tag = "GamepadsChangeListen", value = Json.Encode.null }
-            )
+            GamepadsChangeListen _ ->
+                { tag = "GamepadsChangeListen", value = Json.Encode.null }
+        )
 
 
 socketIdToJson : SocketId -> Json.Encode.Value
-socketIdToJson =
-    \(SocketId index) -> index |> Json.Encode.int
+socketIdToJson (SocketId index) =
+    index |> Json.Encode.int
 
 
 httpRequestInfoToJson : HttpRequest future_ -> Json.Encode.Value
-httpRequestInfoToJson =
-    \httpRequestId ->
-        Json.Encode.object
-            [ ( "url", httpRequestId.url |> Json.Encode.string )
-            , ( "method", httpRequestId.method |> Json.Encode.string )
-            , ( "headers"
-              , httpRequestId.headers
-                    |> addContentTypeForBody httpRequestId.body
-                    |> Json.Encode.list
-                        (\header ->
-                            Json.Encode.object
-                                [ ( "name", header.name |> Json.Encode.string )
-                                , ( "value", header.value |> Json.Encode.string )
-                                ]
-                        )
-              )
-            , ( "expect", httpRequestId.expect |> httpExpectInfoToJson )
-            , ( "body", httpRequestId.body |> httpBodyToJson )
-            ]
+httpRequestInfoToJson httpRequestId =
+    Json.Encode.object
+        [ ( "url", httpRequestId.url |> Json.Encode.string )
+        , ( "method", httpRequestId.method |> Json.Encode.string )
+        , ( "headers"
+          , httpRequestId.headers
+                |> addContentTypeForBody httpRequestId.body
+                |> Json.Encode.list
+                    (\header ->
+                        Json.Encode.object
+                            [ ( "name", header.name |> Json.Encode.string )
+                            , ( "value", header.value |> Json.Encode.string )
+                            ]
+                    )
+          )
+        , ( "expect", httpRequestId.expect |> httpExpectInfoToJson )
+        , ( "body", httpRequestId.body |> httpBodyToJson )
+        ]
 
 
 addContentTypeForBody : HttpBody -> (List { name : String, value : String } -> List { name : String, value : String })
@@ -2352,19 +2349,18 @@ httpBodyToJson body =
 
 
 httpExpectInfoToJson : HttpExpect future_ -> Json.Encode.Value
-httpExpectInfoToJson =
-    \httpExpectId ->
-        Json.Encode.string
-            (case httpExpectId of
-                HttpExpectString _ ->
-                    "String"
+httpExpectInfoToJson httpExpectId =
+    Json.Encode.string
+        (case httpExpectId of
+            HttpExpectString _ ->
+                "String"
 
-                HttpExpectBytes _ ->
-                    "Bytes"
+            HttpExpectBytes _ ->
+                "Bytes"
 
-                HttpExpectWhatever _ ->
-                    "Whatever"
-            )
+            HttpExpectWhatever _ ->
+                "Whatever"
+        )
 
 
 audioToJson : Audio -> Json.Encode.Value
@@ -2519,44 +2515,41 @@ domElementStylesToJson styles =
 
 
 domElementBoolPropertiesToJson : SortedKeyValueList String Bool -> Json.Encode.Value
-domElementBoolPropertiesToJson =
-    \boolProperties ->
-        boolProperties
-            |> sortedKeyValueListToList
-            |> Json.Encode.list
-                (\entry ->
-                    Json.Encode.object
-                        [ ( "key", entry.key |> Json.Encode.string )
-                        , ( "value", entry.value |> Json.Encode.bool )
-                        ]
-                )
+domElementBoolPropertiesToJson boolProperties =
+    boolProperties
+        |> sortedKeyValueListToList
+        |> Json.Encode.list
+            (\entry ->
+                Json.Encode.object
+                    [ ( "key", entry.key |> Json.Encode.string )
+                    , ( "value", entry.value |> Json.Encode.bool )
+                    ]
+            )
 
 
 domElementStringPropertiesToJson : SortedKeyValueList String String -> Json.Encode.Value
-domElementStringPropertiesToJson =
-    \stringProperties ->
-        stringProperties
-            |> sortedKeyValueListToList
-            |> Json.Encode.list
-                (\entry ->
-                    Json.Encode.object
-                        [ ( "key", entry.key |> Json.Encode.string )
-                        , ( "value", entry.value |> Json.Encode.string )
-                        ]
-                )
+domElementStringPropertiesToJson stringProperties =
+    stringProperties
+        |> sortedKeyValueListToList
+        |> Json.Encode.list
+            (\entry ->
+                Json.Encode.object
+                    [ ( "key", entry.key |> Json.Encode.string )
+                    , ( "value", entry.value |> Json.Encode.string )
+                    ]
+            )
 
 
 defaultActionHandlingToJson : DefaultActionHandling -> Json.Encode.Value
-defaultActionHandlingToJson =
-    \defaultActionHandling ->
-        Json.Encode.string
-            (case defaultActionHandling of
-                DefaultActionPrevent ->
-                    "DefaultActionPrevent"
+defaultActionHandlingToJson defaultActionHandling =
+    Json.Encode.string
+        (case defaultActionHandling of
+            DefaultActionPrevent ->
+                "DefaultActionPrevent"
 
-                DefaultActionExecute ->
-                    "DefaultActionExecute"
-            )
+            DefaultActionExecute ->
+                "DefaultActionExecute"
+        )
 
 
 domElementVisibilityAlignmentsToJson : { y : DomElementVisibilityAlignment, x : DomElementVisibilityAlignment } -> Json.Encode.Value
@@ -2591,204 +2584,203 @@ domElementScrollPositionToJson position =
 
 
 interfaceSingleToStructuredId : InterfaceSingle future_ -> StructuredId
-interfaceSingleToStructuredId =
-    \interfaceSingle ->
-        StructuredId.ofVariant
-            (case interfaceSingle of
-                DocumentTitleReplaceBy _ ->
-                    { tag = "DocumentTitleReplaceBy", value = StructuredId.ofUnit }
+interfaceSingleToStructuredId interfaceSingle =
+    StructuredId.ofVariant
+        (case interfaceSingle of
+            DocumentTitleReplaceBy _ ->
+                { tag = "DocumentTitleReplaceBy", value = StructuredId.ofUnit }
 
-                DocumentAuthorSet _ ->
-                    { tag = "DocumentAuthorSet", value = StructuredId.ofUnit }
+            DocumentAuthorSet _ ->
+                { tag = "DocumentAuthorSet", value = StructuredId.ofUnit }
 
-                DocumentKeywordsSet _ ->
-                    { tag = "DocumentKeywordsSet"
-                    , value = StructuredId.ofUnit
-                    }
+            DocumentKeywordsSet _ ->
+                { tag = "DocumentKeywordsSet"
+                , value = StructuredId.ofUnit
+                }
 
-                DocumentDescriptionSet _ ->
-                    { tag = "DocumentDescriptionSet", value = StructuredId.ofUnit }
+            DocumentDescriptionSet _ ->
+                { tag = "DocumentDescriptionSet", value = StructuredId.ofUnit }
 
-                ConsoleLog message ->
-                    { tag = "ConsoleLog", value = message |> StructuredId.ofString }
+            ConsoleLog message ->
+                { tag = "ConsoleLog", value = message |> StructuredId.ofString }
 
-                ConsoleWarn message ->
-                    { tag = "ConsoleWarn", value = message |> StructuredId.ofString }
+            ConsoleWarn message ->
+                { tag = "ConsoleWarn", value = message |> StructuredId.ofString }
 
-                ConsoleError message ->
-                    { tag = "ConsoleError", value = message |> StructuredId.ofString }
+            ConsoleError message ->
+                { tag = "ConsoleError", value = message |> StructuredId.ofString }
 
-                NavigationReplaceUrl _ ->
-                    { tag = "NavigationReplaceUrl", value = StructuredId.ofUnit }
+            NavigationReplaceUrl _ ->
+                { tag = "NavigationReplaceUrl", value = StructuredId.ofUnit }
 
-                NavigationPushUrl _ ->
-                    { tag = "NavigationPushUrl", value = StructuredId.ofUnit }
+            NavigationPushUrl _ ->
+                { tag = "NavigationPushUrl", value = StructuredId.ofUnit }
 
-                NavigationGo urlSteps ->
-                    { tag = "NavigationGo", value = urlSteps |> StructuredId.ofInt }
+            NavigationGo urlSteps ->
+                { tag = "NavigationGo", value = urlSteps |> StructuredId.ofInt }
 
-                NavigationLoad _ ->
-                    { tag = "NavigationLoad", value = StructuredId.ofUnit }
+            NavigationLoad _ ->
+                { tag = "NavigationLoad", value = StructuredId.ofUnit }
 
-                NavigationReload () ->
-                    { tag = "NavigationReload", value = StructuredId.ofUnit }
+            NavigationReload () ->
+                { tag = "NavigationReload", value = StructuredId.ofUnit }
 
-                FileDownloadUnsignedInt8s config ->
-                    { tag = "FileDownloadUnsignedInt8s"
-                    , value =
-                        StructuredId.ofParts
-                            [ config.name |> StructuredId.ofString
-                            , config.mimeType |> StructuredId.ofString
-                            ]
-                    }
+            FileDownloadUnsignedInt8s config ->
+                { tag = "FileDownloadUnsignedInt8s"
+                , value =
+                    StructuredId.ofParts
+                        [ config.name |> StructuredId.ofString
+                        , config.mimeType |> StructuredId.ofString
+                        ]
+                }
 
-                ClipboardReplaceBy _ ->
-                    { tag = "ClipboardReplaceBy", value = StructuredId.ofUnit }
+            ClipboardReplaceBy _ ->
+                { tag = "ClipboardReplaceBy", value = StructuredId.ofUnit }
 
-                AudioPlay audio ->
-                    { tag = "AudioPlay"
-                    , value =
-                        StructuredId.ofParts
-                            [ audio.url |> StructuredId.ofString
-                            , audio.startTime |> Time.LocalExtra.posixToStructureId
-                            ]
-                    }
+            AudioPlay audio ->
+                { tag = "AudioPlay"
+                , value =
+                    StructuredId.ofParts
+                        [ audio.url |> StructuredId.ofString
+                        , audio.startTime |> Time.LocalExtra.posixToStructureId
+                        ]
+                }
 
-                SocketMessage message ->
-                    { tag = "SocketMessage"
-                    , value =
-                        StructuredId.ofParts
-                            [ message.id |> socketIdToStructuredId
-                            , message.data |> StructuredId.ofString
-                            ]
-                    }
+            SocketMessage message ->
+                { tag = "SocketMessage"
+                , value =
+                    StructuredId.ofParts
+                        [ message.id |> socketIdToStructuredId
+                        , message.data |> StructuredId.ofString
+                        ]
+                }
 
-                SocketDisconnect id ->
-                    { tag = "SocketDisconnect", value = id |> socketIdToStructuredId }
+            SocketDisconnect id ->
+                { tag = "SocketDisconnect", value = id |> socketIdToStructuredId }
 
-                LocalStorageSet set ->
-                    { tag = "LocalStorageSet"
-                    , value =
-                        StructuredId.ofParts
-                            [ set.key |> StructuredId.ofString
-                            , set.value |> StructuredId.ofMaybe StructuredId.ofString
-                            ]
-                    }
+            LocalStorageSet set ->
+                { tag = "LocalStorageSet"
+                , value =
+                    StructuredId.ofParts
+                        [ set.key |> StructuredId.ofString
+                        , set.value |> StructuredId.ofMaybe StructuredId.ofString
+                        ]
+                }
 
-                NotificationAskForPermission () ->
-                    { tag = "NotificationAskForPermission", value = StructuredId.ofUnit }
+            NotificationAskForPermission () ->
+                { tag = "NotificationAskForPermission", value = StructuredId.ofUnit }
 
-                DomNodeRender render ->
-                    { tag = "DomNodeRender"
-                    , value =
-                        render.reversePath |> reverseIndexListToDigitCountPrefixedStructureId
-                    }
+            DomNodeRender render ->
+                { tag = "DomNodeRender"
+                , value =
+                    render.reversePath |> reverseIndexListToDigitCountPrefixedStructureId
+                }
 
-                AudioSourceLoad sourceLoad ->
-                    { tag = "AudioSourceLoad"
-                    , value = sourceLoad.url |> StructuredId.ofString
-                    }
+            AudioSourceLoad sourceLoad ->
+                { tag = "AudioSourceLoad"
+                , value = sourceLoad.url |> StructuredId.ofString
+                }
 
-                SocketConnect connect ->
-                    { tag = "SocketConnect"
-                    , value = StructuredId.ofString connect.address
-                    }
+            SocketConnect connect ->
+                { tag = "SocketConnect"
+                , value = StructuredId.ofString connect.address
+                }
 
-                NotificationShow show ->
-                    { tag = "NotificationShow"
-                    , value = show.id |> StructuredId.ofString
-                    }
+            NotificationShow show ->
+                { tag = "NotificationShow"
+                , value = show.id |> StructuredId.ofString
+                }
 
-                HttpRequest request ->
-                    { tag = "HttpRequest"
-                    , value = request.url |> StructuredId.ofString
-                    }
+            HttpRequest request ->
+                { tag = "HttpRequest"
+                , value = request.url |> StructuredId.ofString
+                }
 
-                TimePosixRequest _ ->
-                    { tag = "TimePosixRequest", value = StructuredId.ofUnit }
+            TimePosixRequest _ ->
+                { tag = "TimePosixRequest", value = StructuredId.ofUnit }
 
-                TimezoneOffsetRequest _ ->
-                    { tag = "TimezoneOffsetRequest", value = StructuredId.ofUnit }
+            TimezoneOffsetRequest _ ->
+                { tag = "TimezoneOffsetRequest", value = StructuredId.ofUnit }
 
-                TimezoneNameRequest _ ->
-                    { tag = "TimezoneNameRequest", value = StructuredId.ofUnit }
+            TimezoneNameRequest _ ->
+                { tag = "TimezoneNameRequest", value = StructuredId.ofUnit }
 
-                TimeOnce once ->
-                    { tag = "TimeOnce", value = once.pointInTime |> Time.LocalExtra.posixToStructureId }
+            TimeOnce once ->
+                { tag = "TimeOnce", value = once.pointInTime |> Time.LocalExtra.posixToStructureId }
 
-                RandomUnsignedInt32sRequest request ->
-                    { tag = "RandomUnsignedInt32sRequest"
-                    , value = request.count |> StructuredId.ofInt
-                    }
+            RandomUnsignedInt32sRequest request ->
+                { tag = "RandomUnsignedInt32sRequest"
+                , value = request.count |> StructuredId.ofInt
+                }
 
-                LocalStorageRequest request ->
-                    { tag = "LocalStorageRequest"
-                    , value = request.key |> StructuredId.ofString
-                    }
+            LocalStorageRequest request ->
+                { tag = "LocalStorageRequest"
+                , value = request.key |> StructuredId.ofString
+                }
 
-                WindowSizeRequest _ ->
-                    { tag = "WindowSizeRequest", value = StructuredId.ofUnit }
+            WindowSizeRequest _ ->
+                { tag = "WindowSizeRequest", value = StructuredId.ofUnit }
 
-                WindowPreferredLanguagesRequest _ ->
-                    { tag = "WindowPreferredLanguagesRequest", value = StructuredId.ofUnit }
+            WindowPreferredLanguagesRequest _ ->
+                { tag = "WindowPreferredLanguagesRequest", value = StructuredId.ofUnit }
 
-                NavigationUrlRequest _ ->
-                    { tag = "NavigationUrlRequest", value = StructuredId.ofUnit }
+            NavigationUrlRequest _ ->
+                { tag = "NavigationUrlRequest", value = StructuredId.ofUnit }
 
-                ClipboardRequest _ ->
-                    { tag = "ClipboardRequest", value = StructuredId.ofUnit }
+            ClipboardRequest _ ->
+                { tag = "ClipboardRequest", value = StructuredId.ofUnit }
 
-                GeoLocationRequest _ ->
-                    { tag = "GeoLocationRequest", value = StructuredId.ofUnit }
+            GeoLocationRequest _ ->
+                { tag = "GeoLocationRequest", value = StructuredId.ofUnit }
 
-                GamepadsRequest _ ->
-                    { tag = "GamepadsRequest", value = StructuredId.ofUnit }
+            GamepadsRequest _ ->
+                { tag = "GamepadsRequest", value = StructuredId.ofUnit }
 
-                WindowEventListen listen ->
-                    { tag = "WindowEventListen"
-                    , value = listen.eventName |> StructuredId.ofString
-                    }
+            WindowEventListen listen ->
+                { tag = "WindowEventListen"
+                , value = listen.eventName |> StructuredId.ofString
+                }
 
-                WindowVisibilityChangeListen _ ->
-                    { tag = "WindowVisibilityChangeListen", value = StructuredId.ofUnit }
+            WindowVisibilityChangeListen _ ->
+                { tag = "WindowVisibilityChangeListen", value = StructuredId.ofUnit }
 
-                WindowAnimationFrameListen _ ->
-                    { tag = "WindowAnimationFrameListen", value = StructuredId.ofUnit }
+            WindowAnimationFrameListen _ ->
+                { tag = "WindowAnimationFrameListen", value = StructuredId.ofUnit }
 
-                WindowPreferredLanguagesChangeListen _ ->
-                    { tag = "WindowPreferredLanguagesChangeListen", value = StructuredId.ofUnit }
+            WindowPreferredLanguagesChangeListen _ ->
+                { tag = "WindowPreferredLanguagesChangeListen", value = StructuredId.ofUnit }
 
-                DocumentEventListen listen ->
-                    { tag = "DocumentEventListen"
-                    , value = listen.eventName |> StructuredId.ofString
-                    }
+            DocumentEventListen listen ->
+                { tag = "DocumentEventListen"
+                , value = listen.eventName |> StructuredId.ofString
+                }
 
-                TimePeriodicallyListen listen ->
-                    { tag = "TimePeriodicallyListen"
-                    , value = listen.intervalDurationMilliSeconds |> StructuredId.ofInt
-                    }
+            TimePeriodicallyListen listen ->
+                { tag = "TimePeriodicallyListen"
+                , value = listen.intervalDurationMilliSeconds |> StructuredId.ofInt
+                }
 
-                SocketMessageListen listen ->
-                    { tag = "SocketMessageListen"
-                    , value = listen.id |> socketIdToStructuredId
-                    }
+            SocketMessageListen listen ->
+                { tag = "SocketMessageListen"
+                , value = listen.id |> socketIdToStructuredId
+                }
 
-                LocalStorageRemoveOnADifferentTabListen listen ->
-                    { tag = "LocalStorageRemoveOnADifferentTabListen"
-                    , value = listen.key |> StructuredId.ofString
-                    }
+            LocalStorageRemoveOnADifferentTabListen listen ->
+                { tag = "LocalStorageRemoveOnADifferentTabListen"
+                , value = listen.key |> StructuredId.ofString
+                }
 
-                LocalStorageSetOnADifferentTabListen listen ->
-                    { tag = "LocalStorageSetOnADifferentTabListen"
-                    , value = listen.key |> StructuredId.ofString
-                    }
+            LocalStorageSetOnADifferentTabListen listen ->
+                { tag = "LocalStorageSetOnADifferentTabListen"
+                , value = listen.key |> StructuredId.ofString
+                }
 
-                GeoLocationChangeListen _ ->
-                    { tag = "GeoLocationChangeListen", value = StructuredId.ofUnit }
+            GeoLocationChangeListen _ ->
+                { tag = "GeoLocationChangeListen", value = StructuredId.ofUnit }
 
-                GamepadsChangeListen _ ->
-                    { tag = "GamepadsChangeListen", value = StructuredId.ofUnit }
-            )
+            GamepadsChangeListen _ ->
+                { tag = "GamepadsChangeListen", value = StructuredId.ofUnit }
+        )
 
 
 {-| See indexToDigitCountPrefixed.
@@ -2871,16 +2863,15 @@ commaPrefixedMap soFar elementToString list =
 
 
 socketIdToStructuredId : SocketId -> StructuredId
-socketIdToStructuredId =
-    \(SocketId raw) -> raw |> StructuredId.ofInt
+socketIdToStructuredId (SocketId raw) =
+    raw |> StructuredId.ofInt
 
 
 {-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](#SortedKeyValueList)
 -}
 sortedKeyValueListFromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
-sortedKeyValueListFromList =
-    \unsortedList ->
-        SortedKeyValueList (unsortedList |> List.sortBy .key)
+sortedKeyValueListFromList unsortedList =
+    SortedKeyValueList (unsortedList |> List.sortBy .key)
 
 
 {-| The "init" part for an embedded program
