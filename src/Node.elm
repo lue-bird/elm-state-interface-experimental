@@ -3,7 +3,7 @@ module Node exposing
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
-    , workingDirectoryPathRequest, exit
+    , workingDirectoryPathRequest, launchArgumentsRequest, exit
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
     , fileChangeListen, FileChange(..)
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
@@ -40,7 +40,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## process
 
-@docs workingDirectoryPathRequest, exit
+@docs workingDirectoryPathRequest, launchArgumentsRequest, exit
 
 
 ## file system
@@ -288,6 +288,7 @@ type InterfaceSingle future
     | FileUtf8Request { path : String, on : String -> future }
     | FileChangeListen { path : String, on : FileChange -> future }
     | WorkingDirectoryPathRequest (String -> future)
+    | LaunchArgumentsRequest (List String -> future)
 
 
 {-| Did the file at a path get changed/created or moved away/removed?
@@ -512,6 +513,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         WorkingDirectoryPathRequest on ->
             WorkingDirectoryPathRequest (\path -> on path |> futureChange)
 
+        LaunchArgumentsRequest on ->
+            LaunchArgumentsRequest (\arguments -> on arguments |> futureChange)
+
 
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
 httpRequestFutureMap futureChange request =
@@ -614,6 +618,9 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
             []
 
         WorkingDirectoryPathRequest _ ->
+            []
+
+        LaunchArgumentsRequest _ ->
             []
 
 
@@ -747,6 +754,9 @@ interfaceSingleToJson interfaceSingle =
 
             WorkingDirectoryPathRequest _ ->
                 { tag = "WorkingDirectoryPathRequest", value = Json.Encode.null }
+
+            LaunchArgumentsRequest _ ->
+                { tag = "LaunchArgumentsRequest", value = Json.Encode.null }
         )
 
 
@@ -893,6 +903,9 @@ interfaceSingleToStructuredId interfaceSingle =
 
             WorkingDirectoryPathRequest _ ->
                 { tag = "WorkingDirectoryPathRequest", value = StructuredId.ofUnit }
+
+            LaunchArgumentsRequest _ ->
+                { tag = "LaunchArgumentsRequest", value = StructuredId.ofUnit }
         )
 
 
@@ -1042,6 +1055,11 @@ interfaceSingleFutureJsonDecoder interface =
 
         WorkingDirectoryPathRequest on ->
             Json.Decode.string
+                |> Json.Decode.map on
+                |> Just
+
+        LaunchArgumentsRequest on ->
+            Json.Decode.list Json.Decode.string
                 |> Json.Decode.map on
                 |> Just
 
@@ -1452,6 +1470,18 @@ Uses [`process.cwd`](https://nodejs.org/api/process.html#processcwd)
 workingDirectoryPathRequest : Interface String
 workingDirectoryPathRequest =
     WorkingDirectoryPathRequest identity
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Web#Interface) for getting
+the command-line arguments passed when the Node.js process was launched.
+
+Uses [`process.argv`](https://nodejs.org/api/process.html#processargv)
+
+-}
+launchArgumentsRequest : Interface (List String)
+launchArgumentsRequest =
+    LaunchArgumentsRequest identity
         |> interfaceFromSingle
 
 

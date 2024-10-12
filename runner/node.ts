@@ -156,6 +156,9 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "WorkingDirectoryPathRequest": return (_config: null) => {
                 sendToElm(process.cwd())
             }
+            case "LaunchArgumentsRequest": return (_config: null) => {
+                sendToElm(process.argv)
+            }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Add." + tag)
             }
