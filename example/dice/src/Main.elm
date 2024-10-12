@@ -21,56 +21,55 @@ initialState =
 
 
 interface : State -> Web.Interface State
-interface =
-    \state ->
-        case state of
-            WaitingForInitialRandomness ->
-                Web.randomUnsignedInt32s 4
-                    |> Web.interfaceFutureMap
-                        (\unsignedInt32s ->
-                            let
-                                initialSeed : Random.Pcg.Extended.Seed
-                                initialSeed =
-                                    Random.Pcg.Extended.initialSeed (unsignedInt32s |> List.head |> Maybe.withDefault 0) (unsignedInt32s |> List.drop 1)
+interface state =
+    case state of
+        WaitingForInitialRandomness ->
+            Web.randomUnsignedInt32s 4
+                |> Web.interfaceFutureMap
+                    (\unsignedInt32s ->
+                        let
+                            initialSeed : Random.Pcg.Extended.Seed
+                            initialSeed =
+                                Random.Pcg.Extended.initialSeed (unsignedInt32s |> List.head |> Maybe.withDefault 0) (unsignedInt32s |> List.drop 1)
 
-                                ( diceEyes, newSeed ) =
-                                    Random.Pcg.Extended.step diceEyesRandomGenerator initialSeed
-                            in
-                            DiceUiState { diceEyes = diceEyes, seed = newSeed }
-                        )
+                            ( diceEyes, newSeed ) =
+                                Random.Pcg.Extended.step diceEyesRandomGenerator initialSeed
+                        in
+                        DiceUiState { diceEyes = diceEyes, seed = newSeed }
+                    )
 
-            DiceUiState randomStuff ->
-                Web.domElement "div"
-                    [ Web.domStyle "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
-                    , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
-                    , Web.domStyle "padding-left" "80px"
-                    , Web.domStyle "padding-right" "80px"
-                    , Web.domStyle "position" "fixed"
-                    , Web.domStyle "top" "0"
-                    , Web.domStyle "right" "0"
-                    , Web.domStyle "bottom" "0"
-                    , Web.domStyle "left" "0"
+        DiceUiState randomStuff ->
+            Web.domElement "div"
+                [ Web.domStyle "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
+                , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
+                , Web.domStyle "padding-left" "80px"
+                , Web.domStyle "padding-right" "80px"
+                , Web.domStyle "position" "fixed"
+                , Web.domStyle "top" "0"
+                , Web.domStyle "right" "0"
+                , Web.domStyle "bottom" "0"
+                , Web.domStyle "left" "0"
+                ]
+                [ Web.domElement "span"
+                    [ Web.domStyle "font-size" "24em"
                     ]
-                    [ Web.domElement "span"
-                        [ Web.domStyle "font-size" "24em"
-                        ]
-                        [ randomStuff.diceEyes |> diceEyesToSymbol |> Web.domText ]
-                    , Web.domElement "br" [] []
-                    , buttonUi
-                        [ Web.domStyle "font-size" "4em"
-                        ]
-                        [ Web.domText "roll the dice" ]
-                        |> Web.domFutureMap (\() -> RerollClicked)
+                    [ randomStuff.diceEyes |> diceEyesToSymbol |> Web.domText ]
+                , Web.domElement "br" [] []
+                , buttonUi
+                    [ Web.domStyle "font-size" "4em"
                     ]
-                    |> Web.domRender
-                    |> Web.interfaceFutureMap
-                        (\RerollClicked ->
-                            let
-                                ( diceEyes, newSeed ) =
-                                    Random.Pcg.Extended.step diceEyesRandomGenerator randomStuff.seed
-                            in
-                            DiceUiState { diceEyes = diceEyes, seed = newSeed }
-                        )
+                    [ Web.domText "roll the dice" ]
+                    |> Web.domFutureMap (\() -> RerollClicked)
+                ]
+                |> Web.domRender
+                |> Web.interfaceFutureMap
+                    (\RerollClicked ->
+                        let
+                            ( diceEyes, newSeed ) =
+                                Random.Pcg.Extended.step diceEyesRandomGenerator randomStuff.seed
+                        in
+                        DiceUiState { diceEyes = diceEyes, seed = newSeed }
+                    )
 
 
 diceEyesRandomGenerator : Random.Pcg.Extended.Generator Int
@@ -99,26 +98,25 @@ buttonUi modifiers subs =
 
 
 diceEyesToSymbol : Int -> String
-diceEyesToSymbol =
-    \diceEyes ->
-        case diceEyes of
-            1 ->
-                "⚀"
+diceEyesToSymbol diceEyes =
+    case diceEyes of
+        1 ->
+            "⚀"
 
-            2 ->
-                "⚁"
+        2 ->
+            "⚁"
 
-            3 ->
-                "⚂"
+        3 ->
+            "⚂"
 
-            4 ->
-                "⚃"
+        4 ->
+            "⚃"
 
-            5 ->
-                "⚄"
+        5 ->
+            "⚄"
 
-            _ ->
-                "⚅"
+        _ ->
+            "⚅"
 
 
 port toJs : Json.Encode.Value -> Cmd event_

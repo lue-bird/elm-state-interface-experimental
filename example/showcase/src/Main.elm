@@ -100,20 +100,19 @@ programConfig =
 
 
 initializedInterface : InitializedState -> Web.Interface InitializedState
-initializedInterface =
-    \stateChoice ->
-        case stateChoice of
-            StartingRoom startingRoomState ->
-                startingRoomState |> startingRoomInterface
+initializedInterface stateChoice =
+    case stateChoice of
+        StartingRoom startingRoomState ->
+            startingRoomState |> startingRoomInterface
 
-            AtSign atSignState ->
-                atSignState |> atSignInterface
+        AtSign atSignState ->
+            atSignState |> atSignInterface
 
-            PickingApples pickingApplesState ->
-                pickingApplesState |> pickApplesInterface
+        PickingApples pickingApplesState ->
+            pickingApplesState |> pickApplesInterface
 
-            ShowingMapWithExit ->
-                mapWithExitInterface
+        ShowingMapWithExit ->
+            mapWithExitInterface
 
 
 narrativeUiFrame : List (Web.DomModifier state) -> List (Web.DomNode state) -> Web.DomNode state
@@ -169,196 +168,195 @@ buttonUi modifiers subs =
 
 
 startingRoomInterface : StartingRoomState -> Web.Interface InitializedState
-startingRoomInterface =
-    \state ->
-        [ narrativeUiFrame
-            [ Web.domListenTo "mousemove"
-                |> Web.domModifierFutureMap
-                    (\mouseEvent ->
-                        mouseEvent
-                            |> Json.Decode.decodeValue
-                                (Json.Decode.map2 (\x y -> { x = x, y = y })
-                                    (Json.Decode.field "clientX" Json.Decode.int)
-                                    (Json.Decode.field "clientY" Json.Decode.int)
-                                )
-                            |> MouseMovedTo
-                    )
-            ]
-            [ "Your gaze drifts towards a clock on the wall " |> Web.domText
-            , clockUi { posix = state.posix, timezone = state.timezone }
-            , " and with a shiver you realize. You're trapped in a state-interface. Countless questions rush in:" |> Web.domText
-            , Web.domElement "ul"
-                []
-                [ Web.domElement "li"
-                    []
-                    [ Web.domElement "q"
-                        []
-                        [ "How did you get here?" |> Web.domText ]
-                    ]
-                , Web.domElement "li"
-                    []
-                    [ Web.domElement "q"
-                        []
-                        [ ([ "Why do I know that you're exactly at "
-                           , "x"
-                           , state.mousePoint.x |> String.fromInt
-                           , " y"
-                           , state.mousePoint.y |> String.fromInt
-                           , "?"
-                           ]
-                            |> String.concat
-                          )
-                            |> Web.domText
-                        ]
-                    ]
-                , Web.domElement "li"
-                    []
-                    [ Web.domElement "q"
-                        []
-                        [ "How did I know your name is " |> Web.domText
-                        , textInputUi state.name |> Web.domFutureMap NameChanged
-                        , "?" |> Web.domText
-                        ]
-                    ]
-                , Web.domElement "li"
-                    []
-                    [ Web.domElement "q"
-                        []
-                        [ "Why is there a tutl?" |> Web.domText ]
-                    , Web.svgElement "svg"
-                        [ Web.domAttribute "viewBox" "0 12 96 40"
-                        , Web.domAttribute "width" "96"
-                        , Web.domAttribute "height" "40"
-                        ]
-                        [ Web.svgElement "image"
-                            [ Web.domAttribute "width" "72"
-                            , Web.domAttribute "height" "72"
-                            , Web.domAttribute "href" "https://elm-lang.org/images/turtle.gif"
-                            ]
-                            []
-                        ]
-                    ]
-                ]
-            , Web.domElement "p"
+startingRoomInterface state =
+    [ narrativeUiFrame
+        [ Web.domListenTo "mousemove"
+            |> Web.domModifierFutureMap
+                (\mouseEvent ->
+                    mouseEvent
+                        |> Json.Decode.decodeValue
+                            (Json.Decode.map2 (\x y -> { x = x, y = y })
+                                (Json.Decode.field "clientX" Json.Decode.int)
+                                (Json.Decode.field "clientY" Json.Decode.int)
+                            )
+                        |> MouseMovedTo
+                )
+        ]
+        [ "Your gaze drifts towards a clock on the wall " |> Web.domText
+        , clockUi { posix = state.posix, timezone = state.timezone }
+        , " and with a shiver you realize. You're trapped in a state-interface. Countless questions rush in:" |> Web.domText
+        , Web.domElement "ul"
+            []
+            [ Web.domElement "li"
                 []
                 [ Web.domElement "q"
                     []
-                    [ "Don't worry" |> Web.domText ]
-                , Web.domText ", I say. "
-                , Web.domElement "q"
-                    []
-                    [ "I know how we can get out. See this little bird on the sign over there? It will give us a map for 💎3" |> Web.domText ]
+                    [ "How did you get here?" |> Web.domText ]
                 ]
-            , Web.domElement "p"
+            , Web.domElement "li"
                 []
-                [ "The voice repeats: " |> Web.domText
-                , Web.domElement "q"
+                [ Web.domElement "q"
                     []
-                    [ ([ "Don't worry. Here,  take a couple 💎 if you want"
-                       , case state.name of
-                            Nothing ->
-                                ""
-
-                            Just name ->
-                                ", " ++ name
-                       , ":"
+                    [ ([ "Why do I know that you're exactly at "
+                       , "x"
+                       , state.mousePoint.x |> String.fromInt
+                       , " y"
+                       , state.mousePoint.y |> String.fromInt
+                       , "?"
                        ]
                         |> String.concat
                       )
                         |> Web.domText
                     ]
                 ]
-            , Web.domElement "div"
-                [ Web.domStyle "padding-top" "30px"
-                , Web.domStyle "padding-bottom" "30px"
+            , Web.domElement "li"
+                []
+                [ Web.domElement "q"
+                    []
+                    [ "How did I know your name is " |> Web.domText
+                    , textInputUi state.name |> Web.domFutureMap NameChanged
+                    , "?" |> Web.domText
+                    ]
                 ]
-                [ buttonUi
-                    [ Web.domStyle "height" "60px"
-                    , Web.domStyle "width" "60px"
-                    , Web.domStyle "text-align" "center"
+            , Web.domElement "li"
+                []
+                [ Web.domElement "q"
+                    []
+                    [ "Why is there a tutl?" |> Web.domText ]
+                , Web.svgElement "svg"
+                    [ Web.domAttribute "viewBox" "0 12 96 40"
+                    , Web.domAttribute "width" "96"
+                    , Web.domAttribute "height" "40"
                     ]
-                    [ "+" |> Web.domText ]
-                    |> Web.domFutureMap (\() -> GemCountIncreaseClicked)
-                , Web.domElement "b"
-                    [ Web.domStyle "padding" "15px 15px"
+                    [ Web.svgElement "image"
+                        [ Web.domAttribute "width" "72"
+                        , Web.domAttribute "height" "72"
+                        , Web.domAttribute "href" "https://elm-lang.org/images/turtle.gif"
+                        ]
+                        []
                     ]
-                    [ "💎" ++ (state.gemCount |> String.fromInt) |> Web.domText ]
-                , buttonUi
-                    [ Web.domStyle "height" "60px"
-                    , Web.domStyle "width" "60px"
-                    , Web.domStyle "text-align" "center"
-                    ]
-                    [ "-" |> Web.domText ]
-                    |> Web.domFutureMap (\() -> GemCountDecreaseClicked)
                 ]
-            , buttonUi []
-                [ "walk towards the sign as "
-                    ++ (case state.name of
-                            Nothing ->
-                                "nameless"
+            ]
+        , Web.domElement "p"
+            []
+            [ Web.domElement "q"
+                []
+                [ "Don't worry" |> Web.domText ]
+            , Web.domText ", I say. "
+            , Web.domElement "q"
+                []
+                [ "I know how we can get out. See this little bird on the sign over there? It will give us a map for 💎3" |> Web.domText ]
+            ]
+        , Web.domElement "p"
+            []
+            [ "The voice repeats: " |> Web.domText
+            , Web.domElement "q"
+                []
+                [ ([ "Don't worry. Here,  take a couple 💎 if you want"
+                   , case state.name of
+                        Nothing ->
+                            ""
 
-                            Just name ->
-                                name
-                       )
+                        Just name ->
+                            ", " ++ name
+                   , ":"
+                   ]
+                    |> String.concat
+                  )
                     |> Web.domText
                 ]
-                |> Web.domFutureMap (\() -> WalkToSignClicked)
             ]
-            |> Web.domRender
-        , Web.timeZoneRequest |> Web.interfaceFutureMap TimeZoneReceived
-        , Web.timePeriodicallyListen Duration.second |> Web.interfaceFutureMap TimePassed
+        , Web.domElement "div"
+            [ Web.domStyle "padding-top" "30px"
+            , Web.domStyle "padding-bottom" "30px"
+            ]
+            [ buttonUi
+                [ Web.domStyle "height" "60px"
+                , Web.domStyle "width" "60px"
+                , Web.domStyle "text-align" "center"
+                ]
+                [ "+" |> Web.domText ]
+                |> Web.domFutureMap (\() -> GemCountIncreaseClicked)
+            , Web.domElement "b"
+                [ Web.domStyle "padding" "15px 15px"
+                ]
+                [ "💎" ++ (state.gemCount |> String.fromInt) |> Web.domText ]
+            , buttonUi
+                [ Web.domStyle "height" "60px"
+                , Web.domStyle "width" "60px"
+                , Web.domStyle "text-align" "center"
+                ]
+                [ "-" |> Web.domText ]
+                |> Web.domFutureMap (\() -> GemCountDecreaseClicked)
+            ]
+        , buttonUi []
+            [ "walk towards the sign as "
+                ++ (case state.name of
+                        Nothing ->
+                            "nameless"
+
+                        Just name ->
+                            name
+                   )
+                |> Web.domText
+            ]
+            |> Web.domFutureMap (\() -> WalkToSignClicked)
         ]
-            |> Web.interfaceBatch
-            |> Web.interfaceFutureMap
-                (\event ->
-                    case event of
-                        MouseMovedTo (Ok newMousePoint) ->
-                            StartingRoom { state | mousePoint = newMousePoint }
+        |> Web.domRender
+    , Web.timeZoneRequest |> Web.interfaceFutureMap TimeZoneReceived
+    , Web.timePeriodicallyListen Duration.second |> Web.interfaceFutureMap TimePassed
+    ]
+        |> Web.interfaceBatch
+        |> Web.interfaceFutureMap
+            (\event ->
+                case event of
+                    MouseMovedTo (Ok newMousePoint) ->
+                        StartingRoom { state | mousePoint = newMousePoint }
 
-                        MouseMovedTo (Err _) ->
-                            StartingRoom state
+                    MouseMovedTo (Err _) ->
+                        StartingRoom state
 
-                        GemCountDecreaseClicked ->
-                            StartingRoom { state | gemCount = state.gemCount - 1 }
+                    GemCountDecreaseClicked ->
+                        StartingRoom { state | gemCount = state.gemCount - 1 }
 
-                        GemCountIncreaseClicked ->
-                            StartingRoom { state | gemCount = state.gemCount + 1 }
+                    GemCountIncreaseClicked ->
+                        StartingRoom { state | gemCount = state.gemCount + 1 }
 
-                        TimePassed newTime ->
-                            StartingRoom { state | posix = newTime }
+                    TimePassed newTime ->
+                        StartingRoom { state | posix = newTime }
 
-                        TimeZoneReceived timezone ->
-                            StartingRoom { state | timezone = timezone }
+                    TimeZoneReceived timezone ->
+                        StartingRoom { state | timezone = timezone }
 
-                        NameChanged (Err jsonError) ->
-                            StartingRoom { state | name = jsonError |> Json.Decode.errorToString |> Just }
+                    NameChanged (Err jsonError) ->
+                        StartingRoom { state | name = jsonError |> Json.Decode.errorToString |> Just }
 
-                        NameChanged (Ok name) ->
-                            StartingRoom
-                                { state
-                                    | name =
-                                        case name |> String.trimLeft of
-                                            "" ->
-                                                Nothing
+                    NameChanged (Ok name) ->
+                        StartingRoom
+                            { state
+                                | name =
+                                    case name |> String.trimLeft of
+                                        "" ->
+                                            Nothing
 
-                                            nonBlankName ->
-                                                nonBlankName |> Just
-                                }
+                                        nonBlankName ->
+                                            nonBlankName |> Just
+                            }
 
-                        WalkToSignClicked ->
-                            AtSign
-                                { name =
-                                    case state.name of
-                                        Nothing ->
-                                            "nameless"
+                    WalkToSignClicked ->
+                        AtSign
+                            { name =
+                                case state.name of
+                                    Nothing ->
+                                        "nameless"
 
-                                        Just name ->
-                                            name
-                                , gemCount = state.gemCount
-                                , appleCount = 0
-                                , birdConversationState = WaitingForTalk
-                                }
-                )
+                                    Just name ->
+                                        name
+                            , gemCount = state.gemCount
+                            , appleCount = 0
+                            , birdConversationState = WaitingForTalk
+                            }
+            )
 
 
 textInputUi : Maybe String -> Web.DomNode (Result Json.Decode.Error String)
@@ -467,170 +465,169 @@ dummyWindowSize =
 
 
 atSignInterface : AtSignState -> Web.Interface InitializedState
-atSignInterface =
-    \state ->
-        [ narrativeUiFrame []
-            [ Web.domElement "p"
+atSignInterface state =
+    [ narrativeUiFrame []
+        [ Web.domElement "p"
+            []
+            [ Web.domElement "q"
                 []
-                [ Web.domElement "q"
-                    []
-                    [ ([ "And there we are, ", state.name, "!" ] |> String.concat) |> Web.domText ]
-                ]
-            , Web.domElement "div"
-                [ Web.domStyle "text-align" "center"
-                , Web.domStyle "width" "50%"
-                ]
-                [ "🕊️" |> Web.domText ]
-            , Web.domElement "div"
-                [ Web.domStyle "text-align" "center"
-                , Web.domStyle "width" "50%"
-                ]
-                [ "🎏" |> Web.domText ]
-            , Web.domElement "p"
-                []
-                [ case state.appleCount of
-                    0 ->
-                        Web.domElement "q"
-                            []
-                            [ "Don't you think the bird looks a bit hungry..." |> Web.domText ]
-
-                    non0AppleCount ->
-                        ([ "You've already picked "
-                         , non0AppleCount |> String.fromInt
-                         , " 🍎s"
-                         ]
-                            |> String.concat
-                        )
-                            |> Web.domText
-                ]
-            , case state.birdConversationState of
-                WaitingForTalk ->
-                    Web.domElement "div"
-                        []
-                        [ buttonUi []
-                            [ "talk to the bird" |> Web.domText
-                            ]
-                            |> Web.domFutureMap (\() -> TalkToBirdClicked)
-                        , " or " |> Web.domText
-                        , buttonUi []
-                            [ (case state.appleCount of
-                                0 ->
-                                    "pick some 🍎s"
-
-                                _ ->
-                                    "pick even more 🍎s"
-                              )
-                                |> Web.domText
-                            ]
-                            |> Web.domFutureMap (\() -> PickApplesClicked)
-                        ]
-
-                GreetingAndAskingForWhatYouWant ->
-                    Web.domElement "div"
-                        []
-                        [ Web.domElement "p"
-                            []
-                            [ Web.domElement "q"
-                                []
-                                [ "chirp chirp. Thanks for coming by!"
-                                    ++ " I usually sell for 💎 but since your new here, a couple of 🍎s would make me happy as well :)"
-                                    |> Web.domText
-                                ]
-                            ]
-                        , buttonUi []
-                            [ "Ask for an introduction" |> Web.domText
-                            ]
-                            |> Web.domFutureMap (\() -> BirdTellAboutYourselfClicked)
-                        , " or " |> Web.domText
-                        , buttonUi []
-                            [ "Buy map with the exit" |> Web.domText
-                            ]
-                            |> Web.domFutureMap (\() -> BuyMapClicked)
-                        ]
-
-                BirdTellAboutItself ->
-                    Web.domElement "div"
-                        []
-                        [ Web.domElement "q"
-                            []
-                            [ "Jo jo. I'm the map and info dealer in this village since I fly around a lot."
-                                ++ " If you want to catch me to suggest some offers I could make you, write me a "
-                                |> Web.domText
-                            ]
-                        , Web.domElement "a"
-                            [ Web.domAttribute "href" "https://github.com/lue-bird/elm-state-interface-experimental/discussions/new/choose"
-                            , Web.domStyle "color" "inherit"
-                            ]
-                            [ "letter" |> Web.domText ]
-                        , buttonUi []
-                            [ "Buy map with the exit" |> Web.domText
-                            ]
-                            |> Web.domFutureMap (\() -> BuyMapClicked)
-                        ]
-
-                AskedBirdForMap ->
-                    Web.domElement "div"
-                        []
-                        [ Web.domElement "p"
-                            []
-                            [ Web.domElement "q"
-                                []
-                                [ "Hope you'll come by again!" |> Web.domText ]
-                            , " says the bird, looking a bit down" |> Web.domText
-                            ]
-                        , buttonUi []
-                            [ "Open the map" |> Web.domText
-                            ]
-                            |> Web.domFutureMap (\() -> OpenMapClicked)
-                        ]
-
-                TooHungryToSell ->
-                    Web.domElement "div"
-                        []
-                        [ Web.domElement "q"
-                            []
-                            [ "Nah, I'm hungry, I will need more of these fresh 🍎s" |> Web.domText ]
-                        , buttonUi []
-                            [ "pick 🍎s" |> Web.domText
-                            ]
-                            |> Web.domFutureMap (\() -> PickApplesClicked)
-                        ]
+                [ ([ "And there we are, ", state.name, "!" ] |> String.concat) |> Web.domText ]
             ]
-            |> Web.domRender
+        , Web.domElement "div"
+            [ Web.domStyle "text-align" "center"
+            , Web.domStyle "width" "50%"
+            ]
+            [ "🕊️" |> Web.domText ]
+        , Web.domElement "div"
+            [ Web.domStyle "text-align" "center"
+            , Web.domStyle "width" "50%"
+            ]
+            [ "🎏" |> Web.domText ]
+        , Web.domElement "p"
+            []
+            [ case state.appleCount of
+                0 ->
+                    Web.domElement "q"
+                        []
+                        [ "Don't you think the bird looks a bit hungry..." |> Web.domText ]
+
+                non0AppleCount ->
+                    ([ "You've already picked "
+                     , non0AppleCount |> String.fromInt
+                     , " 🍎s"
+                     ]
+                        |> String.concat
+                    )
+                        |> Web.domText
+            ]
+        , case state.birdConversationState of
+            WaitingForTalk ->
+                Web.domElement "div"
+                    []
+                    [ buttonUi []
+                        [ "talk to the bird" |> Web.domText
+                        ]
+                        |> Web.domFutureMap (\() -> TalkToBirdClicked)
+                    , " or " |> Web.domText
+                    , buttonUi []
+                        [ (case state.appleCount of
+                            0 ->
+                                "pick some 🍎s"
+
+                            _ ->
+                                "pick even more 🍎s"
+                          )
+                            |> Web.domText
+                        ]
+                        |> Web.domFutureMap (\() -> PickApplesClicked)
+                    ]
+
+            GreetingAndAskingForWhatYouWant ->
+                Web.domElement "div"
+                    []
+                    [ Web.domElement "p"
+                        []
+                        [ Web.domElement "q"
+                            []
+                            [ "chirp chirp. Thanks for coming by!"
+                                ++ " I usually sell for 💎 but since your new here, a couple of 🍎s would make me happy as well :)"
+                                |> Web.domText
+                            ]
+                        ]
+                    , buttonUi []
+                        [ "Ask for an introduction" |> Web.domText
+                        ]
+                        |> Web.domFutureMap (\() -> BirdTellAboutYourselfClicked)
+                    , " or " |> Web.domText
+                    , buttonUi []
+                        [ "Buy map with the exit" |> Web.domText
+                        ]
+                        |> Web.domFutureMap (\() -> BuyMapClicked)
+                    ]
+
+            BirdTellAboutItself ->
+                Web.domElement "div"
+                    []
+                    [ Web.domElement "q"
+                        []
+                        [ "Jo jo. I'm the map and info dealer in this village since I fly around a lot."
+                            ++ " If you want to catch me to suggest some offers I could make you, write me a "
+                            |> Web.domText
+                        ]
+                    , Web.domElement "a"
+                        [ Web.domAttribute "href" "https://github.com/lue-bird/elm-state-interface-experimental/discussions/new/choose"
+                        , Web.domStyle "color" "inherit"
+                        ]
+                        [ "letter" |> Web.domText ]
+                    , buttonUi []
+                        [ "Buy map with the exit" |> Web.domText
+                        ]
+                        |> Web.domFutureMap (\() -> BuyMapClicked)
+                    ]
+
+            AskedBirdForMap ->
+                Web.domElement "div"
+                    []
+                    [ Web.domElement "p"
+                        []
+                        [ Web.domElement "q"
+                            []
+                            [ "Hope you'll come by again!" |> Web.domText ]
+                        , " says the bird, looking a bit down" |> Web.domText
+                        ]
+                    , buttonUi []
+                        [ "Open the map" |> Web.domText
+                        ]
+                        |> Web.domFutureMap (\() -> OpenMapClicked)
+                    ]
+
+            TooHungryToSell ->
+                Web.domElement "div"
+                    []
+                    [ Web.domElement "q"
+                        []
+                        [ "Nah, I'm hungry, I will need more of these fresh 🍎s" |> Web.domText ]
+                    , buttonUi []
+                        [ "pick 🍎s" |> Web.domText
+                        ]
+                        |> Web.domFutureMap (\() -> PickApplesClicked)
+                    ]
         ]
-            |> Web.interfaceBatch
-            |> Web.interfaceFutureMap
-                (\event ->
-                    case event of
-                        TalkToBirdClicked ->
-                            AtSign { state | birdConversationState = GreetingAndAskingForWhatYouWant }
+        |> Web.domRender
+    ]
+        |> Web.interfaceBatch
+        |> Web.interfaceFutureMap
+            (\event ->
+                case event of
+                    TalkToBirdClicked ->
+                        AtSign { state | birdConversationState = GreetingAndAskingForWhatYouWant }
 
-                        BuyMapClicked ->
-                            if state.appleCount <= 9 then
-                                AtSign { state | birdConversationState = TooHungryToSell }
+                    BuyMapClicked ->
+                        if state.appleCount <= 9 then
+                            AtSign { state | birdConversationState = TooHungryToSell }
 
-                            else
-                                AtSign
-                                    { state
-                                        | birdConversationState = AskedBirdForMap
-                                        , appleCount = state.appleCount - 10
-                                    }
+                        else
+                            AtSign
+                                { state
+                                    | birdConversationState = AskedBirdForMap
+                                    , appleCount = state.appleCount - 10
+                                }
 
-                        BirdTellAboutYourselfClicked ->
-                            AtSign { state | birdConversationState = BirdTellAboutItself }
+                    BirdTellAboutYourselfClicked ->
+                        AtSign { state | birdConversationState = BirdTellAboutItself }
 
-                        OpenMapClicked ->
-                            ShowingMapWithExit
+                    OpenMapClicked ->
+                        ShowingMapWithExit
 
-                        PickApplesClicked ->
-                            PickingApples
-                                ({ name = state.name
-                                 , gemCount = state.gemCount
-                                 , appleCountBefore = state.appleCount
-                                 }
-                                    |> initialPickingApplesState
-                                )
-                )
+                    PickApplesClicked ->
+                        PickingApples
+                            ({ name = state.name
+                             , gemCount = state.gemCount
+                             , appleCountBefore = state.appleCount
+                             }
+                                |> initialPickingApplesState
+                            )
+            )
 
 
 pickApplesInterface : PickApplesState -> Web.Interface InitializedState
@@ -1193,25 +1190,24 @@ colorInvisible =
 
 
 listTakeEveryAndEnds : Int -> (List a -> List a)
-listTakeEveryAndEnds step =
-    \list ->
-        case list of
-            [] ->
-                []
+listTakeEveryAndEnds step list =
+    case list of
+        [] ->
+            []
 
-            head :: tail ->
-                tail
-                    |> List.foldr
-                        (\element soFar ->
-                            if soFar.dropCount <= 0 then
-                                { dropCount = step, result = soFar.result |> (::) element }
+        head :: tail ->
+            tail
+                |> List.foldr
+                    (\element soFar ->
+                        if soFar.dropCount <= 0 then
+                            { dropCount = step, result = soFar.result |> (::) element }
 
-                            else
-                                { dropCount = soFar.dropCount - 1, result = soFar.result }
-                        )
-                        { result = [], dropCount = 0 }
-                    |> .result
-                    |> (::) head
+                        else
+                            { dropCount = soFar.dropCount - 1, result = soFar.result }
+                    )
+                    { result = [], dropCount = 0 }
+                |> .result
+                |> (::) head
 
 
 snakeDirectionFromKeyboardKey : Dict String SnakeDirection
@@ -1229,26 +1225,25 @@ snakeDirectionFromKeyboardKey =
 
 
 snakeDirectionFromThumbstick : { x : Float, y : Float } -> Maybe SnakeDirection
-snakeDirectionFromThumbstick =
-    \thumbCoordinates ->
-        if (thumbCoordinates.y |> abs) <= 0.3 && (thumbCoordinates.x |> abs) <= 0.3 then
-            Nothing
+snakeDirectionFromThumbstick thumbCoordinates =
+    if (thumbCoordinates.y |> abs) <= 0.3 && (thumbCoordinates.x |> abs) <= 0.3 then
+        Nothing
 
-        else
-            (if (thumbCoordinates.y |> abs) > (thumbCoordinates.x |> abs) then
-                if thumbCoordinates.y < 0 then
-                    Up
+    else
+        (if (thumbCoordinates.y |> abs) > (thumbCoordinates.x |> abs) then
+            if thumbCoordinates.y < 0 then
+                Up
 
-                else
-                    Down
+            else
+                Down
 
-             else if thumbCoordinates.x < 0 then
-                Left
+         else if thumbCoordinates.x < 0 then
+            Left
 
-             else
-                Right
-            )
-                |> Just
+         else
+            Right
+        )
+            |> Just
 
 
 directionToXYOffset : SnakeDirection -> { x : Int, y : Int }
@@ -1379,21 +1374,19 @@ pickApplesStateCodec =
 
 
 stateToAppUrl : InitializedState -> AppUrl
-stateToAppUrl =
-    \state ->
-        { path = []
-        , queryParameters = Dict.singleton "" [ state |> Serialize.encodeToString stateCodec ]
-        , fragment = Nothing
-        }
+stateToAppUrl state =
+    { path = []
+    , queryParameters = Dict.singleton "" [ state |> Serialize.encodeToString stateCodec ]
+    , fragment = Nothing
+    }
 
 
 appUrlToState : AppUrl -> Maybe InitializedState
-appUrlToState =
-    \appUrl ->
-        appUrl.queryParameters
-            |> Dict.get ""
-            |> Maybe.andThen List.head
-            |> Maybe.andThen (\str -> str |> Serialize.decodeFromString stateCodec |> Result.toMaybe)
+appUrlToState appUrl =
+    appUrl.queryParameters
+        |> Dict.get ""
+        |> Maybe.andThen List.head
+        |> Maybe.andThen (\str -> str |> Serialize.decodeFromString stateCodec |> Result.toMaybe)
 
 
 type State

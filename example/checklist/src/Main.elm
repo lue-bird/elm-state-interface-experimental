@@ -24,72 +24,71 @@ initialState =
 
 
 interface : State -> Web.Interface State
-interface =
-    \state ->
-        [ ui state |> Web.domRender
-        ]
-            |> Web.interfaceBatch
-            |> Web.interfaceFutureMap
-                (\msg ->
-                    case msg of
-                        InputTextSubmitClicked ->
-                            case state.userInput of
-                                "" ->
-                                    state
+interface state =
+    [ ui state |> Web.domRender
+    ]
+        |> Web.interfaceBatch
+        |> Web.interfaceFutureMap
+            (\msg ->
+                case msg of
+                    InputTextSubmitClicked ->
+                        case state.userInput of
+                            "" ->
+                                state
 
-                                nonEmptyUserInput ->
-                                    let
-                                        newTodo =
-                                            { content = nonEmptyUserInput
-                                            , completed = False
-                                            }
+                            nonEmptyUserInput ->
+                                let
+                                    newTodo =
+                                        { content = nonEmptyUserInput
+                                        , completed = False
+                                        }
 
-                                        newTodos =
-                                            newTodo :: state.todos
-                                    in
-                                    { state | userInput = "", todos = newTodos }
+                                    newTodos =
+                                        newTodo :: state.todos
+                                in
+                                { state | userInput = "", todos = newTodos }
 
-                        InputTextChanged (Err _) ->
-                            state
+                    InputTextChanged (Err _) ->
+                        state
 
-                        InputTextChanged (Ok str) ->
-                            { state | userInput = str }
+                    InputTextChanged (Ok str) ->
+                        { state | userInput = str }
 
-                        TodoRemoved todoId ->
-                            let
-                                filteredTodos =
-                                    List.indexedMap Tuple.pair state.todos
-                                        |> List.filter (\( i, _ ) -> i /= todoId)
-                                        |> List.map (\( _, todo ) -> todo)
-                            in
-                            { state | todos = filteredTodos }
+                    TodoRemoved todoId ->
+                        let
+                            filteredTodos =
+                                List.indexedMap Tuple.pair state.todos
+                                    |> List.filter (\( i, _ ) -> i /= todoId)
+                                    |> List.map (\( _, todo ) -> todo)
+                        in
+                        { state | todos = filteredTodos }
 
-                        TodoCompletenessToggled todoIndex ->
-                            { state
-                                | todos =
-                                    state.todos
-                                        |> List.indexedMap
-                                            (\i todo ->
-                                                if i == todoIndex then
-                                                    { todo | completed = not todo.completed }
+                    TodoCompletenessToggled todoIndex ->
+                        { state
+                            | todos =
+                                state.todos
+                                    |> List.indexedMap
+                                        (\i todo ->
+                                            if i == todoIndex then
+                                                { todo | completed = not todo.completed }
 
-                                                else
-                                                    todo
-                                            )
-                            }
+                                            else
+                                                todo
+                                        )
+                        }
 
-                        ResetAllToUncompletedClicked ->
-                            { state
-                                | todos =
-                                    state.todos |> List.map (\todo -> { todo | completed = False })
-                            }
+                    ResetAllToUncompletedClicked ->
+                        { state
+                            | todos =
+                                state.todos |> List.map (\todo -> { todo | completed = False })
+                        }
 
-                        VisibilityFilterSet newVisibilityFilter ->
-                            { state | visibilityFilter = newVisibilityFilter }
+                    VisibilityFilterSet newVisibilityFilter ->
+                        { state | visibilityFilter = newVisibilityFilter }
 
-                        RemoveCompleted ->
-                            { state | todos = state.todos |> List.filter (\todo -> not todo.completed) }
-                )
+                    RemoveCompleted ->
+                        { state | todos = state.todos |> List.filter (\todo -> not todo.completed) }
+            )
 
 
 ui : State -> Web.DomNode Event
