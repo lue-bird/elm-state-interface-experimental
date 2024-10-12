@@ -25,9 +25,8 @@ initialState =
 
 interface : State -> Web.Interface State
 interface state =
-    [ ui state |> Web.domRender
-    ]
-        |> Web.interfaceBatch
+    ui state
+        |> Web.domRender
         |> Web.interfaceFutureMap
             (\msg ->
                 case msg of
