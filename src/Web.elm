@@ -3737,7 +3737,6 @@ httpMetadataJsonDecoder =
                     headerTuples
                         |> List.LocalExtra.mapAnyOrder
                             (\( key, value ) -> { key = key, value = value })
-                        |> sortedKeyValueListFromList
                 )
                 (Json.Decode.keyValuePairs Json.Decode.string)
             )
@@ -4068,7 +4067,7 @@ type alias HttpMetadata =
         { url : String
         , statusCode : Int
         , statusText : String
-        , headers : SortedKeyValueList String String
+        , headers : List { key : String, value : String }
         }
 
 
