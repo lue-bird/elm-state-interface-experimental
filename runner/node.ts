@@ -10,6 +10,9 @@ export interface ElmPorts {
 }
 
 export function programStart(appConfig: { ports: ElmPorts, domElement: Element }) {
+    process.on("SIGINT", () => {
+        process.exit()
+    })
     appConfig.ports.toJs.subscribe(function (fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
         // console.log("elm → js: ", fromElm)
         function sendToElm(eventData: void) {
