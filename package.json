@@ -4,6 +4,7 @@
     "description": "fast-moving, less tested version of elm-state-interface",
     "author": "lue-bird",
     "license": "MIT",
+    "type": "module",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/lue-bird/elm-state-interface-experimental.git"
