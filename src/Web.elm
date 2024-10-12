@@ -38,7 +38,7 @@ module Web exposing
     , Gamepad, GamepadButton(..), gamepadsRequest, gamepadsChangeListen
     , notificationAskForPermission, notificationShow, NotificationClicked(..)
     , animationFrameListen, windowVisibilityChangeListen, WindowVisibility(..)
-    , windowSizeRequest, windowResizeListen
+    , windowSizeRequest, windowSizeChangeListen
     , preferredLanguagesRequest, preferredLanguagesChangeListen
     , documentListenTo, windowListenTo
     , titleReplaceBy, authorSet, keywordsSet, descriptionSet
@@ -402,7 +402,7 @@ to only notify users when they're on a different page
 Observe and alter the page's global environment as part of an [`Interface`](Web#Interface)
 
 @docs animationFrameListen, windowVisibilityChangeListen, WindowVisibility
-@docs windowSizeRequest, windowResizeListen
+@docs windowSizeRequest, windowSizeChangeListen
 @docs preferredLanguagesRequest, preferredLanguagesChangeListen
 @docs documentListenTo, windowListenTo
 
@@ -4912,8 +4912,8 @@ windowSizeRequest =
 
 {-| An [`Interface`](Web#Interface) for detecting changes to the inner window width and height
 -}
-windowResizeListen : Interface { width : Int, height : Int }
-windowResizeListen =
+windowSizeChangeListen : Interface { width : Int, height : Int }
+windowSizeChangeListen =
     WindowEventListen
         { eventName = "resize"
         , on =

@@ -659,7 +659,7 @@ pickApplesInterface state =
                 |> Web.interfaceFutureMap EatAppleAudioReceived
     , Web.timePeriodicallyListen (Duration.milliseconds 110)
         |> Web.interfaceFutureMap PickApplesSimulationTick
-    , [ Web.windowSizeRequest, Web.windowResizeListen ]
+    , [ Web.windowSizeRequest, Web.windowSizeChangeListen ]
         |> Web.interfaceBatch
         |> Web.interfaceFutureMap WindowSizeReceived
     , Web.windowListenTo "keydown"

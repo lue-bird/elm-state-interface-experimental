@@ -410,7 +410,7 @@ The Elm Architecture uses command/task types for one and subscription types for 
 In state-interface, these 2 look identical:
 ```elm
 Web.windowSizeRequest : Interface { width : Int, height : Int }
-Web.windowResizeListen : Interface { width : Int, height : Int }
+Web.windowSizeChangeListen : Interface { width : Int, height : Int }
 ```
 "-Listen" is equivalent to subscription in The Elm Architecture, "-Request" is roughly like command/task.
 So trying to keep your window size state updated using
@@ -422,7 +422,7 @@ is not going to work as the request will only be executed once.
 
 So the full solution to always get the current window size is
 ```elm
-[ Web.windowSizeRequest, Web.windowResizeListen ]
+[ Web.windowSizeRequest, Web.windowSizeChangeListen ]
     |> Web.interfaceBatch
     |> Web.interfaceFutureMap (\windowSize -> { state | windowSize = windowSize })
 ```

@@ -28,7 +28,7 @@ initialState =
 
 interface : State -> Web.Interface State
 interface (State state) =
-    [ [ Web.windowSizeRequest, Web.windowResizeListen ]
+    [ [ Web.windowSizeRequest, Web.windowSizeChangeListen ]
         |> Web.interfaceBatch
         |> Web.interfaceFutureMap (\windowSize -> State { state | windowSize = windowSize })
     , case state.musicSource of
