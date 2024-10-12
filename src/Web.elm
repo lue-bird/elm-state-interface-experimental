@@ -487,7 +487,7 @@ import Url.LocalExtra
        Unless you want to allow your interface to be edited while it's running,
        it usually contains all the info from the `DomainSubjectVerb` variant (not including functions)
 
-     - in `runner/index.ts` inside `interfaceAddImplementation`, add
+     - in `runner/web.ts` inside `interfaceAddImplementation`, add
        ```javascript
        case "[YourName]": return (yourInput) => {
            // perform your stuff
@@ -520,7 +520,7 @@ import Url.LocalExtra
               [YourName] new ->
                   Edit[YourName] ..the diff..
       ```
-    - in `runner/index.ts` inside `interfaceEditImplementation`, add a `case "Edit[YourName]" : return (yourInput) => { ... }`
+    - in `runner/web.ts` inside `interfaceEditImplementation`, add a `case "Edit[YourName]" : return (yourInput) => { ... }`
 -}
 
 
