@@ -553,12 +553,12 @@ atSignInterface state =
                         [ "Jo jo. I'm the map and info dealer in this village since I fly around a lot."
                             ++ " If you want to catch me to suggest some offers I could make you, write me a "
                             |> Web.domText
+                        , Web.domElement "a"
+                            [ Web.domAttribute "href" "https://github.com/lue-bird/elm-state-interface-experimental/discussions/new/choose"
+                            , Web.domStyle "color" "inherit"
+                            ]
+                            [ "letter" |> Web.domText ]
                         ]
-                    , Web.domElement "a"
-                        [ Web.domAttribute "href" "https://github.com/lue-bird/elm-state-interface-experimental/discussions/new/choose"
-                        , Web.domStyle "color" "inherit"
-                        ]
-                        [ "letter" |> Web.domText ]
                     , buttonUi []
                         [ "Buy map with the exit" |> Web.domText
                         ]

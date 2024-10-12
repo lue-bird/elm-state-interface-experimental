@@ -91,42 +91,41 @@ interface state =
 
 
 ui : State -> Web.DomNode Event
-ui =
-    \state ->
-        Web.domElement "div"
-            [ Web.domStyle "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
-            , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
-            , Web.domStyle "font-size" "2em"
-            , Web.domStyle "padding-left" "80px"
-            , Web.domStyle "padding-right" "80px"
-            , Web.domStyle "position" "fixed"
-            , Web.domStyle "top" "0"
-            , Web.domStyle "right" "0"
-            , Web.domStyle "bottom" "0"
-            , Web.domStyle "left" "0"
+ui state =
+    Web.domElement "div"
+        [ Web.domStyle "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
+        , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
+        , Web.domStyle "font-size" "2em"
+        , Web.domStyle "padding-left" "80px"
+        , Web.domStyle "padding-right" "80px"
+        , Web.domStyle "position" "fixed"
+        , Web.domStyle "top" "0"
+        , Web.domStyle "right" "0"
+        , Web.domStyle "bottom" "0"
+        , Web.domStyle "left" "0"
+        ]
+        [ Web.domElement "div"
+            [ Web.domStyle "max-width" "870px"
+            , Web.domStyle "padding-top" "80px"
             ]
-            [ Web.domElement "div"
-                [ Web.domStyle "max-width" "870px"
-                , Web.domStyle "padding-top" "80px"
-                ]
-                [ Web.domElement "h1" [] [ Web.domText "todos" ]
-                , Web.domElement "div"
-                    []
-                    [ todoNewItemInputUi state.userInput
-                    , todoListInfoAndActionsUi state.todos state.visibilityFilter
-                    , case state.todos of
-                        [] ->
-                            Web.domElement "div" [] []
+            [ Web.domElement "h1" [] [ Web.domText "todos" ]
+            , Web.domElement "div"
+                []
+                [ todoNewItemInputUi state.userInput
+                , todoListInfoAndActionsUi state.todos state.visibilityFilter
+                , case state.todos of
+                    [] ->
+                        Web.domElement "div" [] []
 
-                        todo0 :: todo1Up ->
-                            Web.domElement "div"
-                                [ Web.domStyle "padding" "34px 34px 0px 0px" ]
-                                [ visibilityOptionsUi state.visibilityFilter
-                                , todoListUi { todos = todo0 :: todo1Up, visibilityFilter = state.visibilityFilter }
-                                ]
-                    ]
+                    todo0 :: todo1Up ->
+                        Web.domElement "div"
+                            [ Web.domStyle "padding" "34px 34px 0px 0px" ]
+                            [ visibilityOptionsUi state.visibilityFilter
+                            , todoListUi { todos = todo0 :: todo1Up, visibilityFilter = state.visibilityFilter }
+                            ]
                 ]
             ]
+        ]
 
 
 buttonUi : List (Web.DomModifier ()) -> List (Web.DomNode ()) -> Web.DomNode ()
@@ -193,17 +192,16 @@ textInputUi toFuture inputValue modifiers =
 
 
 visibilityFilterToString : VisibilityFilter -> String
-visibilityFilterToString =
-    \visibilityFilter ->
-        case visibilityFilter of
-            AllVisible ->
-                "all"
+visibilityFilterToString visibilityFilter =
+    case visibilityFilter of
+        AllVisible ->
+            "all"
 
-            OnlyTodoVisible ->
-                "only todo"
+        OnlyTodoVisible ->
+            "only todo"
 
-            OnlyCompletedVisible ->
-                "only completed"
+        OnlyCompletedVisible ->
+            "only completed"
 
 
 visibilityOptionsUi : VisibilityFilter -> Web.DomNode Event

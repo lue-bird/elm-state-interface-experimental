@@ -2,6 +2,7 @@ module Svg.LocalExtra exposing (circle, ellipse, fillUniform, line, polygon, pol
 
 import Angle
 import Color exposing (Color)
+import Web
 
 
 line :
