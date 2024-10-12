@@ -5,6 +5,7 @@ module Node exposing
     , timePeriodicallyListen, timeOnceAt
     , workingDirectoryPathRequest, exit
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
+    , fileChangeListen, FileChange(..)
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
     , httpRequest
     , httpGet, httpPost, httpAddHeaders
@@ -45,6 +46,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 ## file system
 
 @docs directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
+@docs fileChangeListen, FileChange
 
 
 ## HTTP
@@ -284,7 +286,15 @@ type InterfaceSingle future
     | FileRemove String
     | FileUtf8Write { content : String, path : String }
     | FileUtf8Request { path : String, on : String -> future }
+    | FileChangeListen { path : String, on : FileChange -> future }
     | WorkingDirectoryPathRequest (String -> future)
+
+
+{-| Did the file at a path get changed/created or moved away/removed?
+-}
+type FileChange
+    = FileAddedOrChanged String
+    | FileRemoved String
 
 
 {-| An HTTP request for use in an [`Interface`](#Interface).
@@ -493,6 +503,12 @@ interfaceSingleFutureMap futureChange interfaceSingle =
                 , on = \content -> request.on content |> futureChange
                 }
 
+        FileChangeListen listen ->
+            FileChangeListen
+                { path = listen.path
+                , on = \fileChange -> listen.on fileChange |> futureChange
+                }
+
         WorkingDirectoryPathRequest on ->
             WorkingDirectoryPathRequest (\path -> on path |> futureChange)
 
@@ -590,6 +606,9 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
 
                 _ ->
                     []
+
+        FileChangeListen _ ->
+            []
 
         FileUtf8Request _ ->
             []
@@ -719,6 +738,11 @@ interfaceSingleToJson interfaceSingle =
             FileUtf8Request request ->
                 { tag = "FileUtf8Request"
                 , value = request.path |> Json.Encode.string
+                }
+
+            FileChangeListen listen ->
+                { tag = "FileChangeListen"
+                , value = listen.path |> Json.Encode.string
                 }
 
             WorkingDirectoryPathRequest _ ->
@@ -862,6 +886,11 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value = request.path |> StructuredId.ofString
                 }
 
+            FileChangeListen listen ->
+                { tag = "FileChangeListen"
+                , value = listen.path |> StructuredId.ofString
+                }
+
             WorkingDirectoryPathRequest _ ->
                 { tag = "WorkingDirectoryPathRequest", value = StructuredId.ofUnit }
         )
@@ -999,6 +1028,16 @@ interfaceSingleFutureJsonDecoder interface =
         FileUtf8Request request ->
             Json.Decode.string
                 |> Json.Decode.map request.on
+                |> Just
+
+        FileChangeListen listen ->
+            Json.Decode.oneOf
+                [ Json.Decode.LocalExtra.variant "Removed"
+                    (Json.Decode.map FileRemoved Json.Decode.string)
+                , Json.Decode.LocalExtra.variant "AddedOrChanged"
+                    (Json.Decode.map FileAddedOrChanged Json.Decode.string)
+                ]
+                |> Json.Decode.map listen.on
                 |> Just
 
         WorkingDirectoryPathRequest on ->
@@ -1461,6 +1500,18 @@ Uses [`fs.readFile`](https://nodejs.org/api/fs.html#fsreadfilepath-options-callb
 fileUtf8Request : String -> Interface String
 fileUtf8Request path =
     FileUtf8Request { path = path, on = identity }
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Web#Interface) for detecting changes to
+the file at a given path or any of its deepest sub-files.
+
+Uses [`fs.watch({ recursive: true })`](https://nodejs.org/api/fs.html#fswatchfilename-options-listener)
+
+-}
+fileChangeListen : String -> Interface FileChange
+fileChangeListen path =
+    FileChangeListen { path = path, on = identity }
         |> interfaceFromSingle
 
 

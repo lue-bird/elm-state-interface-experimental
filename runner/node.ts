@@ -1,6 +1,6 @@
-import * as process from "node:process"
 import * as fs from "node:fs"
 import * as path from "node:path"
+import * as child_process from "node:child_process"
 
 
 export interface ElmPorts {
@@ -10,7 +10,36 @@ export interface ElmPorts {
     fromJs: { send: (toElm: any) => void }
 }
 
-export function programStart(appConfig: { ports: ElmPorts, domElement: Element }) {
+/** Small helper for creating a runnable elm program. Requires the `elm` binary to be available.
+ * Feel free to use a custom loader that e.g. allows debug or uses an alternative compiler.
+ * 
+ * @param elmProjectDirectoryPath The path to the `review-mini/` elm application. Use `import.meta.dirname`
+ * @param mainElmModuleNamePath 
+ * @returns An elm worker program you can start whenever you want which then provides its ports
+ */
+export function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePath: string): { init: () => { ports: ElmPorts } } {
+    if (elmProjectDirectoryPath === undefined) {
+        console.error("To access import.meta.dirname you need at least Node.js 20.11 / 21.2: https://stackoverflow.com/a/50052194")
+        throw new Error()
+    }
+    const elmJsPath = path.join(elmProjectDirectoryPath, "elm-stuff", "temporary-elm.js")
+    child_process.execSync(
+        // if you want to use Debug.log etc while prototyping or debugging, remove the --optimize flag
+        // if you need extra performance switch to https://github.com/mdgriffith/elm-optimize-level-2
+        `elm make ${mainElmModuleNamePath} --output "${elmJsPath}" --optimize`,
+        { cwd: elmProjectDirectoryPath }
+    )
+    eval(
+        fs.readFileSync(elmJsPath, { encoding: "utf8" })
+            .replace("(this)", "(globalThis)")
+    )
+    fs.unlinkSync(elmJsPath)
+    return (globalThis as any).Elm.Main
+}
+
+
+
+export function programStart(appConfig: { ports: ElmPorts }) {
     process.on("SIGINT", () => {
         process.exit()
     })
@@ -76,26 +105,26 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             }
             case "TimePeriodicallyListen": return (config: { milliSeconds: number }) => {
                 const timePeriodicallyListenId =
-                    window.setInterval(
+                    setInterval(
                         () => { sendToElm(Date.now()) },
                         config.milliSeconds
                     )
                 abortSignal.addEventListener("abort", _event => {
-                    window.clearInterval(timePeriodicallyListenId)
+                    clearInterval(timePeriodicallyListenId)
                 })
             }
             case "TimeOnce": return (config: { pointInTime: number }) => {
                 const timeOnceId =
-                    window.setTimeout(
+                    setTimeout(
                         () => { sendToElm(Date.now()) },
                         config.pointInTime - Date.now()
                     )
                 abortSignal.addEventListener("abort", _event => {
-                    window.clearInterval(timeOnceId)
+                    clearInterval(timeOnceId)
                 })
             }
             case "RandomUnsignedInt32sRequest": return (config: number) => {
-                sendToElm(Array.from(window.crypto.getRandomValues(new Uint32Array(config))))
+                sendToElm(Array.from(crypto.getRandomValues(new Uint32Array(config))))
             }
             case "Exit": return (code: number) => {
                 process.exit(code)
@@ -120,6 +149,9 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 )
                     .then((content) => { sendToElm(content) })
                     .catch((err) => warn("failed to read file " + err))
+            }
+            case "FileChangeListen": return (path: string) => {
+                watchPath(path, abortSignal, event => sendToElm(event))
             }
             case "WorkingDirectoryPathRequest": return (_config: null) => {
                 sendToElm(process.cwd())
@@ -159,38 +191,34 @@ function fileUtf8Write(write: { path: string, content: string }, abortSignal: Ab
         .catch((err) => warn("failed to write to file " + err))
 }
 
-function watchPaths(
-    watch: {
-        paths: string[],
-        on: (event: { tag: "Removed" | "AddedOrChanged", value: string }) => void
-    },
-    abortSignal: AbortSignal
+function watchPath(
+    pathToWatch: string,
+    abortSignal: AbortSignal,
+    on: (event: { tag: "Removed" | "AddedOrChanged", value: string }) => void
 ) {
     // most editors chunk up their file edits in 2, see
     // https://stackoverflow.com/questions/12978924/fs-watch-fired-twice-when-i-change-the-watched-file
     let debounced = true
-    watch.paths
-        .forEach(directoryOrFilePath => {
-            fs.watch(
-                directoryOrFilePath,
-                { recursive: true, encoding: "utf8", signal: abortSignal },
-                (_event, fileName) => {
-                    if (debounced) {
-                        debounced = false
-                        if (fileName !== null) {
-                            const fullPath = path.join(directoryOrFilePath, fileName)
-                            if (fs.existsSync(fullPath)) {
-                                watch.on({ tag: "AddedOrChanged", value: fullPath })
-                            } else {
-                                watch.on({ tag: "Removed", value: fullPath })
-                            }
-                        }
+
+    fs.watch(
+        pathToWatch,
+        { recursive: true, signal: abortSignal },
+        (_event, fileName) => {
+            if (debounced) {
+                debounced = false
+                if (fileName !== null) {
+                    const fullPath = path.join(pathToWatch, fileName)
+                    if (fs.existsSync(fullPath)) {
+                        on({ tag: "AddedOrChanged", value: fullPath })
                     } else {
-                        setTimeout(() => { debounced = true }, 100)
+                        on({ tag: "Removed", value: fullPath })
                     }
                 }
-            )
-        })
+            } else {
+                setTimeout(() => { debounced = true }, 100)
+            }
+        }
+    )
 }
 
 
