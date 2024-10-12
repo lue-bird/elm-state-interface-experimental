@@ -130,7 +130,10 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 sendToElm(Array.from(crypto.getRandomValues(new Uint32Array(config))))
             }
             case "Exit": return (code: number) => {
-                process.exit(code)
+                process.exitCode = code
+                abortSignal.addEventListener("abort", (_event) => {
+                    process.exitCode = 0
+                })
             }
             case "DirectoryMake": return (write: { path: string }) => {
                 fs.promises.mkdir(write.path, { recursive: true })
