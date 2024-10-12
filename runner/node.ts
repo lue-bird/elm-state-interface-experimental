@@ -93,7 +93,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             case "RandomUnsignedInt32sRequest": return (config: number) => {
                 sendToElm(Array.from(window.crypto.getRandomValues(new Uint32Array(config))))
             }
-            case "ProcessExit": return (code: number) => {
+            case "Exit": return (code: number) => {
                 process.exit(code)
             }
             case "FileDirectoryMake": return (write: { path: string }) => {

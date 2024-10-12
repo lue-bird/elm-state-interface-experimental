@@ -3,7 +3,7 @@ module Node exposing
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
-    , workingDirectoryPathRequest
+    , workingDirectoryPathRequest, exit
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
     , httpRequest
     , httpGet, httpPost, httpAddHeaders
@@ -38,7 +38,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## process
 
-@docs workingDirectoryPathRequest
+@docs workingDirectoryPathRequest, exit
 
 
 ## HTTP
@@ -273,7 +273,7 @@ type InterfaceSingle future
     | TimePeriodicallyListen { intervalDurationMilliSeconds : Int, on : Time.Posix -> future }
     | TimezoneNameRequest (String -> future)
     | RandomUnsignedInt32sRequest { count : Int, on : List Int -> future }
-    | ProcessExit Int
+    | Exit Int
     | FileDirectoryMake String
     | FileUtf8Write { content : String, path : String }
     | FileUtf8Request { path : String, on : String -> future }
@@ -468,8 +468,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             }
                 |> TimePeriodicallyListen
 
-        ProcessExit code ->
-            ProcessExit code
+        Exit code ->
+            Exit code
 
         FileDirectoryMake path ->
             FileDirectoryMake path
@@ -560,7 +560,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         RandomUnsignedInt32sRequest _ ->
             []
 
-        ProcessExit _ ->
+        Exit _ ->
             []
 
         FileDirectoryMake _ ->
@@ -685,8 +685,8 @@ interfaceSingleToJson interfaceSingle =
                         [ ( "milliSeconds", intervalDuration.intervalDurationMilliSeconds |> Json.Encode.int ) ]
                 }
 
-            ProcessExit code ->
-                { tag = "ProcessExit", value = code |> Json.Encode.int }
+            Exit code ->
+                { tag = "Exit", value = code |> Json.Encode.int }
 
             FileDirectoryMake path ->
                 { tag = "FileDirectoryMake", value = path |> Json.Encode.string }
@@ -830,8 +830,8 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value = listen.intervalDurationMilliSeconds |> StructuredId.ofInt
                 }
 
-            ProcessExit _ ->
-                { tag = "ProcessExit", value = StructuredId.ofUnit }
+            Exit _ ->
+                { tag = "Exit", value = StructuredId.ofUnit }
 
             FileDirectoryMake path ->
                 { tag = "FileDirectoryMake", value = path |> StructuredId.ofString }
@@ -968,7 +968,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Json.Decode.map randomUnsignedInt32sRequest.on
                 |> Just
 
-        ProcessExit _ ->
+        Exit _ ->
             Nothing
 
         FileDirectoryMake _ ->
@@ -1374,9 +1374,21 @@ timePeriodicallyListen intervalDuration =
         |> interfaceFromSingle
 
 
+{-| Stop the process as quickly as possible,
+not completing any further operations.
+
+Uses [process.exit](https://nodejs.org/api/process.html#processexitcode)
+
+-}
+exit : Int -> Interface future_
+exit code =
+    Exit code
+        |> interfaceFromSingle
+
+
 {-| An [`Interface`](Web#Interface) for getting the current working directory.
 
-Note: Uses [`process.cwd`](https://nodejs.org/api/process.html#processcwd)
+Uses [`process.cwd`](https://nodejs.org/api/process.html#processcwd)
 
 -}
 workingDirectoryPathRequest : Interface String
