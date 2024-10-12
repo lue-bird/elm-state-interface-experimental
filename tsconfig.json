@@ -5,12 +5,11 @@
         "target": "ESNext",
         "declaration": true,
         // Module resolution
-        "baseUrl": "runner",
+        "baseUrl": "./runner",
         "esModuleInterop": true,
         "moduleResolution": "node",
         // Source Map
         "sourceMap": true,
-        "sourceRoot": "./runner",
         // Strict Checks
         "alwaysStrict": true,
         "allowUnreachableCode": false,

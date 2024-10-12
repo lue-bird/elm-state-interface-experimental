@@ -5,7 +5,8 @@
     "license": "MIT",
     "version": "4.0.0",
     "exposed-modules": [
-        "Web"
+        "Web",
+        "Node"
     ],
     "elm-version": "0.19.1 <= v < 20.0.0",
     "dependencies": {

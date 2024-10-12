@@ -18,8 +18,16 @@
         "tea"
     ],
     "homepage": "https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface-experimental/latest/",
-    "main": "runner-compiled/index.js",
-    "types": "runner-compiled/index.d.ts",
+    "exports": {
+        "web": {
+            "import": "./runner-compiled/web.js",
+            "types": "./runner-compiled/web.d.ts"
+        },
+        "node": {
+            "import": "./runner-compiled/node.js",
+            "types": "./runner-compiled/node.d.ts"
+        }
+    },
     "files": [
         "runner-compiled"
     ],
