@@ -4,7 +4,7 @@ module Node exposing
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
     , workingDirectoryPathRequest, exit
-    , directoryMake, fileUtf8Write, fileUtf8Request
+    , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
     , httpRequest
     , httpGet, httpPost, httpAddHeaders
@@ -44,7 +44,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## file system
 
-@docs directoryMake, fileUtf8Write, fileUtf8Request
+@docs directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
 
 
 ## HTTP
@@ -281,6 +281,7 @@ type InterfaceSingle future
     | RandomUnsignedInt32sRequest { count : Int, on : List Int -> future }
     | Exit Int
     | DirectoryMake String
+    | FileRemove String
     | FileUtf8Write { content : String, path : String }
     | FileUtf8Request { path : String, on : String -> future }
     | WorkingDirectoryPathRequest (String -> future)
@@ -480,6 +481,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         DirectoryMake path ->
             DirectoryMake path
 
+        FileRemove path ->
+            FileRemove path
+
         FileUtf8Write write ->
             FileUtf8Write write
 
@@ -570,6 +574,9 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
             []
 
         DirectoryMake _ ->
+            []
+
+        FileRemove _ ->
             []
 
         FileUtf8Write oldWrite ->
@@ -697,6 +704,9 @@ interfaceSingleToJson interfaceSingle =
             DirectoryMake path ->
                 { tag = "DirectoryMake", value = path |> Json.Encode.string }
 
+            FileRemove path ->
+                { tag = "FileRemove", value = path |> Json.Encode.string }
+
             FileUtf8Write write ->
                 { tag = "FileUtf8Write"
                 , value =
@@ -708,10 +718,7 @@ interfaceSingleToJson interfaceSingle =
 
             FileUtf8Request request ->
                 { tag = "FileUtf8Request"
-                , value =
-                    Json.Encode.object
-                        [ ( "path", request.path |> Json.Encode.string )
-                        ]
+                , value = request.path |> Json.Encode.string
                 }
 
             WorkingDirectoryPathRequest _ ->
@@ -841,6 +848,9 @@ interfaceSingleToStructuredId interfaceSingle =
 
             DirectoryMake path ->
                 { tag = "DirectoryMake", value = path |> StructuredId.ofString }
+
+            FileRemove path ->
+                { tag = "FileRemove", value = path |> StructuredId.ofString }
 
             FileUtf8Write write ->
                 { tag = "FileUtf8Write"
@@ -978,6 +988,9 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         DirectoryMake _ ->
+            Nothing
+
+        FileRemove _ ->
             Nothing
 
         FileUtf8Write _ ->
@@ -1412,6 +1425,18 @@ Uses [`fs.mkdir`](https://nodejs.org/api/fs.html#fspromisesmkdirpath-options)
 directoryMake : String -> Interface future_
 directoryMake path =
     DirectoryMake path
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Web#Interface) for unlinking a file
+at a given path.
+
+Uses [`fs.unlink`](https://nodejs.org/api/fs.html#fsunlinkpath-callback)
+
+-}
+fileRemove : String -> Interface future_
+fileRemove path =
+    FileRemove path
         |> interfaceFromSingle
 
 

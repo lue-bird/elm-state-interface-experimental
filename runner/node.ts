@@ -1,5 +1,6 @@
 import * as process from "node:process"
 import * as fs from "node:fs"
+import * as path from "node:path"
 
 
 export interface ElmPorts {
@@ -104,12 +105,17 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                     .then(() => { })
                     .catch((err) => warn("failed to make directory " + err))
             }
+            case "FileRemove": return (path: string) => {
+                fs.promises.unlink(path)
+                    .then(() => { })
+                    .catch((err) => warn("failed to unlink file " + err))
+            }
             case "FileUtf8Write": return (write: { content: string, path: string }) => {
                 fileUtf8Write(write, abortSignal)
             }
-            case "FileUtf8Request": return (write: { path: string }) => {
+            case "FileUtf8Request": return (path: string) => {
                 fs.promises.readFile(
-                    write.path,
+                    path,
                     { encoding: "utf-8", signal: abortSignal }
                 )
                     .then((content) => { sendToElm(content) })
@@ -152,6 +158,42 @@ function fileUtf8Write(write: { path: string, content: string }, abortSignal: Ab
         .then(() => { })
         .catch((err) => warn("failed to write to file " + err))
 }
+
+function watchPaths(
+    watch: {
+        paths: string[],
+        on: (event: { tag: "Removed" | "AddedOrChanged", value: string }) => void
+    },
+    abortSignal: AbortSignal
+) {
+    // most editors chunk up their file edits in 2, see
+    // https://stackoverflow.com/questions/12978924/fs-watch-fired-twice-when-i-change-the-watched-file
+    let debounced = true
+    watch.paths
+        .forEach(directoryOrFilePath => {
+            fs.watch(
+                directoryOrFilePath,
+                { recursive: true, encoding: "utf8", signal: abortSignal },
+                (_event, fileName) => {
+                    if (debounced) {
+                        debounced = false
+                        if (fileName !== null) {
+                            const fullPath = path.join(directoryOrFilePath, fileName)
+                            if (fs.existsSync(fullPath)) {
+                                watch.on({ tag: "AddedOrChanged", value: fullPath })
+                            } else {
+                                watch.on({ tag: "Removed", value: fullPath })
+                            }
+                        }
+                    } else {
+                        setTimeout(() => { debounced = true }, 100)
+                    }
+                }
+            )
+        })
+}
+
+
 
 interface HttpRequest {
     url: string
