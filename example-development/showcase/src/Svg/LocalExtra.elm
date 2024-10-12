@@ -72,19 +72,18 @@ strokeUniform color =
 
 
 points : List { x : Float, y : Float } -> Web.DomModifier future_
-points =
-    \points_ ->
-        Web.domAttribute "points"
-            ((case points_ of
-                [ onlyElement ] ->
-                    [ onlyElement, onlyElement ]
+points points_ =
+    Web.domAttribute "points"
+        ((case points_ of
+            [ onlyElement ] ->
+                [ onlyElement, onlyElement ]
 
-                notOnlyOne ->
-                    notOnlyOne
-             )
-                |> List.map (\point -> [ point.x |> String.fromFloat, ",", point.y |> String.fromFloat ] |> String.concat)
-                |> String.join " "
-            )
+            notOnlyOne ->
+                notOnlyOne
+         )
+            |> List.map (\point -> [ point.x |> String.fromFloat, ",", point.y |> String.fromFloat ] |> String.concat)
+            |> String.join " "
+        )
 
 
 polygon : List { x : Float, y : Float } -> List (Web.DomModifier future) -> Web.DomNode future
