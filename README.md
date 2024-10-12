@@ -5,8 +5,9 @@
 > Changes so far compared to the stable [elm-state-interface](https://dark.elm.dmy.fr/packages/lue-bird/elm-state-interface/latest):
 > 
 >   - move all `Web.X.y` module members to `Web.xY`
+>   - add module `Node`, split js package into `/web` and `/node` entrypoints
 >   - internal: improve performance of identifying many interfaces that would accumulate over time
->   - internal: replace `Dict` values to sorted assoc-list, `FastDict.Dict` or in the case of Interface, a custom FastDict clone
+>   - internal: replace `Dict` values to sorted assoc-list, `FastDict.Dict` or in the case of `Web.Interface`, a custom FastDict clone
 
 ### define an app in a simple, safe and declarative way
 
