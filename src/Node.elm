@@ -69,63 +69,6 @@ Helpers for randomness as part of an [`Interface`](Node#Interface).
 Not familiar with random "generators"? [`elm/random`](https://package.elm-lang.org/packages/elm/random/latest)
 explains it nicely!
 
-Here's an example showing a number between 1 and 6 and a button to reroll
-using [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packages/NoRedInk/elm-random-pcg-extended/latest/)
-
-    import Random.Pcg.Extended
-    import Node
-
-    type State
-        = WaitingForInitialRandomness
-        | DiceUiState { diceEyes : Int, seed : Random.Pcg.Extended.Seed }
-
-    type DiceUiEvent
-        = RerollClicked
-
-    diceEyesRandomGenerator : Random.Pcg.Extended.Generator Int
-    diceEyesRandomGenerator =
-        Random.Pcg.Extended.int 1 6
-
-    { initialState = WaitingForInitialRandomness
-    , interface =
-        \state ->
-            case state of
-                WaitingForInitialRandomness ->
-                    Node.randomUnsignedInt32s 4
-                        |> Node.interfaceFutureMap
-                            (\unsignedInt32s ->
-                                let
-                                    initialSeed : Random.Pcg.Extended.Seed
-                                    initialSeed =
-                                        Random.Pcg.Extended.initialSeed (unsignedInt32s |> List.head |> Maybe.withDefault 0) (unsignedInt32s |> List.drop 1)
-
-                                    ( diceEyes, newSeed ) =
-                                        Random.Pcg.Extended.step diceEyesRandomGenerator initialSeed
-                                in
-                                DiceUiState { diceEyes = diceEyes, seed = newSeed }
-                            )
-
-                DiceUiState randomStuff ->
-                    Node.domElement "div"
-                        []
-                        [ randomStuff.diceEyes |> String.fromInt |> Node.domText
-                        , Node.domElement "button"
-                            [ Node.domListenTo "click"
-                                |> Node.domModifierFutureMap (\_ -> RerollClicked)
-                            ]
-                            [ Node.domText "roll the dice" ]
-                        ]
-                        |> Node.domRender
-                        |> Node.interfaceFutureMap
-                            (\RerollClicked ->
-                                let
-                                    ( diceEyes, newSeed ) =
-                                        Random.Pcg.Extended.step diceEyesRandomGenerator randomStuff.seed
-                                in
-                                DiceUiState { diceEyes = diceEyes, seed = newSeed }
-                            )
-    }
-
 @docs randomUnsignedInt32s
 
 
@@ -199,7 +142,7 @@ import Time.LocalExtra
        Unless you want to allow your interface to be edited while it's running,
        it usually contains all the info from the `DomainSubjectVerb` variant (not including functions)
 
-     - in `runner/index.ts` inside `interfaceAddImplementation`, add
+     - in `runner/node.ts` inside `interfaceAddImplementation`, add
        ```javascript
        case "[YourName]": return (yourInput) => {
            // perform your stuff
@@ -232,7 +175,7 @@ import Time.LocalExtra
               [YourName] new ->
                   Edit[YourName] ..the diff..
       ```
-    - in `runner/index.ts` inside `interfaceEditImplementation`, add a `case "Edit[YourName]" : return (yourInput) => { ... }`
+    - in `runner/node.ts` inside `interfaceEditImplementation`, add a `case "Edit[YourName]" : return (yourInput) => { ... }`
 -}
 
 
@@ -385,46 +328,21 @@ In practice, this is sometimes used like a kind of event-config pattern:
     Node.timePosixRequest
         |> Node.interfaceFutureMap (\timeNow -> TimeReceived timeNow)
 
-    button "show all entries"
-        |> Node.domRender
-        |> Node.interfaceFutureMap (\Pressed -> ShowAllEntriesButtonClicked)
-
 sometimes as a way to deal with all events (like `update` in The Elm Architecture)
 
     ...
         |> Node.interfaceFutureMap
             (\event ->
                 case event of
-                    MouseMovedTo newMousePoint ->
-                        { state | mousePoint = newMousePoint }
+                    CursorMovedTo newCursorPoint ->
+                        { state | cursorPoint = newCursorPoint }
 
-                    CounterDecreaseClicked ->
+                    MinusEntered ->
                         { state | counter = state.counter - 1 }
 
-                    CounterIncreaseClicked ->
+                    PlusEntered ->
                         { state | counter = state.counter + 1 }
             )
-
-and sometimes to nest events (like `Cmd.map/Task.map/Sub.map/...` in The Elm Architecture):
-
-    type Event
-        = DirectoryTreeViewEvent TreeUiEvent
-        | SortButtonClicked
-
-    type TreeUiEvent
-        = Expanded TreePath
-        | Collapsed TreePath
-
-    interface : State -> Interface State
-    interface state =
-        ...
-            [ treeUi ..
-                |> Node.interfaceFutureMap DirectoryTreeViewEvent
-            , ...
-            ]
-            |> Node.domRender
-
-    treeUi : ... -> Node.DomNode TreeUiEvent
 
 In all these examples, you end up converting the narrow future representation of part of the interface
 to a broader representation for the parent interface
