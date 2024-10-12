@@ -1,4 +1,5 @@
 import * as process from "node:process"
+import * as fs from "node:fs"
 
 
 export interface ElmPorts {
@@ -26,10 +27,10 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             case "Add": return (config: { tag: string, value: any }) => {
                 const abortController = new AbortController()
                 abortControllers.set(id, abortController)
-                interfaceAddImplementation(id, config.tag, sendToElm, abortController.signal)(config.value)
+                interfaceAddImplementation(config.tag, sendToElm, abortController.signal)(config.value)
             }
             case "Edit": return (config: { tag: string, value: any }) => {
-                interfaceEditImplementation(id, config.tag, sendToElm)(config.value)
+                interfaceEditImplementation(id, config.tag)(config.value)
             }
             case "Remove": return (_config: null) => {
                 const abortController = abortControllers.get(id)
@@ -42,7 +43,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             }
         }
     }
-    function interfaceAddImplementation(id: string, tag: string, sendToElm: (v: any) => void, abortSignal: AbortSignal): ((config: any) => void) {
+    function interfaceAddImplementation(tag: string, sendToElm: (v: any) => void, abortSignal: AbortSignal): ((config: any) => void) {
         switch (tag) {
             case "ConsoleLog": return (message: string) => {
                 console.log(message)
@@ -95,13 +96,35 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             case "ProcessExit": return (code: number) => {
                 process.exit(code)
             }
+            case "FileDirectoryMake": return (write: { path: string }) => {
+                fs.promises.mkdir(write.path, { recursive: true })
+                    .then(() => { })
+                    .catch((err) => warn("failed to make directory " + err))
+            }
+            case "FileUtf8Write": return (write: { content: string, path: string }) => {
+                fileUtf8Write(write, abortSignal)
+            }
+            case "FileUtf8Request": return (write: { path: string }) => {
+                fs.promises.readFile(
+                    write.path,
+                    { encoding: "utf-8", signal: abortSignal }
+                )
+                    .then((content) => { sendToElm(content) })
+                    .catch((err) => warn("failed to read file " + err))
+            }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Add." + tag)
             }
         }
     }
-    function interfaceEditImplementation(id: string, tag: string, sendToElm: (v: any) => void): ((config: any) => void) {
+    function interfaceEditImplementation(id: string, tag: string): ((config: any) => void) {
         switch (tag) {
+            case "EditUtf8Write": return (write: { content: string, path: string }) => {
+                abortControllers.get(id)?.abort()
+                const abortController = new AbortController()
+                abortControllers.set(id, abortController)
+                fileUtf8Write(write, abortController.signal)
+            }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Edit." + tag)
             }
@@ -113,6 +136,16 @@ const abortControllers: Map<string, AbortController> = new Map()
 
 
 
+
+function fileUtf8Write(write: { path: string, content: string }, abortSignal: AbortSignal | undefined) {
+    fs.promises.writeFile(
+        write.path,
+        write.content,
+        { encoding: "utf-8", signal: abortSignal }
+    )
+        .then(() => { })
+        .catch((err) => warn("failed to write to file " + err))
+}
 
 interface HttpRequest {
     url: string

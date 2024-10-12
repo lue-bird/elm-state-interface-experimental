@@ -268,6 +268,9 @@ type InterfaceSingle future
     | TimezoneNameRequest (String -> future)
     | RandomUnsignedInt32sRequest { count : Int, on : List Int -> future }
     | ProcessExit Int
+    | FileDirectoryMake String
+    | FileUtf8Write { content : String, path : String }
+    | FileUtf8Request { path : String, on : String -> future }
 
 
 {-| An HTTP request for use in an [`Interface`](#Interface).
@@ -461,6 +464,18 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         ProcessExit code ->
             ProcessExit code
 
+        FileDirectoryMake path ->
+            FileDirectoryMake path
+
+        FileUtf8Write write ->
+            FileUtf8Write write
+
+        FileUtf8Request request ->
+            FileUtf8Request
+                { path = request.path
+                , on = \content -> request.on content |> futureChange
+                }
+
 
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
 httpRequestFutureMap futureChange request =
@@ -538,6 +553,24 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         ProcessExit _ ->
             []
 
+        FileDirectoryMake _ ->
+            []
+
+        FileUtf8Write oldWrite ->
+            case interfaces.updated of
+                FileUtf8Write updatedWrite ->
+                    if oldWrite.content == updatedWrite.content then
+                        []
+
+                    else
+                        [ fromSingeEdit (EditFileUtf8 updatedWrite) ]
+
+                _ ->
+                    []
+
+        FileUtf8Request _ ->
+            []
+
 
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
 -}
@@ -575,8 +608,14 @@ interfaceSingleEditToJson : InterfaceSingleEdit -> Json.Encode.Value
 interfaceSingleEditToJson edit =
     Json.Encode.LocalExtra.variant
         (case edit of
-            EditNever ever ->
-                never ever
+            EditFileUtf8 write ->
+                { tag = "FileUtf8Write"
+                , value =
+                    Json.Encode.object
+                        [ ( "path", write.path |> Json.Encode.string )
+                        , ( "content", write.content |> Json.Encode.string )
+                        ]
+                }
         )
 
 
@@ -635,6 +674,26 @@ interfaceSingleToJson interfaceSingle =
 
             ProcessExit code ->
                 { tag = "ProcessExit", value = code |> Json.Encode.int }
+
+            FileDirectoryMake path ->
+                { tag = "FileDirectoryMake", value = path |> Json.Encode.string }
+
+            FileUtf8Write write ->
+                { tag = "FileUtf8Write"
+                , value =
+                    Json.Encode.object
+                        [ ( "path", write.path |> Json.Encode.string )
+                        , ( "content", write.content |> Json.Encode.string )
+                        ]
+                }
+
+            FileUtf8Request request ->
+                { tag = "FileUtf8Request"
+                , value =
+                    Json.Encode.object
+                        [ ( "path", request.path |> Json.Encode.string )
+                        ]
+                }
         )
 
 
@@ -757,6 +816,19 @@ interfaceSingleToStructuredId interfaceSingle =
 
             ProcessExit _ ->
                 { tag = "ProcessExit", value = StructuredId.ofUnit }
+
+            FileDirectoryMake path ->
+                { tag = "FileDirectoryMake", value = path |> StructuredId.ofString }
+
+            FileUtf8Write write ->
+                { tag = "FileUtf8Write"
+                , value = write.path |> StructuredId.ofString
+                }
+
+            FileUtf8Request request ->
+                { tag = "FileUtf8Request"
+                , value = request.path |> StructuredId.ofString
+                }
         )
 
 
@@ -879,6 +951,17 @@ interfaceSingleFutureJsonDecoder interface =
 
         ProcessExit _ ->
             Nothing
+
+        FileDirectoryMake _ ->
+            Nothing
+
+        FileUtf8Write _ ->
+            Nothing
+
+        FileUtf8Request request ->
+            Json.Decode.string
+                |> Json.Decode.map request.on
+                |> Just
 
 
 httpExpectOnError : HttpExpect future -> (HttpError -> future)
@@ -1108,7 +1191,7 @@ type InterfaceSingleDiff irrelevantFuture
 describing changes to an existing interface with the same identity
 -}
 type InterfaceSingleEdit
-    = EditNever Never
+    = EditFileUtf8 { path : String, content : String }
 
 
 {-| Create a [`Program`](#Program):
