@@ -13,6 +13,7 @@ module Node exposing
     , httpBodyJson, httpBodyBytes
     , randomUnsignedInt32s
     , consoleLog, consoleWarn, consoleError, consoleClear
+    , terminalSizeRequest, terminalSizeChangeListen
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..)
     , interfaceSingleEdits, InterfaceSingleEdit(..)
@@ -32,7 +33,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## time
 
-[`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/) primitives as part of an [`Interface`](Web#Interface).
+[`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/) primitives as part of an [`Interface`](Node#Interface).
 
 @docs timePosixRequest, timeZoneRequest, timeZoneNameRequest
 @docs timePeriodicallyListen, timeOnceAt
@@ -51,7 +52,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## HTTP
 
-Helpers for HTTP requests as part of an [`Interface`](Web#Interface)
+Helpers for HTTP requests as part of an [`Interface`](Node#Interface)
 
 @docs HttpRequest, HttpBody, HttpExpect, HttpError, HttpMetadata
 
@@ -63,7 +64,7 @@ Helpers for HTTP requests as part of an [`Interface`](Web#Interface)
 
 ## random
 
-Helpers for randomness as part of an [`Interface`](Web#Interface).
+Helpers for randomness as part of an [`Interface`](Node#Interface).
 Not familiar with random "generators"? [`elm/random`](https://package.elm-lang.org/packages/elm/random/latest)
 explains it nicely!
 
@@ -127,11 +128,14 @@ using [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packages/NoRedI
 @docs randomUnsignedInt32s
 
 
-## console
+## console/terminal
 
-Helpers for console interactions as part of an [`Interface`](Web#Interface)
+Helpers for the simple debugging console that is similar to the JavaScript console mechanism provided by web browsers
+as part of an [`Interface`](Node#Interface).
+It's configured to write to standard out and standard err
 
 @docs consoleLog, consoleWarn, consoleError, consoleClear
+@docs terminalSizeRequest, terminalSizeChangeListen
 
 
 ## embed
@@ -140,7 +144,7 @@ If you just want to replace a part of your elm app with this architecture. Make 
 
 @docs ProgramConfig, programInit, programUpdate, programSubscriptions
 
-Under the hood, [`Node.program`](Web#program) is then defined as just
+Under the hood, [`Node.program`](Node#program) is then defined as just
 
     program config =
         Platform.worker
@@ -257,7 +261,7 @@ type alias ProgramConfig state =
 To create one, use the helpers in [time](#time), [HTTP](#http) etc.
 
 To combine multiple, use [`Node.interfaceBatch`](#interfaceBatch) and [`Node.interfaceNone`](#interfaceNone).
-To change the value that comes back in the future, use [`Node.interfaceFutureMap`](Web#interfaceFutureMap)
+To change the value that comes back in the future, use [`Node.interfaceFutureMap`](Node#interfaceFutureMap)
 
 -}
 type alias Interface future =
@@ -272,6 +276,8 @@ type InterfaceSingle future
     | ConsoleWarn String
     | ConsoleError String
     | ConsoleClear ()
+    | TerminalSizeRequest ({ lines : Int, columns : Int } -> future)
+    | TerminalSizeChangeListen ({ lines : Int, columns : Int } -> future)
     | ClipboardReplaceBy String
     | ClipboardRequest (String -> future)
     | HttpRequest (HttpRequest future)
@@ -300,8 +306,8 @@ type FileChange
 
 {-| An HTTP request for use in an [`Interface`](#Interface).
 
-Use [`Node.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
-Use [`Node.timeOnceAt`](Web#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
+Use [`Node.httpAddHeaders`](Node#httpAddHeaders) to set custom headers as needed.
+Use [`Node.timeOnceAt`](Node#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
 
 -}
 type alias HttpRequest future =
@@ -338,7 +344,7 @@ type HttpExpect future
     The first argument is a [MIME type](https://en.wikipedia.org/wiki/Media_type) of the body.
 
   - `HttpBodyUnsignedInt8s` is pretty much the same as `HttpBodyString` but for [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/),
-    see [`Node.httpBodyBytes`](Web#httpBodyBytes)
+    see [`Node.httpBodyBytes`](Node#httpBodyBytes)
 
 -}
 type HttpBody
@@ -516,6 +522,12 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         LaunchArgumentsRequest on ->
             LaunchArgumentsRequest (\arguments -> on arguments |> futureChange)
 
+        TerminalSizeRequest on ->
+            TerminalSizeRequest (\size -> on size |> futureChange)
+
+        TerminalSizeChangeListen on ->
+            TerminalSizeChangeListen (\size -> on size |> futureChange)
+
 
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
 httpRequestFutureMap futureChange request =
@@ -621,6 +633,12 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
             []
 
         LaunchArgumentsRequest _ ->
+            []
+
+        TerminalSizeRequest _ ->
+            []
+
+        TerminalSizeChangeListen _ ->
             []
 
 
@@ -757,6 +775,12 @@ interfaceSingleToJson interfaceSingle =
 
             LaunchArgumentsRequest _ ->
                 { tag = "LaunchArgumentsRequest", value = Json.Encode.null }
+
+            TerminalSizeRequest _ ->
+                { tag = "TerminalSizeRequest", value = Json.Encode.null }
+
+            TerminalSizeChangeListen _ ->
+                { tag = "TerminalSizeChangeListen", value = Json.Encode.null }
         )
 
 
@@ -906,6 +930,12 @@ interfaceSingleToStructuredId interfaceSingle =
 
             LaunchArgumentsRequest _ ->
                 { tag = "LaunchArgumentsRequest", value = StructuredId.ofUnit }
+
+            TerminalSizeRequest _ ->
+                { tag = "TerminalSizeRequest", value = StructuredId.ofUnit }
+
+            TerminalSizeChangeListen _ ->
+                { tag = "TerminalSizeChangeListen", value = StructuredId.ofUnit }
         )
 
 
@@ -1062,6 +1092,23 @@ interfaceSingleFutureJsonDecoder interface =
             Json.Decode.list Json.Decode.string
                 |> Json.Decode.map on
                 |> Just
+
+        TerminalSizeRequest on ->
+            terminalSizeJsonDecoder
+                |> Json.Decode.map on
+                |> Just
+
+        TerminalSizeChangeListen on ->
+            terminalSizeJsonDecoder
+                |> Json.Decode.map on
+                |> Just
+
+
+terminalSizeJsonDecoder : Json.Decode.Decoder { lines : Int, columns : Int }
+terminalSizeJsonDecoder =
+    Json.Decode.map2 (\lines columns -> { lines = lines, columns = columns })
+        (Json.Decode.field "lines" Json.Decode.int)
+        (Json.Decode.field "columns" Json.Decode.int)
 
 
 httpExpectOnError : HttpExpect future -> (HttpError -> future)
@@ -1342,7 +1389,7 @@ interfaceFromSingle interfaceSingle =
         interfaceSingle
 
 
-{-| An [`Interface`](Web#Interface) for getting the current [POSIX time](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Posix).
+{-| An [`Interface`](Node#Interface) for getting the current [POSIX time](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Posix).
 
 Replacement for [`elm/time`'s `Time.now`](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#now).
 
@@ -1353,7 +1400,7 @@ timePosixRequest =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for getting a [`Time.Zone`](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Zone)
+{-| An [`Interface`](Node#Interface) for getting a [`Time.Zone`](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Zone)
 based on the current UTC offset.
 
 Replacement for [`elm/time`'s `Time.here`](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#here).
@@ -1366,7 +1413,7 @@ timeZoneRequest =
 
 
 {-| Intended for package authors.
-An [`Interface`](Web#Interface) for using [`Intl.DateTimeFormat().resolvedOptions().timeZone`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/resolvedOptions#timezone)
+An [`Interface`](Node#Interface) for using [`Intl.DateTimeFormat().resolvedOptions().timeZone`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/resolvedOptions#timezone)
 to get names like `Europe/Moscow` or `America/Havana`.
 From there you can look it up in any [IANA data](https://www.iana.org/time-zones) you loaded yourself.
 
@@ -1379,7 +1426,7 @@ timeZoneNameRequest =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for getting a reminder
+{-| An [`Interface`](Node#Interface) for getting a reminder
 once a given [point in time](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Posix) has been reached.
 
 This lets you for example wait until it's 15 minutes before the event,
@@ -1433,13 +1480,8 @@ timeOnceAt pointInTime =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for getting the current time
+{-| An [`Interface`](Node#Interface) for getting the current time
 every time a given [`Duration`](https://dark.elm.dmy.fr/packages/ianmackenzie/elm-units/latest/Duration) has passed.
-
-Note: Do not use it for animations.
-[`Node.animationFrameListen`](Web#animationFrameListen)
-syncs up with repaints and will end up being much smoother for any moving visuals.
-
 -}
 timePeriodicallyListen : Duration -> Interface Time.Posix
 timePeriodicallyListen intervalDuration =
@@ -1470,7 +1512,7 @@ exit code =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for getting the current working directory.
+{-| An [`Interface`](Node#Interface) for getting the current working directory.
 
 Uses [`process.cwd`](https://nodejs.org/api/process.html#processcwd)
 
@@ -1481,7 +1523,7 @@ workingDirectoryPathRequest =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for getting
+{-| An [`Interface`](Node#Interface) for getting
 the command-line arguments passed when the Node.js process was launched.
 
 Uses [`process.argv`](https://nodejs.org/api/process.html#processargv)
@@ -1493,7 +1535,7 @@ launchArgumentsRequest =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for creating a directory
+{-| An [`Interface`](Node#Interface) for creating a directory
 at a given path.
 
 Uses [`fs.mkdir`](https://nodejs.org/api/fs.html#fspromisesmkdirpath-options)
@@ -1505,7 +1547,7 @@ directoryMake path =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for unlinking a file
+{-| An [`Interface`](Node#Interface) for unlinking a file
 at a given path.
 
 Uses [`fs.unlink`](https://nodejs.org/api/fs.html#fsunlinkpath-callback)
@@ -1517,7 +1559,7 @@ fileRemove path =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for creating or overwriting a file
+{-| An [`Interface`](Node#Interface) for creating or overwriting a file
 at a given path with given string content.
 
 Uses [`fs.writeFile`](https://nodejs.org/api/fs.html#fswritefilefile-data-options-callback)
@@ -1529,7 +1571,7 @@ fileUtf8Write write =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for reading the string content of the file
+{-| An [`Interface`](Node#Interface) for reading the string content of the file
 at a given path.
 
 Uses [`fs.readFile`](https://nodejs.org/api/fs.html#fsreadfilepath-options-callback)
@@ -1541,7 +1583,7 @@ fileUtf8Request path =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for detecting changes to
+{-| An [`Interface`](Node#Interface) for detecting changes to
 the file at a given path or any of its deepest sub-files.
 
 Uses [`fs.watch({ recursive: true })`](https://nodejs.org/api/fs.html#fswatchfilename-options-listener)
@@ -1553,11 +1595,11 @@ fileChangeListen path =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for generating a given count of cryptographically sound unsigned 32-bit `Int`s.
+{-| An [`Interface`](Node#Interface) for generating a given count of cryptographically sound unsigned 32-bit `Int`s.
 You can use these in all kinds of packages that allow creating an initial seed
 from ints like [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packages/NoRedInk/elm-random-pcg-extended/latest/Random-Pcg-Extended#initialSeed)
 
-Note: uses [`window.crypto.getRandomValues`](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)
+Note: uses [`crypto.getRandomValues`](https://nodejs.org/api/crypto.html#cryptogetrandomvaluestypedarray)
 
 -}
 randomUnsignedInt32s : Int -> Interface (List Int)
@@ -1609,7 +1651,7 @@ httpBodyBytes mimeType content =
 {-| Expect the response body to be `JSON`, decode it using the given decoder.
 The result will either be
 
-  - `Err` with an [`HttpError`](Web#HttpError) if it didn't succeed
+  - `Err` with an [`HttpError`](Node#HttpError) if it didn't succeed
   - `Ok` if there was a result with either
       - `Ok` with the decoded value
       - `Err` with a [`Json.Decode.Error`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Decode#Error)
@@ -1644,7 +1686,7 @@ httpExpectJson stateDecoder =
 {-| Expect the response body to be [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/).
 The result will either be
 
-  - `Err` with an [`HttpError`](Web#HttpError) if it didn't succeed
+  - `Err` with an [`HttpError`](Node#HttpError) if it didn't succeed
   - `Ok` with the `Bytes`
 
 -}
@@ -1671,10 +1713,10 @@ httpExpectWhatever =
     HttpExpectWhatever identity
 
 
-{-| Create a `GET` [`HttpRequest`](Web#HttpRequest).
+{-| Create a `GET` [`HttpRequest`](Node#HttpRequest).
 
-Use [`Node.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
-Use [`Node.timeOnceAt`](Web#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
+Use [`Node.httpAddHeaders`](Node#httpAddHeaders) to set custom headers as needed.
+Use [`Node.timeOnceAt`](Node#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
 
 -}
 httpGet :
@@ -1691,7 +1733,7 @@ httpGet options =
     }
 
 
-{-| Add custom headers to the [`Node.HttpRequest`](Web#HttpRequest).
+{-| Add custom headers to the [`Node.HttpRequest`](Node#HttpRequest).
 
     request
         |> Node.httpAddHeaders
@@ -1712,10 +1754,10 @@ httpAddHeaders headers request =
 -- request
 
 
-{-| Create a `POST` [`HttpRequest`](Web#HttpRequest).
+{-| Create a `POST` [`HttpRequest`](Node#HttpRequest).
 
-Use [`Node.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
-Use [`Node.timeOnceAt`](Web#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
+Use [`Node.httpAddHeaders`](Node#httpAddHeaders) to set custom headers as needed.
+Use [`Node.timeOnceAt`](Node#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
 
 -}
 httpPost :
@@ -1733,7 +1775,7 @@ httpPost options =
     }
 
 
-{-| An [`Interface`](Web#Interface) for handling an [`HttpRequest`](Web#HttpRequest)
+{-| An [`Interface`](Node#Interface) for handling an [`HttpRequest`](Node#HttpRequest)
 using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
 -}
 httpRequest : HttpRequest future -> Interface future
@@ -1741,14 +1783,12 @@ httpRequest request =
     request |> HttpRequest |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for printing a message with general information
+{-| An [`Interface`](Node#Interface) for printing a message with general information
 like if certain tasks have been successful
 
 > survey submitted and received successfully
 
-Depending on what minifying tools you use for your production build, these might get removed.
-
-Note: uses [`console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static),
+Uses [`console.log`](https://nodejs.org/api/console.html#consolelogdata-args),
 just like [`Debug.log`](https://dark.elm.dmy.fr/packages/elm/core/latest/Debug#log)
 
 -}
@@ -1758,13 +1798,13 @@ consoleLog string =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for printing a message that something didn't succeed but you could recover from, for example
+{-| An [`Interface`](Node#Interface) for printing a message that something didn't succeed but you could recover from, for example
 
 > ⚠️ Unknown device - there may be compatibility issues.
 
 > ⚠️ Recoverable upload failure, will retry. Error was: no status.
 
-Note: uses [`console.warn`](https://developer.mozilla.org/en-US/docs/Web/API/console/warn_static)
+Uses [`console.warn`](https://nodejs.org/api/console.html#consolewarndata-args)
 
 -}
 consoleWarn : String -> Interface future_
@@ -1773,11 +1813,11 @@ consoleWarn string =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for printing a message that something failed with bad consequences, for example
+{-| An [`Interface`](Node#Interface) for printing a message that something failed with bad consequences, for example
 
 > ❌ decoding the selected file failed. Please report this bug at ...
 
-Note: uses [`console.error`](https://developer.mozilla.org/en-US/docs/Web/API/console/error_static)
+Uses [`console.error`](https://nodejs.org/api/console.html#consoleerrordata-args)
 
 -}
 consoleError : String -> Interface future_
@@ -1786,18 +1826,34 @@ consoleError string =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for printing a message with general information
-like if certain tasks have been successful
+{-| An [`Interface`](Node#Interface) for setting the console to blank.
+For most Linux operating systems, this works similar to the `clear` command.
+On Windows, it will only clear the output in the current terminal viewport for node.
 
-> survey submitted and received successfully
+If you want to do more than clear the screen,
+use [`Node.consoleLog`](#consoleLog) with [an ansi code for erasing](https://dark.elm.dmy.fr/packages/wolfadex/elm-ansi/latest/Ansi#erasing) instead
+(either use a library or go click on the declarations and copy source)
 
-Depending on what minifying tools you use for your production build, these might get removed.
-
-Note: uses [`console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static),
-just like [`Debug.log`](https://dark.elm.dmy.fr/packages/elm/core/latest/Debug#log)
+Uses [`console.clear`](https://nodejs.org/api/console.html#consoleclear),
 
 -}
 consoleClear : Interface future_
 consoleClear =
     ConsoleClear ()
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Node#Interface) for getting the inner terminal window width and height in characters,
+-}
+terminalSizeRequest : Interface { lines : Int, columns : Int }
+terminalSizeRequest =
+    TerminalSizeRequest identity
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Node#Interface) for detecting changes to the inner window width and height
+-}
+terminalSizeChangeListen : Interface { lines : Int, columns : Int }
+terminalSizeChangeListen =
+    TerminalSizeChangeListen identity
         |> interfaceFromSingle

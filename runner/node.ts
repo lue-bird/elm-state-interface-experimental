@@ -93,6 +93,18 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "ConsoleError": return (_config: null) => {
                 console.clear()
             }
+            case "TerminalSizeRequest": return (_config: null) => {
+                sendToElm({ lines: process.stdout.rows, columns: process.stdout.columns })
+            }
+            case "TerminalSizeChangeListen": return (_config: null) => {
+                function onResize(_event: any): void {
+                    sendToElm({ lines: process.stdout.rows, columns: process.stdout.columns })
+                }
+                process.stdout.addListener("resize", onResize)
+                abortSignal.addEventListener("abort", (_event) => {
+                    process.stdout.removeListener("resize", onResize)
+                })
+            }
             case "HttpRequest": return (config: HttpRequest) => {
                 httpFetch(config, abortSignal).then(sendToElm)
             }
