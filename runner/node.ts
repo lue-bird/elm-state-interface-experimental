@@ -41,6 +41,9 @@ export function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePat
 
 export function programStart(appConfig: { ports: ElmPorts }) {
     process.on("SIGINT", () => {
+        abortControllers.forEach((abortController) => {
+            abortController.abort()
+        })
         process.exit()
     })
     appConfig.ports.toJs.subscribe(function (fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
