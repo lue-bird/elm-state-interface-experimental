@@ -4,6 +4,7 @@ module Node exposing
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
     , workingDirectoryPathRequest, exit
+    , directoryMake, fileUtf8Write, fileUtf8Request
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
     , httpRequest
     , httpGet, httpPost, httpAddHeaders
@@ -39,6 +40,11 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 ## process
 
 @docs workingDirectoryPathRequest, exit
+
+
+## file system
+
+@docs directoryMake, fileUtf8Write, fileUtf8Request
 
 
 ## HTTP
@@ -274,7 +280,7 @@ type InterfaceSingle future
     | TimezoneNameRequest (String -> future)
     | RandomUnsignedInt32sRequest { count : Int, on : List Int -> future }
     | Exit Int
-    | FileDirectoryMake String
+    | DirectoryMake String
     | FileUtf8Write { content : String, path : String }
     | FileUtf8Request { path : String, on : String -> future }
     | WorkingDirectoryPathRequest (String -> future)
@@ -471,8 +477,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         Exit code ->
             Exit code
 
-        FileDirectoryMake path ->
-            FileDirectoryMake path
+        DirectoryMake path ->
+            DirectoryMake path
 
         FileUtf8Write write ->
             FileUtf8Write write
@@ -563,7 +569,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         Exit _ ->
             []
 
-        FileDirectoryMake _ ->
+        DirectoryMake _ ->
             []
 
         FileUtf8Write oldWrite ->
@@ -688,8 +694,8 @@ interfaceSingleToJson interfaceSingle =
             Exit code ->
                 { tag = "Exit", value = code |> Json.Encode.int }
 
-            FileDirectoryMake path ->
-                { tag = "FileDirectoryMake", value = path |> Json.Encode.string }
+            DirectoryMake path ->
+                { tag = "DirectoryMake", value = path |> Json.Encode.string }
 
             FileUtf8Write write ->
                 { tag = "FileUtf8Write"
@@ -833,8 +839,8 @@ interfaceSingleToStructuredId interfaceSingle =
             Exit _ ->
                 { tag = "Exit", value = StructuredId.ofUnit }
 
-            FileDirectoryMake path ->
-                { tag = "FileDirectoryMake", value = path |> StructuredId.ofString }
+            DirectoryMake path ->
+                { tag = "DirectoryMake", value = path |> StructuredId.ofString }
 
             FileUtf8Write write ->
                 { tag = "FileUtf8Write"
@@ -971,7 +977,7 @@ interfaceSingleFutureJsonDecoder interface =
         Exit _ ->
             Nothing
 
-        FileDirectoryMake _ ->
+        DirectoryMake _ ->
             Nothing
 
         FileUtf8Write _ ->
@@ -1377,7 +1383,7 @@ timePeriodicallyListen intervalDuration =
 {-| Stop the process as quickly as possible,
 not completing any further operations.
 
-Uses [process.exit](https://nodejs.org/api/process.html#processexitcode)
+Uses [`process.exit`](https://nodejs.org/api/process.html#processexitcode)
 
 -}
 exit : Int -> Interface future_
@@ -1394,6 +1400,42 @@ Uses [`process.cwd`](https://nodejs.org/api/process.html#processcwd)
 workingDirectoryPathRequest : Interface String
 workingDirectoryPathRequest =
     WorkingDirectoryPathRequest identity
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Web#Interface) for creating a directory
+at a given path.
+
+Uses [`fs.mkdir`](https://nodejs.org/api/fs.html#fspromisesmkdirpath-options)
+
+-}
+directoryMake : String -> Interface future_
+directoryMake path =
+    DirectoryMake path
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Web#Interface) for creating or overwriting a file
+at a given path with given string content.
+
+Uses [`fs.writeFile`](https://nodejs.org/api/fs.html#fswritefilefile-data-options-callback)
+
+-}
+fileUtf8Write : { content : String, path : String } -> Interface future_
+fileUtf8Write write =
+    FileUtf8Write write
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Web#Interface) for reading the string content of the file
+at a given path.
+
+Uses [`fs.readFile`](https://nodejs.org/api/fs.html#fsreadfilepath-options-callback)
+
+-}
+fileUtf8Request : String -> Interface String
+fileUtf8Request path =
+    FileUtf8Request { path = path, on = identity }
         |> interfaceFromSingle
 
 

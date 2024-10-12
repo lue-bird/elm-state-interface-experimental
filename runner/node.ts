@@ -96,7 +96,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             case "Exit": return (code: number) => {
                 process.exit(code)
             }
-            case "FileDirectoryMake": return (write: { path: string }) => {
+            case "DirectoryMake": return (write: { path: string }) => {
                 fs.promises.mkdir(write.path, { recursive: true })
                     .then(() => { })
                     .catch((err) => warn("failed to make directory " + err))
