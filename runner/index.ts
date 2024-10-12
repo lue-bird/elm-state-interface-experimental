@@ -125,8 +125,20 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             }
             case "DomNodeRender": return (config: { reversePath: number[], node: any }) => {
                 const oldDomNodeToEdit = domElementOrDummyInElementAtReversePath(domElementOrDummyAtIndex(appConfig.domElement, 0), config.reversePath)
-                const newDomNode = createDomNode(id, config.node, oldDomNodeToEdit.childNodes, sendToElm)
-                oldDomNodeToEdit.parentElement?.replaceChild(newDomNode, oldDomNodeToEdit)
+                switch (config.node.tag) {
+                    case "Text": {
+                        oldDomNodeToEdit.parentElement?.replaceChild(
+                            document.createTextNode(config.node.value),
+                            oldDomNodeToEdit
+                        )
+                    }
+                    case "Element": {
+                        oldDomNodeToEdit.parentElement?.replaceChild(
+                            createDomElement(id, config.node.value, oldDomNodeToEdit.childNodes, sendToElm),
+                            oldDomNodeToEdit
+                        )
+                    }
+                }
                 abortSignal.addEventListener("abort", _event => {
                     domListenAbortControllers.delete(id)
                     // it is possible that the "newDomNode" has been replaced
@@ -136,7 +148,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                         appConfigDomELementChildElementOnDelete === null ?
                             null
                             :
-                            domInElementAtReversePath(appConfigDomELementChildElementOnDelete, config.reversePath)
+                            domNodeInElementAtReversePath(appConfigDomELementChildElementOnDelete, config.reversePath)
                     if (toRemove !== null) {
                         while (toRemove.nextSibling !== null) {
                             toRemove.nextSibling.remove()
@@ -405,6 +417,12 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             return (childNode instanceof Element) ? childNode : null
         }
     }
+    function domNodeAtIndex(parent: Element | null, index: number) {
+        return (parent === null) ?
+            null
+            :
+            parent.childNodes.item(index)
+    }
 
     function domElementOrDummyAtIndex(parent: Element, index: number): Element {
         const childNode = parent.childNodes.item(index)
@@ -424,12 +442,16 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
         }
     }
 
-    function domInElementAtReversePath(overallParent: Element, reversePath: number[]): ChildNode | null {
+    function domNodeInElementAtReversePath(overallParent: Element, reversePath: number[]): ChildNode | null {
         let soFar: Element | null = overallParent
-        for (let pathIndex = reversePath.length - 1; pathIndex >= 0; pathIndex--) {
+        for (
+            let pathIndex = reversePath.length - 1;
+            pathIndex >= 1; // ! notice the 1
+            pathIndex--
+        ) {
             soFar = domElementAtIndex(soFar, reversePath[pathIndex] ?? 0)
         }
-        return soFar
+        return domNodeAtIndex(soFar, reversePath[0] ?? 0)
     }
     function domElementOrDummyInElementAtReversePath(overallParent: Element, reversePath: number[]): ChildNode {
         let soFar: Element | null = overallParent
@@ -447,9 +469,28 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     ) {
         switch (replacement.tag) {
             case "Node": {
-                const oldDomNodeToEdit = domElementOrDummyInElementAtReversePath(domElementOrDummyAtIndex(appConfig.domElement, 0), reversePath)
-                const newDomNode = createDomNode(id, replacement.value, oldDomNodeToEdit.childNodes, sendToElm)
-                oldDomNodeToEdit.parentElement?.replaceChild(newDomNode, oldDomNodeToEdit)
+                const oldDomNodeToEdit = domNodeInElementAtReversePath(
+                    domElementOrDummyAtIndex(appConfig.domElement, 0),
+                    reversePath
+                )
+                if (oldDomNodeToEdit == null) {
+                    warn("the DOM node I wanted to replace has been moved. Try to disable potential interfering extensions")
+                } else {
+                    switch (replacement.value.tag) {
+                        case "Text": {
+                            oldDomNodeToEdit.parentElement?.replaceChild(
+                                document.createTextNode(replacement.value.value),
+                                oldDomNodeToEdit
+                            )
+                        }
+                        case "Element": {
+                            oldDomNodeToEdit.parentElement?.replaceChild(
+                                createDomElement(id, replacement.value.value, oldDomNodeToEdit.childNodes, sendToElm),
+                                oldDomNodeToEdit
+                            )
+                        }
+                    }
+                }
                 break
             }
             case "Styles": case "Attributes": case "AttributesNamespaced": case "StringProperties": case "BoolProperties": case "ScrollToPosition": case "ScrollToShow": case "ScrollPositionRequest": case "EventListens": {
@@ -582,37 +623,30 @@ function getOrAddMeta(name: string): HTMLMetaElement {
     }
 }
 
-function createDomNode(id: string, node: { tag: "Text" | "Element", value: any }, subs: NodeListOf<ChildNode>, sendToElm: (v: any) => void): Element | Text {
-    switch (node.tag) {
-        case "Text": {
-            return document.createTextNode(node.value)
-        }
-        case "Element": {
-            const createdDomElement: HTMLElement =
-                node.value.namespace !== null ?
-                    document.createElementNS(node.value.namespace, noScript(node.value.tag))
-                    :
-                    document.createElement(noScript(node.value.tag))
+function createDomElement(id: string, node: any, subs: NodeListOf<ChildNode>, sendToElm: (v: any) => void): Element {
+    const createdDomElement: HTMLElement =
+        node.namespace !== null ?
+            document.createElementNS(node.namespace, noScript(node.tag))
+            :
+            document.createElement(noScript(node.tag))
 
-            domElementAddAttributes(createdDomElement, node.value.attributes)
-            domElementAddAttributesNamespaced(createdDomElement, node.value.attributesNamespaced)
-            domElementAddStyles(createdDomElement, node.value.styles)
-            domElementSetStringProperties(createdDomElement, node.value.stringProperties)
-            domElementSetBoolProperties(createdDomElement, node.value.boolProperties)
-            if (node.value.scrollToPosition !== null) {
-                node.value.scrollTo({ top: node.value.scrollToPosition.fromTop, left: node.value.scrollToPosition.fromLeft })
-            }
-            if (node.value.scrollToShow !== null) {
-                node.value.scrollIntoView({ inline: node.value.scrollToShow.x, block: node.value.scrollToShow.y })
-            }
-            if (node.value.scrollPositionRequest === true) {
-                domElementAddScrollPositionRequest(createdDomElement, sendToElm)
-            }
-            domElementAddEventListens(id, createdDomElement, node.value.eventListens, sendToElm)
-            createdDomElement.append(...subs)
-            return createdDomElement
-        }
+    domElementAddAttributes(createdDomElement, node.attributes)
+    domElementAddAttributesNamespaced(createdDomElement, node.attributesNamespaced)
+    domElementAddStyles(createdDomElement, node.styles)
+    domElementSetStringProperties(createdDomElement, node.stringProperties)
+    domElementSetBoolProperties(createdDomElement, node.boolProperties)
+    if (node.scrollToPosition !== null) {
+        node.scrollTo({ top: node.scrollToPosition.fromTop, left: node.scrollToPosition.fromLeft })
     }
+    if (node.scrollToShow !== null) {
+        node.scrollIntoView({ inline: node.scrollToShow.x, block: node.scrollToShow.y })
+    }
+    if (node.scrollPositionRequest === true) {
+        domElementAddScrollPositionRequest(createdDomElement, sendToElm)
+    }
+    domElementAddEventListens(id, createdDomElement, node.eventListens, sendToElm)
+    createdDomElement.append(...subs)
+    return createdDomElement
 }
 function domElementAddScrollPositionRequest(domElement: Element, sendToElm: (v: any) => void) {
     // guarantee it has painted drawn at least once
