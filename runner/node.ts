@@ -1,3 +1,6 @@
+import * as process from "node:process"
+
+
 export interface ElmPorts {
     toJs: {
         subscribe: (callback: (fromElm: any) => void) => void
@@ -88,6 +91,9 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             }
             case "RandomUnsignedInt32sRequest": return (config: number) => {
                 sendToElm(Array.from(window.crypto.getRandomValues(new Uint32Array(config))))
+            }
+            case "ProcessExit": return (code: number) => {
+                process.exit(code)
             }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Add." + tag)

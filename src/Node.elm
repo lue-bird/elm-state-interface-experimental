@@ -267,6 +267,7 @@ type InterfaceSingle future
     | TimePeriodicallyListen { intervalDurationMilliSeconds : Int, on : Time.Posix -> future }
     | TimezoneNameRequest (String -> future)
     | RandomUnsignedInt32sRequest { count : Int, on : List Int -> future }
+    | ProcessExit Int
 
 
 {-| An HTTP request for use in an [`Interface`](#Interface).
@@ -457,6 +458,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             }
                 |> TimePeriodicallyListen
 
+        ProcessExit code ->
+            ProcessExit code
+
 
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
 httpRequestFutureMap futureChange request =
@@ -529,6 +533,9 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
             []
 
         RandomUnsignedInt32sRequest _ ->
+            []
+
+        ProcessExit _ ->
             []
 
 
@@ -625,6 +632,9 @@ interfaceSingleToJson interfaceSingle =
                     Json.Encode.object
                         [ ( "milliSeconds", intervalDuration.intervalDurationMilliSeconds |> Json.Encode.int ) ]
                 }
+
+            ProcessExit code ->
+                { tag = "ProcessExit", value = code |> Json.Encode.int }
         )
 
 
@@ -744,6 +754,9 @@ interfaceSingleToStructuredId interfaceSingle =
                 { tag = "TimePeriodicallyListen"
                 , value = listen.intervalDurationMilliSeconds |> StructuredId.ofInt
                 }
+
+            ProcessExit _ ->
+                { tag = "ProcessExit", value = StructuredId.ofUnit }
         )
 
 
@@ -863,6 +876,9 @@ interfaceSingleFutureJsonDecoder interface =
             Json.Decode.list Json.Decode.int
                 |> Json.Decode.map randomUnsignedInt32sRequest.on
                 |> Just
+
+        ProcessExit _ ->
+            Nothing
 
 
 httpExpectOnError : HttpExpect future -> (HttpError -> future)
