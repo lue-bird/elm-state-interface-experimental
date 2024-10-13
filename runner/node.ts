@@ -1,11 +1,12 @@
+import whyIsNodeRunning from 'why-is-node-running';
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as child_process from "node:child_process"
 
-
 export interface ElmPorts {
     toJs: {
-        subscribe: (callback: (fromElm: any) => void) => void
+        subscribe: (callback: (fromElm: any) => void) => void,
+        unsubscribe: (callback: (fromElm: any) => void) => void
     }
     fromJs: { send: (toElm: any) => void }
 }
@@ -17,18 +18,23 @@ export interface ElmPorts {
  * @param mainElmModuleNamePath usually Main.elm or src/Main.elm depending on where your index.js is
  * @returns An elm worker program you can start whenever you want which then provides its ports
  */
-export function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePath: string): { init: () => { ports: ElmPorts } } {
+export async function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePath: string): Promise<{ init: () => { ports: ElmPorts } }> {
     if (elmProjectDirectoryPath === undefined) {
         console.error("To access import.meta.dirname you need at least Node.js 20.11 / 21.2: https://stackoverflow.com/a/50052194")
         throw new Error()
     }
     const elmJsPath = path.join(elmProjectDirectoryPath, "elm-stuff", "temporary-elm.js")
-    child_process.execSync(
-        // if you want to use Debug.log etc while prototyping or debugging, remove the --optimize flag
-        // if you need extra performance switch to https://github.com/mdgriffith/elm-optimize-level-2
-        `elm make ${mainElmModuleNamePath} --output "${elmJsPath}" --optimize`,
-        { cwd: elmProjectDirectoryPath }
-    )
+    await new Promise((resolve, _reject) => {
+        child_process.exec(
+            // if you want to use Debug.log etc while prototyping or debugging, remove the --optimize flag
+            // if you need extra performance switch to https://github.com/mdgriffith/elm-optimize-level-2
+            `elm make ${mainElmModuleNamePath} --output "${elmJsPath}" --optimize`,
+            { cwd: elmProjectDirectoryPath },
+            () => {
+                resolve(null)
+            }
+        )
+    })
     eval(
         fs.readFileSync(elmJsPath, { encoding: "utf8" })
             .replace("(this)", "(globalThis)")
@@ -46,7 +52,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
         })
         process.exit()
     })
-    appConfig.ports.toJs.subscribe(function (fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
+    function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
         // console.log("elm → js: ", fromElm)
         function sendToElm(eventData: void) {
             const toElm = {
@@ -57,7 +63,8 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             // console.log("js → elm: ", toElm)
         }
         interfaceDiffImplementation(fromElm.diff.tag, sendToElm, fromElm.id)(fromElm.diff.value)
-    })
+    }
+    appConfig.ports.toJs.subscribe(listenToElm)
     function interfaceDiffImplementation(tag: "Add" | "Edit" | "Remove", sendToElm: (v: any) => void, id: string): ((config: any) => void) {
         switch (tag) {
             case "Add": return (config: { tag: string, value: any }) => {
@@ -142,10 +149,17 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 sendToElm(Array.from(crypto.getRandomValues(new Uint32Array(config))))
             }
             case "Exit": return (code: number) => {
-                process.exitCode = code
-                abortSignal.addEventListener("abort", (_event) => {
-                    process.exitCode = 0
+                appConfig.ports.toJs.unsubscribe(listenToElm)
+                abortControllers.forEach((abortController) => {
+                    abortController.abort()
+                    // abortController.signal.onabort = null
                 })
+                // abortControllers.clear() // disable any abort signal listeners
+                // process.removeAllListeners("SIGINT")
+                // process.stdin.removeAllListeners()
+                console.log(process.stdin.listenerCount("data"))
+                process.exitCode = code
+                whyIsNodeRunning()
             }
             case "ProcessTitleSet": return (newTitle: string) => {
                 process.title = newTitle
@@ -181,8 +195,12 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 sendToElm(process.argv)
             }
             case "StandardInListen": return (_config: null) => {
-                process.stdin.addListener("data", (buffer) => {
+                function listen(buffer: Buffer) {
                     sendToElm(buffer.toString())
+                }
+                process.stdin.addListener("data", listen)
+                abortSignal.addEventListener("abort", (_event) => {
+                    process.stdin.removeListener("data", listen);
                 })
             }
             default: return (_config: any) => {
