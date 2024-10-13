@@ -880,7 +880,7 @@ interfaceSingleToStructuredId interfaceSingle =
             TerminalSizeChangeListen _ ->
                 { tag = "TerminalSizeChangeListen", value = StructuredId.ofUnit }
 
-            ProcessTitleSet newTitle ->
+            ProcessTitleSet _ ->
                 { tag = "ProcessTitleSet", value = StructuredId.ofUnit }
         )
 
