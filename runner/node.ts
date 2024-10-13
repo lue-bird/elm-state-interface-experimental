@@ -1,4 +1,3 @@
-import whyIsNodeRunning from 'why-is-node-running';
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as child_process from "node:child_process"
@@ -46,12 +45,6 @@ export async function compileElm(elmProjectDirectoryPath: string, mainElmModuleN
 
 
 export function programStart(appConfig: { ports: ElmPorts }) {
-    process.on("SIGINT", () => {
-        abortControllers.forEach((abortController) => {
-            abortController.abort()
-        })
-        process.exit()
-    })
     function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
         // console.log("elm → js: ", fromElm)
         function sendToElm(eventData: void) {
@@ -150,16 +143,9 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
             case "Exit": return (code: number) => {
                 appConfig.ports.toJs.unsubscribe(listenToElm)
-                abortControllers.forEach((abortController) => {
-                    abortController.abort()
-                    // abortController.signal.onabort = null
-                })
-                // abortControllers.clear() // disable any abort signal listeners
-                // process.removeAllListeners("SIGINT")
-                // process.stdin.removeAllListeners()
-                console.log(process.stdin.listenerCount("data"))
+                abortControllers.clear() // disable any abort signal listeners
+                process.stdin.unref()
                 process.exitCode = code
-                whyIsNodeRunning()
             }
             case "ProcessTitleSet": return (newTitle: string) => {
                 process.title = newTitle

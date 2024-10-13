@@ -1459,10 +1459,6 @@ completing all other current interface operations.
 Do not keep listens in the interface,
 otherwise the process will not die.
 
-Btw you do not need to specify `Node.exit 0`
-for every interface. Once every interface has completed,
-the process will exit with 0 on its own.
-
 Uses [`process.exitCode = ...`](https://nodejs.org/api/process.html#processexitcode_1)
 instead of [`process.exit`](https://nodejs.org/api/process.html#processexitcode)
 to still make interfaces like writing an error come through before exiting.
