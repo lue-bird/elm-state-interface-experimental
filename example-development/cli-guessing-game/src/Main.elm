@@ -17,7 +17,14 @@ main =
 
 type State
     = WaitingForInitialRandomness
-    | Playing { secretNumber : Int, guesses : List Int }
+    | Playing StatePlaying
+
+
+type alias StatePlaying =
+    { secretNumber : Int
+    , guesses : List Int
+    , previousGuessInvalid : Bool
+    }
 
 
 initialState : State
@@ -46,89 +53,109 @@ interface state =
                                     { secretNumber =
                                         randomInt |> Basics.abs |> Basics.remainderBy 100
                                     , guesses = []
+                                    , previousGuessInvalid = False
                                     }
                     )
 
         Playing playing ->
-            case playing.guesses of
-                [] ->
-                    [ Node.consoleLog
-                        ("We're playing \"guess the number\". You have "
-                            ++ (allowedGuessCount |> String.fromInt)
-                            ++ " guesses to find out my secret number.\nYour first guess: >"
-                        )
-                    , Node.standardInListen
-                        |> Node.interfaceFutureMap (\guess -> storeGuess guess playing)
-                    ]
-                        |> Node.interfaceBatch
+            if playing.previousGuessInvalid then
+                [ Node.consoleLog
+                    ("Please write a number between 0 and 100. "
+                        ++ (allowedGuessCount |> String.fromInt)
+                        ++ " guesses remaining.\nYour guess: >"
+                    )
+                , Node.standardInListen
+                    |> Node.interfaceFutureMap (\guess -> Playing (handleGuess guess playing))
+                ]
+                    |> Node.interfaceBatch
 
-                lastGuess :: guessesBeforeLast ->
-                    let
-                        guessCount : Int
-                        guessCount =
-                            (guessesBeforeLast |> List.length) + 1
-                    in
-                    if guessCount >= allowedGuessCount then
+            else
+                case playing.guesses of
+                    [] ->
                         [ Node.consoleLog
-                            ("⛔ That was your last guess. My secret number would have been "
-                                ++ (playing.secretNumber |> String.fromInt)
-                                ++ "."
-                            )
-                        , Node.exit 0
-                        ]
-                            |> Node.interfaceBatch
-
-                    else if lastGuess == playing.secretNumber then
-                        [ Node.consoleLog
-                            ("🎊 Yes! My secret number was "
-                                ++ (playing.secretNumber |> String.fromInt)
-                                ++ "."
-                            )
-                        , Node.exit 0
-                        ]
-                            |> Node.interfaceBatch
-
-                    else
-                        [ Node.consoleLog
-                            ((lastGuess |> String.fromInt)
-                                ++ " is "
-                                ++ (if lastGuess < playing.secretNumber then
-                                        "less than"
-
-                                    else
-                                        "greater than"
-                                   )
-                                ++ " my secret number. "
-                                ++ (allowedGuessCount - guessCount |> String.fromInt)
-                                ++ " guesses remaining."
-                                ++ "\nYour "
-                                ++ (if guessCount == allowedGuessCount then
-                                        "last"
-
-                                    else
-                                        "next"
-                                   )
-                                ++ " guess: >"
+                            ("We're playing \"guess the number\". You have "
+                                ++ (allowedGuessCount |> String.fromInt)
+                                ++ " guesses to find out my secret number.\nYour first guess: >"
                             )
                         , Node.standardInListen
-                            |> Node.interfaceFutureMap (\guess -> storeGuess guess playing)
+                            |> Node.interfaceFutureMap (\guess -> Playing (handleGuess guess playing))
                         ]
                             |> Node.interfaceBatch
 
+                    lastGuess :: guessesBeforeLast ->
+                        let
+                            guessCount : Int
+                            guessCount =
+                                (guessesBeforeLast |> List.length) + 1
+                        in
+                        if lastGuess == playing.secretNumber then
+                            [ Node.consoleLog
+                                ("🎊 Yes! My secret number was "
+                                    ++ (playing.secretNumber |> String.fromInt)
+                                    ++ "."
+                                )
+                            , Node.exit 0
+                            ]
+                                |> Node.interfaceBatch
 
-storeGuess : String -> { secretNumber : Int, guesses : List Int } -> State
-storeGuess guess playing =
+                        else if guessCount >= allowedGuessCount then
+                            [ Node.consoleLog
+                                ("⛔ That was your last guess. My secret number would have been "
+                                    ++ (playing.secretNumber |> String.fromInt)
+                                    ++ "."
+                                )
+                            , Node.exit 0
+                            ]
+                                |> Node.interfaceBatch
+
+                        else
+                            [ Node.consoleLog
+                                ((lastGuess |> String.fromInt)
+                                    ++ " is "
+                                    ++ (if lastGuess < playing.secretNumber then
+                                            "less than"
+
+                                        else
+                                            "greater than"
+                                       )
+                                    ++ " my secret number. "
+                                    ++ (allowedGuessCount - guessCount |> String.fromInt)
+                                    ++ " guesses remaining."
+                                    ++ "\nYour "
+                                    ++ (if guessCount == allowedGuessCount then
+                                            "last"
+
+                                        else
+                                            "next"
+                                       )
+                                    ++ " guess: >"
+                                )
+                            , Node.standardInListen
+                                |> Node.interfaceFutureMap (\guess -> Playing (handleGuess guess playing))
+                            ]
+                                |> Node.interfaceBatch
+
+
+handleGuess : String -> StatePlaying -> StatePlaying
+handleGuess guess playing =
     case guess |> String.trimRight |> String.toInt of
         Nothing ->
-            Playing
+            { secretNumber = playing.secretNumber
+            , guesses = playing.guesses
+            , previousGuessInvalid = True
+            }
+
+        Just numberGuess ->
+            if numberGuess >= 0 && numberGuess <= 99 then
                 { secretNumber = playing.secretNumber
-                , guesses = -1 :: playing.guesses
+                , guesses = numberGuess :: playing.guesses
+                , previousGuessInvalid = False
                 }
 
-        Just validNumberGuess ->
-            Playing
+            else
                 { secretNumber = playing.secretNumber
-                , guesses = validNumberGuess :: playing.guesses
+                , guesses = playing.guesses
+                , previousGuessInvalid = True
                 }
 
 
