@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
-const path = require("path")
-const fs = require("fs")
+import * as path from "node:path"
+import * as fs from "node:fs"
+
 // inspired by https://github.com/jfmengels/node-elm-review/blob/2651aa4cc53726bbf9107a42f0756b849db3e1e7/new-package/maintenance/update-examples-from-preview.js
 
 fs.readdir(
-    path.resolve(__dirname),
+    path.resolve(import.meta.dirname),
     (_errors, files) => files.forEach(sub => {
         if (sub !== "README.md" && sub !== "update-example.js") {
             copyExampleDevelopmentToExample(sub)
@@ -14,33 +15,32 @@ fs.readdir(
 )
 
 function copyExampleDevelopmentToExample(sub) {
-    const packageElmJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "elm.json")))
-    const packageSrcPath = path.resolve(__dirname, "..", "src")
-    const exampleElmJsonPath = path.resolve(__dirname, "..", "example", sub, "elm.json")
+    const packageElmJson = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "elm.json")))
+    const packageSrcPath = path.resolve(import.meta.dirname, "..", "src")
+    const exampleElmJsonPath = path.resolve(import.meta.dirname, "..", "example", sub, "elm.json")
+    const viteConfigPath = path.resolve(import.meta.dirname, sub, "vite.config.js")
+    const indexHtmlPath = path.resolve(import.meta.dirname, sub, "index.html")
+    const target =
+        fs.existsSync(indexHtmlPath) ?
+            "web"
+            :
+            "node"
 
     fs.cpSync(
-        path.resolve(__dirname, sub, "src"),
-        path.resolve(__dirname, "..", "example", sub, "src"),
+        path.resolve(import.meta.dirname, sub, "src"),
+        path.resolve(import.meta.dirname, "..", "example", sub, "src"),
         { recursive: true, filter: (source, _) => !source.endsWith(".js") }
     )
-    if (fs.existsSync(path.resolve(__dirname, sub, "public"))) {
+    if (fs.existsSync(path.resolve(import.meta.dirname, sub, "public"))) {
         fs.cpSync(
-            path.resolve(__dirname, sub, "public"),
-            path.resolve(__dirname, "..", "example", sub, "public"),
+            path.resolve(import.meta.dirname, sub, "public"),
+            path.resolve(import.meta.dirname, "..", "example", sub, "public"),
             { recursive: true }
         )
     }
     fs.cpSync(
-        path.resolve(__dirname, sub, "elm.json"),
+        path.resolve(import.meta.dirname, sub, "elm.json"),
         exampleElmJsonPath
-    )
-    fs.cpSync(
-        path.resolve(__dirname, sub, "vite.config.js"),
-        path.resolve(__dirname, "..", "example", sub, "vite.config.js")
-    )
-    fs.cpSync(
-        path.resolve(__dirname, sub, "index.html"),
-        path.resolve(__dirname, "..", "example", sub, "index.html")
     )
 
     const exampleElmJson = JSON.parse(fs.readFileSync(exampleElmJsonPath))
@@ -48,7 +48,7 @@ function copyExampleDevelopmentToExample(sub) {
     // Remove the source directory pointing to the package's src/
     exampleElmJson['source-directories'] = exampleElmJson['source-directories'].filter(
         (sourceDirectory) =>
-            path.resolve(__dirname, "..", "example", sub, sourceDirectory) !== packageSrcPath
+            path.resolve(import.meta.dirname, "..", "example", sub, sourceDirectory) !== packageSrcPath
     )
     exampleElmJson.dependencies.direct[packageElmJson.name] = packageElmJson.version
     moveFromDirectToIndirect(exampleElmJson, "miniBill/elm-fast-dict")
@@ -56,28 +56,56 @@ function copyExampleDevelopmentToExample(sub) {
     moveFromDirectToIndirect(exampleElmJson, "elm/bytes")
     fs.writeFileSync(exampleElmJsonPath, JSON.stringify(exampleElmJson, null, 4))
 
-    fs.writeFileSync(
-        path.resolve(__dirname, "..", "example", sub, "src", "index.js"),
-        `import * as Web from "@lue-bird/elm-state-interface-experimental/web"
-import Main from "./Main.elm"
-
-const elmApp = Main.init()
-Web.programStart({ ports: elmApp.ports, domElement: document.getElementById("app") })
-`
-    )
-
-    fs.writeFileSync(
-        path.resolve(__dirname, "..", "example", sub, "package.json"),
-        `{
+    if (target === "web") {
+        fs.cpSync(
+            viteConfigPath,
+            path.resolve(import.meta.dirname, "..", "example", sub, "vite.config.js")
+        )
+        fs.cpSync(
+            indexHtmlPath,
+            path.resolve(import.meta.dirname, "..", "example", sub, "index.html")
+        )
+        fs.writeFileSync(
+            path.resolve(import.meta.dirname, "..", "example", sub, "package.json"),
+            `{
     "type": "module",
-    "main": "index.js",
+    "main": "src/index.js",
     "dependencies": {
         "@lue-bird/elm-state-interface-experimental": "^2.0.0",
         "vite": "^5.1.2",
         "vite-plugin-elm-watch": "^1.3.2"
     }
 }`
-    )
+        )
+        fs.writeFileSync(
+            path.resolve(import.meta.dirname, "..", "example", sub, "src", "index.js"),
+            `import * as Web from "@lue-bird/elm-state-interface-experimental/web"
+import Main from "./Main.elm"
+
+const elmApp = Main.init()
+Web.programStart({ ports: elmApp.ports, domElement: document.getElementById("app") })
+`
+        )
+    } else if (target === "node") {
+        fs.writeFileSync(
+            path.resolve(import.meta.dirname, "..", "example", sub, "package.json"),
+            `{
+    "type": "module",
+    "main": "src/index.js",
+    "dependencies": {
+        "@lue-bird/elm-state-interface-experimental": "^2.0.0"
+    }
+}`
+        )
+        fs.writeFileSync(
+            path.resolve(import.meta.dirname, "..", "example", sub, "src", "index.js"),
+            `import * as Node from "@lue-bird/elm-state-interface-experimental/node"
+
+const elmApp = Node.compileElm(import.meta.dirname, "Main.elm").init()
+Node.programStart({ ports: elmApp.ports })
+`
+        )
+    }
 }
 function moveFromDirectToIndirect(elmJson, dependencyName) {
     elmJson.dependencies.indirect[dependencyName] =
