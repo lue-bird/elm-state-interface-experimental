@@ -1,0 +1,7 @@
+{
+    "type": "module",
+    "main": "src/index.js",
+    "dependencies": {
+        "@lue-bird/elm-state-interface-experimental": "^2.0.0"
+    }
+}
