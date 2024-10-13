@@ -1496,6 +1496,23 @@ workingDirectoryPathRequest =
 {-| An [`Interface`](Node#Interface) for getting
 the command-line arguments passed when the Node.js process was launched.
 
+For example, running
+
+    node process-args.js one two=three four
+
+[`Node.launchArgumentsRequest`](#launchArgumentsRequest)
+would give back
+
+    [ "/usr/local/bin/node"
+    , "/Users/mjr/work/node/process-args.js"
+    , "one"
+    , "two=three"
+    , "four"
+    ]
+
+The first is always the absolute path to the executable that started the Node.js process,
+the second is always the path to the executed js file.
+
 Uses [`process.argv`](https://nodejs.org/api/process.html#processargv)
 
 -}
