@@ -451,7 +451,7 @@ For example apps, see [example/](https://github.com/lue-bird/elm-state-interface
 For a setup which allows an [optimized](https://github.com/mdgriffith/elm-optimize-level-2) build and deployment to github pages,
 see for example [this blog](https://github.com/lue-bird/blog).
 
-In case you want to create your own setup instead:
+In case you want to create your own web setup instead:
 
 ```elm
 port module Main exposing (main)
@@ -488,6 +488,14 @@ Web.programStart({
     ports : elmApp.ports,
     domElement : document.getElementById(...)
 })
+```
+
+If you instead want to set up node.js development, write
+```javascript
+import * as Node from "@lue-bird/elm-state-interface-experimental/node"
+
+const elmApp = Node.compileElm(import.meta.dirname, "Main.elm").init()
+Node.programStart({ ports: elmApp.ports })
 ```
 
 If you're not familiar with The Elm Architecture, skip to ["future"](#future)
