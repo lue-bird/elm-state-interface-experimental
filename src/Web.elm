@@ -2867,13 +2867,6 @@ socketIdToStructuredId (SocketId raw) =
     raw |> StructuredId.ofInt
 
 
-{-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](#SortedKeyValueList)
--}
-sortedKeyValueListFromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
-sortedKeyValueListFromList unsortedList =
-    SortedKeyValueList (unsortedList |> List.sortBy .key)
-
-
 {-| The "init" part for an embedded program
 -}
 programInit : ProgramConfig state -> ( ProgramState state, Cmd (ProgramEvent state) )
@@ -4582,15 +4575,15 @@ httpExpectBytes =
     HttpExpectBytes identity
 
 
-
--- Expect
-
-
 {-| Expect the response body to be a `String`.
 -}
 httpExpectString : HttpExpect (Result HttpError String)
 httpExpectString =
     HttpExpectString identity
+
+
+
+-- Expect
 
 
 {-| Discard the response body.
@@ -4637,10 +4630,6 @@ httpAddHeaders headers request =
     }
 
 
-
--- request
-
-
 {-| Create a `POST` [`HttpRequest`](Web#HttpRequest).
 
 Use [`Web.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
@@ -4660,6 +4649,10 @@ httpPost options =
     , body = options.body
     , expect = options.expect
     }
+
+
+
+-- request
 
 
 {-| An [`Interface`](Web#Interface) for handling an [`HttpRequest`](Web#HttpRequest)
@@ -4999,10 +4992,6 @@ replaceUrl appUrl =
         |> interfaceFromSingle
 
 
-
--- elm/browser on "How do I manage URL from a Browser.element?" https://github.com/elm/browser/blob/master/notes/navigation-in-elements.md
-
-
 {-| An [`Interface`](Web#Interface) for changing the [app-specific URL](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/)
 and adding a new entry to the browser history
 without triggering a page load.
@@ -5014,6 +5003,10 @@ pushUrl : AppUrl -> Interface future_
 pushUrl appUrl =
     NavigationPushUrl appUrl
         |> interfaceFromSingle
+
+
+
+-- elm/browser on "How do I manage URL from a Browser.element?" https://github.com/elm/browser/blob/master/notes/navigation-in-elements.md
 
 
 {-| An [`Interface`](Web#Interface) for going forward a given number of pages.
@@ -5537,6 +5530,13 @@ domElementWithMaybeNamespace maybeNamespace tag modifiers subs =
     , subs = subs
     }
         |> DomElement
+
+
+{-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](#SortedKeyValueList)
+-}
+sortedKeyValueListFromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
+sortedKeyValueListFromList unsortedList =
+    SortedKeyValueList (unsortedList |> List.sortBy .key)
 
 
 {-| Sort a given list of { key, value } elements
