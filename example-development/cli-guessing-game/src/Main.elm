@@ -79,11 +79,14 @@ interface state =
                             |> Node.interfaceBatch
 
                     else if lastGuess == playing.secretNumber then
-                        Node.consoleLog
+                        [ Node.consoleLog
                             ("🎊 Yes! My secret number was "
                                 ++ (playing.secretNumber |> String.fromInt)
                                 ++ "."
                             )
+                        , Node.exit 0
+                        ]
+                            |> Node.interfaceBatch
 
                     else
                         [ Node.consoleLog
