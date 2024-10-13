@@ -180,6 +180,11 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "LaunchArgumentsRequest": return (_config: null) => {
                 sendToElm(process.argv)
             }
+            case "StandardInListen": return (_config: null) => {
+                process.stdin.addListener("data", (buffer) => {
+                    sendToElm(buffer.toString())
+                })
+            }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Add." + tag)
             }

@@ -4,6 +4,9 @@ module Node exposing
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
+    , standardInListen
+    , consoleLog, consoleWarn, consoleError, consoleClear
+    , terminalSizeRequest, terminalSizeChangeListen
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
     , fileChangeListen, FileChange(..)
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
@@ -12,8 +15,6 @@ module Node exposing
     , httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
     , httpBodyJson, httpBodyBytes
     , randomUnsignedInt32s
-    , consoleLog, consoleWarn, consoleError, consoleClear
-    , terminalSizeRequest, terminalSizeChangeListen
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..)
     , interfaceSingleEdits, InterfaceSingleEdit(..)
@@ -40,9 +41,12 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 @docs timePeriodicallyListen, timeOnceAt
 
 
-## process
+## process and terminal
 
 @docs workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
+@docs standardInListen
+@docs consoleLog, consoleWarn, consoleError, consoleClear
+@docs terminalSizeRequest, terminalSizeChangeListen
 
 
 ## file system
@@ -70,16 +74,6 @@ Not familiar with random "generators"? [`elm/random`](https://package.elm-lang.o
 explains it nicely!
 
 @docs randomUnsignedInt32s
-
-
-## console/terminal
-
-Helpers for the simple debugging console that is similar to the JavaScript console mechanism provided by web browsers
-as part of an [`Interface`](Node#Interface).
-It's configured to write to standard out and standard err
-
-@docs consoleLog, consoleWarn, consoleError, consoleClear
-@docs terminalSizeRequest, terminalSizeChangeListen
 
 
 ## embed
@@ -240,6 +234,7 @@ type InterfaceSingle future
     | WorkingDirectoryPathRequest (String -> future)
     | LaunchArgumentsRequest (List String -> future)
     | ProcessTitleSet String
+    | StandardInListen (String -> future)
 
 
 {-| Did the file at a path get changed/created or moved away/removed?
@@ -451,6 +446,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         ProcessTitleSet newTitle ->
             ProcessTitleSet newTitle
 
+        StandardInListen on ->
+            StandardInListen (\size -> on size |> futureChange)
+
 
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
 httpRequestFutureMap futureChange request =
@@ -575,6 +573,9 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
 
                 _ ->
                     []
+
+        StandardInListen _ ->
+            []
 
 
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
@@ -724,6 +725,9 @@ interfaceSingleToJson interfaceSingle =
 
             ProcessTitleSet newTitle ->
                 { tag = "TerminalSizeChangeListen", value = newTitle |> Json.Encode.string }
+
+            StandardInListen _ ->
+                { tag = "StandardInListen", value = Json.Encode.null }
         )
 
 
@@ -882,6 +886,9 @@ interfaceSingleToStructuredId interfaceSingle =
 
             ProcessTitleSet _ ->
                 { tag = "ProcessTitleSet", value = StructuredId.ofUnit }
+
+            StandardInListen _ ->
+                { tag = "StandardInListen", value = StructuredId.ofUnit }
         )
 
 
@@ -1051,6 +1058,11 @@ interfaceSingleFutureJsonDecoder interface =
 
         ProcessTitleSet _ ->
             Nothing
+
+        StandardInListen on ->
+            Json.Decode.string
+                |> Json.Decode.map on
+                |> Just
 
 
 terminalSizeJsonDecoder : Json.Decode.Decoder { lines : Int, columns : Int }
@@ -1742,7 +1754,20 @@ using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API
 -}
 httpRequest : HttpRequest future -> Interface future
 httpRequest request =
-    request |> HttpRequest |> interfaceFromSingle
+    HttpRequest request
+        |> interfaceFromSingle
+
+
+{-| For nice input parsing,
+see for example [gren-tui's `stringToInput`](https://github.com/blaix/gren-tui/blob/main/src/Tui.gren#L562).
+
+Uses [`process.stdin.addListener("data", ...)`](https://nodejs.org/api/stream.html#event-data)
+
+-}
+standardInListen : Interface String
+standardInListen =
+    StandardInListen identity
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Node#Interface) for printing a message with general information
