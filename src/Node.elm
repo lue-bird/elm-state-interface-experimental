@@ -34,7 +34,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## time
 
-[`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/) primitives as part of an [`Interface`](Node#Interface).
+See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 @docs timePosixRequest, timeZoneRequest, timeZoneNameRequest
 @docs timePeriodicallyListen, timeOnceAt
@@ -55,8 +55,6 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## HTTP
 
-Helpers for HTTP requests as part of an [`Interface`](Node#Interface)
-
 @docs HttpRequest, HttpBody, HttpExpect, HttpError, HttpMetadata
 
 @docs httpRequest
@@ -67,7 +65,6 @@ Helpers for HTTP requests as part of an [`Interface`](Node#Interface)
 
 ## random
 
-Helpers for randomness as part of an [`Interface`](Node#Interface).
 Not familiar with random "generators"? [`elm/random`](https://package.elm-lang.org/packages/elm/random/latest)
 explains it nicely!
 
