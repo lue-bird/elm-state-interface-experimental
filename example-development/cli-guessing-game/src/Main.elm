@@ -89,20 +89,20 @@ interface state =
                                 (guessesBeforeLast |> List.length) + 1
                         in
                         if lastGuess == playing.secretNumber then
-                            [ Node.consoleLog
+                            [ Node.standardOutWrite
                                 ("🎊 Yes! My secret number was "
                                     ++ (playing.secretNumber |> String.fromInt)
-                                    ++ "."
+                                    ++ ".\n"
                                 )
                             , Node.exit 0
                             ]
                                 |> Node.interfaceBatch
 
                         else if guessCount >= allowedGuessCount then
-                            [ Node.consoleLog
+                            [ Node.standardOutWrite
                                 ("⛔ That was your last guess. My secret number would have been "
                                     ++ (playing.secretNumber |> String.fromInt)
-                                    ++ "."
+                                    ++ ".\n"
                                 )
                             , Node.exit 0
                             ]
