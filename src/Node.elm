@@ -5,7 +5,6 @@ module Node exposing
     , timePeriodicallyListen, timeOnceAt
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
     , standardOutWrite, standardErrWrite, standardInListen
-    , consoleLog, consoleWarn, consoleError, consoleClear
     , terminalSizeRequest, terminalSizeChangeListen
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
     , fileChangeListen, FileChange(..)
@@ -45,7 +44,6 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 @docs workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
 @docs standardOutWrite, standardErrWrite, standardInListen
-@docs consoleLog, consoleWarn, consoleError, consoleClear
 @docs terminalSizeRequest, terminalSizeChangeListen
 
 
@@ -210,14 +208,14 @@ type alias Interface future =
 To create one, use the helpers in [time](#time), [HTTP](#http) etc.
 -}
 type InterfaceSingle future
-    = ConsoleLog String
-    | ConsoleWarn String
-    | ConsoleError String
-    | ConsoleClear ()
+    = WorkingDirectoryPathRequest (String -> future)
+    | LaunchArgumentsRequest (List String -> future)
+    | ProcessTitleSet String
+    | StandardOutWrite String
+    | StandardErrWrite String
+    | StandardInListen (String -> future)
     | TerminalSizeRequest ({ lines : Int, columns : Int } -> future)
     | TerminalSizeChangeListen ({ lines : Int, columns : Int } -> future)
-    | ClipboardReplaceBy String
-    | ClipboardRequest (String -> future)
     | HttpRequest (HttpRequest future)
     | TimePosixRequest (Time.Posix -> future)
     | TimezoneOffsetRequest (Int -> future)
@@ -231,12 +229,6 @@ type InterfaceSingle future
     | FileUtf8Write { content : String, path : String }
     | FileUtf8Request { path : String, on : String -> future }
     | FileChangeListen { path : String, on : FileChange -> future }
-    | WorkingDirectoryPathRequest (String -> future)
-    | LaunchArgumentsRequest (List String -> future)
-    | ProcessTitleSet String
-    | StandardOutWrite String
-    | StandardErrWrite String
-    | StandardInListen (String -> future)
 
 
 {-| Did the file at a path get changed/created or moved away/removed?
@@ -358,26 +350,8 @@ interfaceFutureMap futureChange interface =
 interfaceSingleFutureMap : (future -> mappedFuture) -> (InterfaceSingle future -> InterfaceSingle mappedFuture)
 interfaceSingleFutureMap futureChange interfaceSingle =
     case interfaceSingle of
-        ConsoleLog message ->
-            ConsoleLog message
-
-        ConsoleWarn message ->
-            ConsoleWarn message
-
-        ConsoleError message ->
-            ConsoleError message
-
-        ConsoleClear () ->
-            ConsoleClear ()
-
-        ClipboardReplaceBy clipboard ->
-            ClipboardReplaceBy clipboard
-
         HttpRequest request ->
             request |> httpRequestFutureMap futureChange |> HttpRequest
-
-        ClipboardRequest toFuture ->
-            (\event -> toFuture event |> futureChange) |> ClipboardRequest
 
         TimePosixRequest requestTimeNow ->
             (\event -> requestTimeNow event |> futureChange)
@@ -492,24 +466,6 @@ interfaceSingleEditsMap :
         )
 interfaceSingleEditsMap fromSingeEdit interfaces =
     case interfaces.old of
-        ConsoleLog _ ->
-            []
-
-        ConsoleWarn _ ->
-            []
-
-        ConsoleError _ ->
-            []
-
-        ConsoleClear () ->
-            []
-
-        ClipboardReplaceBy _ ->
-            []
-
-        ClipboardRequest _ ->
-            []
-
         HttpRequest _ ->
             []
 
@@ -648,23 +604,6 @@ interfaceSingleToJson : InterfaceSingle future_ -> Json.Encode.Value
 interfaceSingleToJson interfaceSingle =
     Json.Encode.LocalExtra.variant
         (case interfaceSingle of
-            ConsoleLog string ->
-                { tag = "ConsoleLog", value = string |> Json.Encode.string }
-
-            ConsoleWarn string ->
-                { tag = "ConsoleWarn", value = string |> Json.Encode.string }
-
-            ConsoleError string ->
-                { tag = "ConsoleError", value = string |> Json.Encode.string }
-
-            ConsoleClear () ->
-                { tag = "ConsoleClear", value = Json.Encode.null }
-
-            ClipboardReplaceBy replacement ->
-                { tag = "ClipboardReplaceBy"
-                , value = replacement |> Json.Encode.string
-                }
-
             HttpRequest httpRequestInfo ->
                 { tag = "HttpRequest", value = httpRequestInfo |> httpRequestInfoToJson }
 
@@ -686,9 +625,6 @@ interfaceSingleToJson interfaceSingle =
 
             RandomUnsignedInt32sRequest request ->
                 { tag = "RandomUnsignedInt32sRequest", value = request.count |> Json.Encode.int }
-
-            ClipboardRequest _ ->
-                { tag = "ClipboardRequest", value = Json.Encode.null }
 
             TimePeriodicallyListen intervalDuration ->
                 { tag = "TimePeriodicallyListen"
@@ -823,21 +759,6 @@ interfaceSingleToStructuredId : InterfaceSingle future_ -> StructuredId
 interfaceSingleToStructuredId interfaceSingle =
     StructuredId.ofVariant
         (case interfaceSingle of
-            ConsoleLog message ->
-                { tag = "ConsoleLog", value = message |> StructuredId.ofString }
-
-            ConsoleWarn message ->
-                { tag = "ConsoleWarn", value = message |> StructuredId.ofString }
-
-            ConsoleError message ->
-                { tag = "ConsoleError", value = message |> StructuredId.ofString }
-
-            ConsoleClear () ->
-                { tag = "ConsoleClear", value = StructuredId.ofUnit }
-
-            ClipboardReplaceBy _ ->
-                { tag = "ClipboardReplaceBy", value = StructuredId.ofUnit }
-
             HttpRequest request ->
                 { tag = "HttpRequest"
                 , value = request.url |> StructuredId.ofString
@@ -859,9 +780,6 @@ interfaceSingleToStructuredId interfaceSingle =
                 { tag = "RandomUnsignedInt32sRequest"
                 , value = request.count |> StructuredId.ofInt
                 }
-
-            ClipboardRequest _ ->
-                { tag = "ClipboardRequest", value = StructuredId.ofUnit }
 
             TimePeriodicallyListen listen ->
                 { tag = "TimePeriodicallyListen"
@@ -989,24 +907,6 @@ for the transformed event data coming back
 interfaceSingleFutureJsonDecoder : InterfaceSingle future -> Maybe (Json.Decode.Decoder future)
 interfaceSingleFutureJsonDecoder interface =
     case interface of
-        ConsoleLog _ ->
-            Nothing
-
-        ConsoleWarn _ ->
-            Nothing
-
-        ConsoleError _ ->
-            Nothing
-
-        ConsoleClear () ->
-            Nothing
-
-        ClipboardReplaceBy _ ->
-            Nothing
-
-        ClipboardRequest toFuture ->
-            Json.Decode.string |> Json.Decode.map toFuture |> Just
-
         HttpRequest request ->
             Json.Decode.oneOf
                 [ Json.Decode.LocalExtra.variant "Success" (httpSuccessResponseJsonDecoder request.expect)
@@ -1218,11 +1118,11 @@ programUpdate appConfig event state =
                 notifyOfBugInterface =
                     ([ "bug: js event failed to decode: "
                      , jsonError |> Json.Decode.errorToString
-                     , ". Please open an issue on github.com/lue-bird/elm-state-interface-experimental"
+                     , ". Please open an issue on github.com/lue-bird/elm-state-interface-experimental\n"
                      ]
                         |> String.concat
                     )
-                        |> ConsoleError
+                        |> StandardErrWrite
               in
               { id = notifyOfBugInterface |> interfaceSingleToStructuredId |> StructuredId.toString
               , diff = notifyOfBugInterface |> Add
@@ -1820,9 +1720,13 @@ standardInListen =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Node#Interface) for writing text to standard in, like
+{-| An [`Interface`](Node#Interface) for writing text to standard out, like
 
 > hit enter to apply changes or escape to cancel:
+
+If you want to clear the screen, apply color or font effects,
+employ [ansi codes](https://dark.elm.dmy.fr/packages/wolfadex/elm-ansi/latest/) instead
+(either use a library or go click on the declarations and copy source)
 
 Uses [`process.stdout.write`](https://nodejs.org/api/stream.html#writablewritechunk-encoding-callback)
 
@@ -1843,68 +1747,6 @@ Uses [`process.stderr.write`](https://nodejs.org/api/stream.html#writablewritech
 standardErrWrite : String -> Interface future_
 standardErrWrite text =
     StandardOutWrite text
-        |> interfaceFromSingle
-
-
-{-| An [`Interface`](Node#Interface) for printing a message with general information
-like if certain tasks have been successful
-
-> rss generated successfully
-
-In general, prefer [`Node.standardOutWrite`](#standardOutWrite).
-
-Uses [`console.log`](https://nodejs.org/api/console.html#consolelogdata-args),
-just like [`Debug.log`](https://dark.elm.dmy.fr/packages/elm/core/latest/Debug#log)
-
--}
-consoleLog : String -> Interface future_
-consoleLog string =
-    ConsoleLog string
-        |> interfaceFromSingle
-
-
-{-| An [`Interface`](Node#Interface) for printing a message that something didn't succeed but you could recover from, for example
-
-> ⚠️ Unknown device - there may be compatibility issues.
-
-> ⚠️ Recoverable upload failure, will retry. Error was: no status.
-
-Uses [`console.warn`](https://nodejs.org/api/console.html#consolewarndata-args)
-
--}
-consoleWarn : String -> Interface future_
-consoleWarn string =
-    ConsoleWarn string
-        |> interfaceFromSingle
-
-
-{-| An [`Interface`](Node#Interface) for printing a message that something failed with bad consequences, for example
-
-> ❌ decoding the selected file failed. Please report this bug at ...
-
-Uses [`console.error`](https://nodejs.org/api/console.html#consoleerrordata-args)
-
--}
-consoleError : String -> Interface future_
-consoleError string =
-    ConsoleError string
-        |> interfaceFromSingle
-
-
-{-| An [`Interface`](Node#Interface) for setting the console to blank.
-For most Linux operating systems, this works similar to the `clear` command.
-On Windows, it will only clear the output in the current terminal viewport for node.
-
-If you want to do more than clear the screen,
-use [`Node.consoleLog`](#consoleLog) with [an ansi code for erasing](https://dark.elm.dmy.fr/packages/wolfadex/elm-ansi/latest/Ansi#erasing) instead
-(either use a library or go click on the declarations and copy source)
-
-Uses [`console.clear`](https://nodejs.org/api/console.html#consoleclear),
-
--}
-consoleClear : Interface future_
-consoleClear =
-    ConsoleClear ()
         |> interfaceFromSingle
 
 
