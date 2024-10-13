@@ -89,6 +89,9 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "StandardOutWrite": return (text: string) => {
                 process.stdout.write(text)
             }
+            case "StandardErrWrite": return (text: string) => {
+                process.stderr.write(text)
+            }
             case "ConsoleLog": return (message: string) => {
                 console.log(message)
             }

@@ -4,7 +4,7 @@ module Node exposing
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
-    , standardOutWrite, standardInListen
+    , standardOutWrite, standardErrWrite, standardInListen
     , consoleLog, consoleWarn, consoleError, consoleClear
     , terminalSizeRequest, terminalSizeChangeListen
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
@@ -44,7 +44,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 ## process and terminal
 
 @docs workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
-@docs standardOutWrite, standardInListen
+@docs standardOutWrite, standardErrWrite, standardInListen
 @docs consoleLog, consoleWarn, consoleError, consoleClear
 @docs terminalSizeRequest, terminalSizeChangeListen
 
@@ -235,6 +235,7 @@ type InterfaceSingle future
     | LaunchArgumentsRequest (List String -> future)
     | ProcessTitleSet String
     | StandardOutWrite String
+    | StandardErrWrite String
     | StandardInListen (String -> future)
 
 
@@ -450,6 +451,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         StandardOutWrite text ->
             StandardOutWrite text
 
+        StandardErrWrite text ->
+            StandardErrWrite text
+
         StandardInListen on ->
             StandardInListen (\size -> on size |> futureChange)
 
@@ -578,10 +582,13 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
                 _ ->
                     []
 
-        StandardInListen _ ->
+        StandardOutWrite _ ->
             []
 
-        StandardOutWrite _ ->
+        StandardErrWrite _ ->
+            []
+
+        StandardInListen _ ->
             []
 
 
@@ -733,11 +740,14 @@ interfaceSingleToJson interfaceSingle =
             ProcessTitleSet newTitle ->
                 { tag = "TerminalSizeChangeListen", value = newTitle |> Json.Encode.string }
 
-            StandardInListen _ ->
-                { tag = "StandardInListen", value = Json.Encode.null }
-
             StandardOutWrite text ->
                 { tag = "StandardOutWrite", value = text |> Json.Encode.string }
+
+            StandardErrWrite text ->
+                { tag = "StandardErrWrite", value = text |> Json.Encode.string }
+
+            StandardInListen _ ->
+                { tag = "StandardInListen", value = Json.Encode.null }
         )
 
 
@@ -897,13 +907,18 @@ interfaceSingleToStructuredId interfaceSingle =
             ProcessTitleSet _ ->
                 { tag = "ProcessTitleSet", value = StructuredId.ofUnit }
 
-            StandardInListen _ ->
-                { tag = "StandardInListen", value = StructuredId.ofUnit }
-
             StandardOutWrite text ->
                 { tag = "StandardOutWrite"
                 , value = text |> StructuredId.ofString
                 }
+
+            StandardErrWrite text ->
+                { tag = "StandardErrWrite"
+                , value = text |> StructuredId.ofString
+                }
+
+            StandardInListen _ ->
+                { tag = "StandardInListen", value = StructuredId.ofUnit }
         )
 
 
@@ -1074,13 +1089,16 @@ interfaceSingleFutureJsonDecoder interface =
         ProcessTitleSet _ ->
             Nothing
 
+        StandardOutWrite _ ->
+            Nothing
+
+        StandardErrWrite _ ->
+            Nothing
+
         StandardInListen on ->
             Json.Decode.string
                 |> Json.Decode.map on
                 |> Just
-
-        StandardOutWrite _ ->
-            Nothing
 
 
 terminalSizeJsonDecoder : Json.Decode.Decoder { lines : Int, columns : Int }
@@ -1802,15 +1820,28 @@ standardInListen =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Node#Interface) for writing text to standard in.
+{-| An [`Interface`](Node#Interface) for writing text to standard in, like
 
-> survey submitted and received successfully
+> hit enter to apply changes or escape to cancel:
 
 Uses [`process.stdout.write`](https://nodejs.org/api/stream.html#writablewritechunk-encoding-callback)
 
 -}
 standardOutWrite : String -> Interface future_
 standardOutWrite text =
+    StandardOutWrite text
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Node#Interface) for writing text to standard err.
+
+> input file does not exits. Is the path correct?
+
+Uses [`process.stderr.write`](https://nodejs.org/api/stream.html#writablewritechunk-encoding-callback)
+
+-}
+standardErrWrite : String -> Interface future_
+standardErrWrite text =
     StandardOutWrite text
         |> interfaceFromSingle
 
