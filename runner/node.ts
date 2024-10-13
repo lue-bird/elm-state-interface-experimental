@@ -17,23 +17,19 @@ export interface ElmPorts {
  * @param mainElmModuleNamePath usually Main.elm or src/Main.elm depending on where your index.js is
  * @returns An elm worker program you can start whenever you want which then provides its ports
  */
-export async function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePath: string): Promise<{ init: () => { ports: ElmPorts } }> {
+export function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePath: string): { init: () => { ports: ElmPorts } } {
     if (elmProjectDirectoryPath === undefined) {
         console.error("To access import.meta.dirname you need at least Node.js 20.11 / 21.2: https://stackoverflow.com/a/50052194")
         throw new Error()
     }
     const elmJsPath = path.join(elmProjectDirectoryPath, "elm-stuff", "temporary-elm.js")
-    await new Promise((resolve, _reject) => {
-        child_process.exec(
-            // if you want to use Debug.log etc while prototyping or debugging, remove the --optimize flag
-            // if you need extra performance switch to https://github.com/mdgriffith/elm-optimize-level-2
-            `elm make ${mainElmModuleNamePath} --output "${elmJsPath}" --optimize`,
-            { cwd: elmProjectDirectoryPath },
-            () => {
-                resolve(null)
-            }
-        )
-    })
+
+    child_process.execSync(
+        // if you want to use Debug.log etc while prototyping or debugging, remove the --optimize flag
+        // if you need extra performance switch to https://github.com/mdgriffith/elm-optimize-level-2
+        `elm make ${mainElmModuleNamePath} --output "${elmJsPath}" --optimize`,
+        { cwd: elmProjectDirectoryPath }
+    )
     eval(
         fs.readFileSync(elmJsPath, { encoding: "utf8" })
             .replace("(this)", "(globalThis)")
