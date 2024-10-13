@@ -77,6 +77,18 @@ export function programStart(appConfig: { ports: ElmPorts }) {
     }
     function interfaceAddImplementation(tag: string, sendToElm: (v: any) => void, abortSignal: AbortSignal): ((config: any) => void) {
         switch (tag) {
+            case "StandardInListen": return (_config: null) => {
+                function listen(buffer: Buffer) {
+                    sendToElm(buffer.toString())
+                }
+                process.stdin.addListener("data", listen)
+                abortSignal.addEventListener("abort", (_event) => {
+                    process.stdin.removeListener("data", listen);
+                })
+            }
+            case "StandardOutWrite": return (text: string) => {
+                process.stdout.write(text)
+            }
             case "ConsoleLog": return (message: string) => {
                 console.log(message)
             }
@@ -88,6 +100,21 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
             case "ConsoleError": return (_config: null) => {
                 console.clear()
+            }
+            case "WorkingDirectoryPathRequest": return (_config: null) => {
+                sendToElm(process.cwd())
+            }
+            case "LaunchArgumentsRequest": return (_config: null) => {
+                sendToElm(process.argv)
+            }
+            case "Exit": return (code: number) => {
+                appConfig.ports.toJs.unsubscribe(listenToElm)
+                abortControllers.clear() // disable any abort signal listeners
+                process.stdin.unref()
+                process.exitCode = code
+            }
+            case "ProcessTitleSet": return (newTitle: string) => {
+                process.title = newTitle
             }
             case "TerminalSizeRequest": return (_config: null) => {
                 sendToElm({ lines: process.stdout.rows, columns: process.stdout.columns })
@@ -137,15 +164,6 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "RandomUnsignedInt32sRequest": return (config: number) => {
                 sendToElm(Array.from(crypto.getRandomValues(new Uint32Array(config))))
             }
-            case "Exit": return (code: number) => {
-                appConfig.ports.toJs.unsubscribe(listenToElm)
-                abortControllers.clear() // disable any abort signal listeners
-                process.stdin.unref()
-                process.exitCode = code
-            }
-            case "ProcessTitleSet": return (newTitle: string) => {
-                process.title = newTitle
-            }
             case "DirectoryMake": return (write: { path: string }) => {
                 fs.promises.mkdir(write.path, { recursive: true })
                     .then(() => { })
@@ -169,21 +187,6 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
             case "FileChangeListen": return (path: string) => {
                 watchPath(path, abortSignal, event => sendToElm(event))
-            }
-            case "WorkingDirectoryPathRequest": return (_config: null) => {
-                sendToElm(process.cwd())
-            }
-            case "LaunchArgumentsRequest": return (_config: null) => {
-                sendToElm(process.argv)
-            }
-            case "StandardInListen": return (_config: null) => {
-                function listen(buffer: Buffer) {
-                    sendToElm(buffer.toString())
-                }
-                process.stdin.addListener("data", listen)
-                abortSignal.addEventListener("abort", (_event) => {
-                    process.stdin.removeListener("data", listen);
-                })
             }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Add." + tag)

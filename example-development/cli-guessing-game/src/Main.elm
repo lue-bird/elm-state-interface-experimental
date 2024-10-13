@@ -59,10 +59,10 @@ interface state =
 
         Playing playing ->
             if playing.previousGuessInvalid then
-                [ Node.consoleLog
+                [ Node.standardOutWrite
                     ("Please write a number between 0 and 100. "
                         ++ (allowedGuessCount |> String.fromInt)
-                        ++ " guesses remaining.\nYour guess: >"
+                        ++ " guesses remaining.\nYour guess: > "
                     )
                 , Node.standardInListen
                     |> Node.interfaceFutureMap (\guess -> Playing (handleGuess guess playing))
@@ -72,10 +72,10 @@ interface state =
             else
                 case playing.guesses of
                     [] ->
-                        [ Node.consoleLog
+                        [ Node.standardOutWrite
                             ("We're playing \"guess the number\". You have "
                                 ++ (allowedGuessCount |> String.fromInt)
-                                ++ " guesses to find out my secret number.\nYour first guess: >"
+                                ++ " guesses to find out my secret number.\nYour first guess: > "
                             )
                         , Node.standardInListen
                             |> Node.interfaceFutureMap (\guess -> Playing (handleGuess guess playing))
@@ -109,7 +109,7 @@ interface state =
                                 |> Node.interfaceBatch
 
                         else
-                            [ Node.consoleLog
+                            [ Node.standardOutWrite
                                 ((lastGuess |> String.fromInt)
                                     ++ " is "
                                     ++ (if lastGuess < playing.secretNumber then
@@ -128,7 +128,7 @@ interface state =
                                         else
                                             "next"
                                        )
-                                    ++ " guess: >"
+                                    ++ " guess: > "
                                 )
                             , Node.standardInListen
                                 |> Node.interfaceFutureMap (\guess -> Playing (handleGuess guess playing))

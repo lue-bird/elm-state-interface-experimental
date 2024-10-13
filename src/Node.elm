@@ -4,7 +4,7 @@ module Node exposing
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
-    , standardInListen
+    , standardOutWrite, standardInListen
     , consoleLog, consoleWarn, consoleError, consoleClear
     , terminalSizeRequest, terminalSizeChangeListen
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
@@ -44,7 +44,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 ## process and terminal
 
 @docs workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
-@docs standardInListen
+@docs standardOutWrite, standardInListen
 @docs consoleLog, consoleWarn, consoleError, consoleClear
 @docs terminalSizeRequest, terminalSizeChangeListen
 
@@ -234,6 +234,7 @@ type InterfaceSingle future
     | WorkingDirectoryPathRequest (String -> future)
     | LaunchArgumentsRequest (List String -> future)
     | ProcessTitleSet String
+    | StandardOutWrite String
     | StandardInListen (String -> future)
 
 
@@ -446,6 +447,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         ProcessTitleSet newTitle ->
             ProcessTitleSet newTitle
 
+        StandardOutWrite text ->
+            StandardOutWrite text
+
         StandardInListen on ->
             StandardInListen (\size -> on size |> futureChange)
 
@@ -575,6 +579,9 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
                     []
 
         StandardInListen _ ->
+            []
+
+        StandardOutWrite _ ->
             []
 
 
@@ -728,6 +735,9 @@ interfaceSingleToJson interfaceSingle =
 
             StandardInListen _ ->
                 { tag = "StandardInListen", value = Json.Encode.null }
+
+            StandardOutWrite text ->
+                { tag = "StandardOutWrite", value = text |> Json.Encode.string }
         )
 
 
@@ -889,6 +899,11 @@ interfaceSingleToStructuredId interfaceSingle =
 
             StandardInListen _ ->
                 { tag = "StandardInListen", value = StructuredId.ofUnit }
+
+            StandardOutWrite text ->
+                { tag = "StandardOutWrite"
+                , value = text |> StructuredId.ofString
+                }
         )
 
 
@@ -1063,6 +1078,9 @@ interfaceSingleFutureJsonDecoder interface =
             Json.Decode.string
                 |> Json.Decode.map on
                 |> Just
+
+        StandardOutWrite _ ->
+            Nothing
 
 
 terminalSizeJsonDecoder : Json.Decode.Decoder { lines : Int, columns : Int }
@@ -1784,10 +1802,25 @@ standardInListen =
         |> interfaceFromSingle
 
 
+{-| An [`Interface`](Node#Interface) for writing text to standard in.
+
+> survey submitted and received successfully
+
+Uses [`process.stdout.write`](https://nodejs.org/api/stream.html#writablewritechunk-encoding-callback)
+
+-}
+standardOutWrite : String -> Interface future_
+standardOutWrite text =
+    StandardOutWrite text
+        |> interfaceFromSingle
+
+
 {-| An [`Interface`](Node#Interface) for printing a message with general information
 like if certain tasks have been successful
 
-> survey submitted and received successfully
+> rss generated successfully
+
+In general, prefer [`Node.standardOutWrite`](#standardOutWrite).
 
 Uses [`console.log`](https://nodejs.org/api/console.html#consolelogdata-args),
 just like [`Debug.log`](https://dark.elm.dmy.fr/packages/elm/core/latest/Debug#log)
