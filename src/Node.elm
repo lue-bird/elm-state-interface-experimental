@@ -614,7 +614,7 @@ interfaceSingleEditToJson edit =
     Json.Encode.LocalExtra.variant
         (case edit of
             EditFileUtf8 write ->
-                { tag = "FileUtf8Write"
+                { tag = "EditFileUtf8"
                 , value =
                     Json.Encode.object
                         [ ( "path", write.path |> Json.Encode.string )
