@@ -24,7 +24,7 @@ interface : State -> Web.Interface State
 interface state =
     case state of
         WaitingForInitialRandomness ->
-            Web.randomUnsignedInt32s 4
+            Web.randomUnsignedInt32sRequest 4
                 |> Web.interfaceFutureMap
                     (\unsignedInt32s ->
                         let

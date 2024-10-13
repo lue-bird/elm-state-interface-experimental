@@ -14,7 +14,7 @@ module Node exposing
     , httpGet, httpPost, httpAddHeaders
     , httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
     , httpBodyJson, httpBodyBytes
-    , randomUnsignedInt32s
+    , randomUnsignedInt32sRequest
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..)
     , interfaceSingleEdits, InterfaceSingleEdit(..)
@@ -73,7 +73,7 @@ Helpers for randomness as part of an [`Interface`](Node#Interface).
 Not familiar with random "generators"? [`elm/random`](https://package.elm-lang.org/packages/elm/random/latest)
 explains it nicely!
 
-@docs randomUnsignedInt32s
+@docs randomUnsignedInt32sRequest
 
 
 ## embed
@@ -395,9 +395,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             }
                 |> TimeOnce
 
-        RandomUnsignedInt32sRequest randomUnsignedInt32sRequest ->
-            { count = randomUnsignedInt32sRequest.count
-            , on = \ints -> randomUnsignedInt32sRequest.on ints |> futureChange
+        RandomUnsignedInt32sRequest request ->
+            { count = request.count
+            , on = \ints -> request.on ints |> futureChange
             }
                 |> RandomUnsignedInt32sRequest
 
@@ -1004,9 +1004,9 @@ interfaceSingleFutureJsonDecoder interface =
         TimezoneNameRequest toFuture ->
             Json.Decode.string |> Json.Decode.map toFuture |> Just
 
-        RandomUnsignedInt32sRequest randomUnsignedInt32sRequest ->
+        RandomUnsignedInt32sRequest request ->
             Json.Decode.list Json.Decode.int
-                |> Json.Decode.map randomUnsignedInt32sRequest.on
+                |> Json.Decode.map request.on
                 |> Just
 
         Exit _ ->
@@ -1576,8 +1576,8 @@ from ints like [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packag
 Note: uses [`crypto.getRandomValues`](https://nodejs.org/api/crypto.html#cryptogetrandomvaluestypedarray)
 
 -}
-randomUnsignedInt32s : Int -> Interface (List Int)
-randomUnsignedInt32s count =
+randomUnsignedInt32sRequest : Int -> Interface (List Int)
+randomUnsignedInt32sRequest count =
     RandomUnsignedInt32sRequest { count = count, on = identity }
         |> interfaceFromSingle
 
@@ -1758,7 +1758,8 @@ httpRequest request =
         |> interfaceFromSingle
 
 
-{-| For nice input parsing,
+{-| Read text from standard in.
+For nice input parsing,
 see for example [gren-tui's `stringToInput`](https://github.com/blaix/gren-tui/blob/main/src/Tui.gren#L562).
 
 Uses [`process.stdin.addListener("data", ...)`](https://nodejs.org/api/stream.html#event-data)

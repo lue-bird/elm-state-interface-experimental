@@ -20,7 +20,7 @@ module Web exposing
     , httpGet, httpPost, httpAddHeaders
     , httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
     , httpBodyJson, httpBodyBytes
-    , randomUnsignedInt32s
+    , randomUnsignedInt32sRequest
     , consoleLog, consoleWarn, consoleError
     , localStorageRequest, localStorageSet, localStorageRemove
     , localStorageSetOnADifferentTabListen, localStorageRemoveOnADifferentTabListen
@@ -136,7 +136,7 @@ using [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packages/NoRedI
         \state ->
             case state of
                 WaitingForInitialRandomness ->
-                    Web.randomUnsignedInt32s 4
+                    Web.randomUnsignedInt32sRequest 4
                         |> Web.interfaceFutureMap
                             (\unsignedInt32s ->
                                 let
@@ -171,7 +171,7 @@ using [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packages/NoRedI
                             )
     }
 
-@docs randomUnsignedInt32s
+@docs randomUnsignedInt32sRequest
 
 
 ## console
@@ -1229,9 +1229,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             }
                 |> TimeOnce
 
-        RandomUnsignedInt32sRequest randomUnsignedInt32sRequest ->
-            { count = randomUnsignedInt32sRequest.count
-            , on = \ints -> randomUnsignedInt32sRequest.on ints |> futureChange
+        RandomUnsignedInt32sRequest request ->
+            { count = request.count
+            , on = \ints -> request.on ints |> futureChange
             }
                 |> RandomUnsignedInt32sRequest
 
@@ -3111,9 +3111,9 @@ interfaceSingleFutureJsonDecoder interface =
         TimezoneNameRequest toFuture ->
             Json.Decode.string |> Json.Decode.map toFuture |> Just
 
-        RandomUnsignedInt32sRequest randomUnsignedInt32sRequest ->
+        RandomUnsignedInt32sRequest request ->
             Json.Decode.list Json.Decode.int
-                |> Json.Decode.map randomUnsignedInt32sRequest.on
+                |> Json.Decode.map request.on
                 |> Just
 
         WindowSizeRequest toFuture ->
@@ -4407,8 +4407,8 @@ from ints like [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packag
 Note: uses [`window.crypto.getRandomValues`](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)
 
 -}
-randomUnsignedInt32s : Int -> Interface (List Int)
-randomUnsignedInt32s count =
+randomUnsignedInt32sRequest : Int -> Interface (List Int)
+randomUnsignedInt32sRequest count =
     RandomUnsignedInt32sRequest { count = count, on = identity }
         |> interfaceFromSingle
 
