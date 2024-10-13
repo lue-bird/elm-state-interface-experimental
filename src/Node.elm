@@ -6,7 +6,7 @@ module Node exposing
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
     , standardOutWrite, standardErrWrite, standardInListen
     , terminalSizeRequest, terminalSizeChangeListen
-    , FileKind(..), fileInfoRequest
+    , FileKind(..), fileInfoRequest, directorySubNamesRequest
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
     , fileChangeListen, FileChange(..)
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
@@ -50,7 +50,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 ## file system
 
-@docs FileKind, fileInfoRequest
+@docs FileKind, fileInfoRequest, directorySubNamesRequest
 @docs directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
 @docs fileChangeListen, FileChange
 
@@ -234,6 +234,7 @@ type InterfaceSingle future
             Maybe { byteCount : Int, lastContentChangeTime : Time.Posix, kind : FileKind }
             -> future
         }
+    | DirectorySubNamesRequest { path : String, on : List String -> future }
 
 
 {-| Does the path point to a directory or "content"-file
@@ -425,6 +426,12 @@ interfaceSingleFutureMap futureChange interfaceSingle =
                 , on = \info -> request.on info |> futureChange
                 }
 
+        DirectorySubNamesRequest request ->
+            DirectorySubNamesRequest
+                { path = request.path
+                , on = \subNames -> request.on subNames |> futureChange
+                }
+
         WorkingDirectoryPathRequest on ->
             WorkingDirectoryPathRequest (\path -> on path |> futureChange)
 
@@ -524,6 +531,9 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
             []
 
         FileInfoRequest _ ->
+            []
+
+        DirectorySubNamesRequest _ ->
             []
 
         WorkingDirectoryPathRequest _ ->
@@ -655,6 +665,11 @@ interfaceSingleToJson interfaceSingle =
 
             FileInfoRequest request ->
                 { tag = "FileInfoRequest"
+                , value = request.path |> Json.Encode.string
+                }
+
+            DirectorySubNamesRequest request ->
+                { tag = "DirectorySubNamesRequest"
                 , value = request.path |> Json.Encode.string
                 }
 
@@ -819,6 +834,11 @@ interfaceSingleToStructuredId interfaceSingle =
 
             FileInfoRequest request ->
                 { tag = "FileInfoRequest"
+                , value = request.path |> StructuredId.ofString
+                }
+
+            DirectorySubNamesRequest request ->
+                { tag = "DirectorySubNamesRequest"
                 , value = request.path |> StructuredId.ofString
                 }
 
@@ -992,6 +1012,11 @@ interfaceSingleFutureJsonDecoder interface =
                         (Json.Decode.map Time.millisToPosix Json.Decode.int)
                     )
                 )
+                |> Json.Decode.map request.on
+                |> Just
+
+        DirectorySubNamesRequest request ->
+            Json.Decode.list Json.Decode.string
                 |> Json.Decode.map request.on
                 |> Just
 
@@ -1572,6 +1597,26 @@ fileInfoRequest :
     -> Interface (Maybe { byteCount : Int, lastContentChangeTime : Time.Posix, kind : FileKind })
 fileInfoRequest path =
     FileInfoRequest { path = path, on = identity }
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Node#Interface) for getting names of the files
+contained on the surface in the directory at the given path.
+
+    directorySubPathsRequest : String -> Node.Interface (List String)
+    directorySubPathsRequest path =
+        Node.fileInfoRequest path
+            |> Node.interfaceFutureRequest
+                (\subNames ->
+                    subNames |> List.map (\subName -> path ++ "/" ++ subName)
+                )
+
+Uses [`fs.readdir`](https://nodejs.org/api/fs.html#fsreaddirpath-options-callback)
+
+-}
+directorySubNamesRequest : String -> Interface (List String)
+directorySubNamesRequest path =
+    DirectorySubNamesRequest { path = path, on = identity }
         |> interfaceFromSingle
 
 

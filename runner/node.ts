@@ -170,12 +170,16 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "DirectoryMake": return (write: { path: string }) => {
                 fs.promises.mkdir(write.path, { recursive: true })
                     .then(() => { })
-                    .catch((err) => warn("failed to make directory " + err))
+                    .catch((err) => {
+                        warn("failed to make directory " + err)
+                    })
             }
             case "FileRemove": return (path: string) => {
                 fs.promises.unlink(path)
                     .then(() => { })
-                    .catch((err) => warn("failed to unlink file " + err))
+                    .catch((err) => {
+                        warn("failed to unlink file " + err)
+                    })
             }
             case "FileUtf8Write": return (write: { content: string, path: string }) => {
                 fileUtf8Write(write, abortSignal)
@@ -185,8 +189,12 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     path,
                     { encoding: "utf-8", signal: abortSignal }
                 )
-                    .then((content) => { sendToElm(content) })
-                    .catch((err) => warn("failed to read file " + err))
+                    .then((content) => {
+                        sendToElm(content)
+                    })
+                    .catch((err) => {
+                        warn("failed to read file " + err)
+                    })
             }
             case "FileInfoRequest": return (path: string) => {
                 fs.promises.stat(path)
@@ -203,6 +211,15 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
             case "FileChangeListen": return (path: string) => {
                 watchPath(path, abortSignal, event => sendToElm(event))
+            }
+            case "DirectorySubNamesRequest": return (path: string) => {
+                fs.promises.readdir(path)
+                    .then((subNames) => {
+                        sendToElm(subNames) // name should always have only 1 element
+                    })
+                    .catch((err) => {
+                        warn("failed to read directory sub names " + err)
+                    })
             }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Add." + tag)
