@@ -6,6 +6,7 @@ module Node exposing
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
     , standardOutWrite, standardErrWrite, standardInListen
     , terminalSizeRequest, terminalSizeChangeListen
+    , FileKind(..), fileInfoRequest
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
     , fileChangeListen, FileChange(..)
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
@@ -49,6 +50,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 ## file system
 
+@docs FileKind, fileInfoRequest
 @docs directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
 @docs fileChangeListen, FileChange
 
@@ -226,6 +228,19 @@ type InterfaceSingle future
     | FileUtf8Write { content : String, path : String }
     | FileUtf8Request { path : String, on : String -> future }
     | FileChangeListen { path : String, on : FileChange -> future }
+    | FileInfoRequest
+        { path : String
+        , on :
+            Maybe { byteCount : Int, lastContentChangeTime : Time.Posix, kind : FileKind }
+            -> future
+        }
+
+
+{-| Does the path point to a directory or "content"-file
+-}
+type FileKind
+    = KindDirectory
+    | KindFile
 
 
 {-| Did the file at a path get changed/created or moved away/removed?
@@ -404,6 +419,12 @@ interfaceSingleFutureMap futureChange interfaceSingle =
                 , on = \fileChange -> listen.on fileChange |> futureChange
                 }
 
+        FileInfoRequest request ->
+            FileInfoRequest
+                { path = request.path
+                , on = \info -> request.on info |> futureChange
+                }
+
         WorkingDirectoryPathRequest on ->
             WorkingDirectoryPathRequest (\path -> on path |> futureChange)
 
@@ -500,6 +521,9 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
             []
 
         FileUtf8Request _ ->
+            []
+
+        FileInfoRequest _ ->
             []
 
         WorkingDirectoryPathRequest _ ->
@@ -627,6 +651,11 @@ interfaceSingleToJson interfaceSingle =
             FileChangeListen listen ->
                 { tag = "FileChangeListen"
                 , value = listen.path |> Json.Encode.string
+                }
+
+            FileInfoRequest request ->
+                { tag = "FileInfoRequest"
+                , value = request.path |> Json.Encode.string
                 }
 
             WorkingDirectoryPathRequest _ ->
@@ -788,6 +817,11 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value = listen.path |> StructuredId.ofString
                 }
 
+            FileInfoRequest request ->
+                { tag = "FileInfoRequest"
+                , value = request.path |> StructuredId.ofString
+                }
+
             WorkingDirectoryPathRequest _ ->
                 { tag = "WorkingDirectoryPathRequest", value = StructuredId.ofUnit }
 
@@ -946,6 +980,21 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Json.Decode.map listen.on
                 |> Just
 
+        FileInfoRequest request ->
+            Json.Decode.nullable
+                (Json.Decode.map3
+                    (\kind byteCount lastContentChangeTime ->
+                        { kind = kind, byteCount = byteCount, lastContentChangeTime = lastContentChangeTime }
+                    )
+                    (Json.Decode.field "kind" fileKindJsonDecoder)
+                    (Json.Decode.field "byteCount" Json.Decode.int)
+                    (Json.Decode.field "lastContentChangePosixMilliseconds"
+                        (Json.Decode.map Time.millisToPosix Json.Decode.int)
+                    )
+                )
+                |> Json.Decode.map request.on
+                |> Just
+
         WorkingDirectoryPathRequest on ->
             Json.Decode.string
                 |> Json.Decode.map on
@@ -979,6 +1028,16 @@ interfaceSingleFutureJsonDecoder interface =
             Json.Decode.string
                 |> Json.Decode.map on
                 |> Just
+
+
+fileKindJsonDecoder : Json.Decode.Decoder FileKind
+fileKindJsonDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map (\() -> KindFile)
+            (Json.Decode.LocalExtra.onlyString "File")
+        , Json.Decode.map (\() -> KindDirectory)
+            (Json.Decode.LocalExtra.onlyString "Directory")
+        ]
 
 
 terminalSizeJsonDecoder : Json.Decode.Decoder { lines : Int, columns : Int }
@@ -1494,6 +1553,25 @@ Uses [`fs.watch({ recursive: true })`](https://nodejs.org/api/fs.html#fswatchfil
 fileChangeListen : String -> Interface FileChange
 fileChangeListen path =
     FileChangeListen { path = path, on = identity }
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Node#Interface) for getting file metadata at a given path
+or `Nothing` if no file exists there.
+
+    fileExistsRequest : String -> Node.Interface Bool
+    fileExistsRequest path =
+        Node.fileInfoRequest path
+            |> Node.interfaceFutureRequest (\info -> info /= Nothing)
+
+Uses [`fs.stat`](https://nodejs.org/api/fs.html#fspromisesstatpath-options)
+
+-}
+fileInfoRequest :
+    String
+    -> Interface (Maybe { byteCount : Int, lastContentChangeTime : Time.Posix, kind : FileKind })
+fileInfoRequest path =
+    FileInfoRequest { path = path, on = identity }
         |> interfaceFromSingle
 
 

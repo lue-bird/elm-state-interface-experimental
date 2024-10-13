@@ -188,6 +188,19 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     .then((content) => { sendToElm(content) })
                     .catch((err) => warn("failed to read file " + err))
             }
+            case "FileInfoRequest": return (path: string) => {
+                fs.promises.stat(path)
+                    .then((stats) => {
+                        sendToElm({
+                            byteCount: stats.size,
+                            kind: stats.isDirectory() ? "Directory" : "File",
+                            lastContentChangePosixMilliseconds: stats.mtimeMs
+                        })
+                    })
+                    .catch((_enoend) => {
+                        sendToElm(null)
+                    })
+            }
             case "FileChangeListen": return (path: string) => {
                 watchPath(path, abortSignal, event => sendToElm(event))
             }
