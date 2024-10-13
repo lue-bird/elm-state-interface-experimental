@@ -18,7 +18,6 @@ function copyExampleDevelopmentToExample(sub) {
     const packageElmJson = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "elm.json")))
     const packageSrcPath = path.resolve(import.meta.dirname, "..", "src")
     const exampleElmJsonPath = path.resolve(import.meta.dirname, "..", "example", sub, "elm.json")
-    const viteConfigPath = path.resolve(import.meta.dirname, sub, "vite.config.js")
     const indexHtmlPath = path.resolve(import.meta.dirname, sub, "index.html")
     const target =
         fs.existsSync(indexHtmlPath) ?
@@ -58,7 +57,7 @@ function copyExampleDevelopmentToExample(sub) {
 
     if (target === "web") {
         fs.cpSync(
-            viteConfigPath,
+            path.resolve(import.meta.dirname, sub, "vite.config.js"),
             path.resolve(import.meta.dirname, "..", "example", sub, "vite.config.js")
         )
         fs.cpSync(
