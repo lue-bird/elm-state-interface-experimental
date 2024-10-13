@@ -64,7 +64,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## time
 
-[`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/) primitives as part of an [`Interface`](Web#Interface).
+See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 @docs timePosixRequest, timeZoneRequest, timeZoneNameRequest
 @docs timePeriodicallyListen, timeOnceAt
@@ -72,7 +72,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## DOM
 
-These are primitives used for SVG and HTML
+Primitives used for SVG and HTML
 (filling the same role as [`elm/virtual-dom`](https://dark.elm.dmy.fr/packages/elm/virtual-dom/latest/))
 
 @docs DomElementHeader, DomElementVisibilityAlignment, DefaultActionHandling
@@ -88,7 +88,7 @@ These are primitives used for SVG and HTML
 
 ## navigation
 
-`history` interaction as part of an [`Interface`](Web#Interface)
+`history` interaction
 
 @docs urlRequest
 @docs pushUrl, replaceUrl
@@ -97,8 +97,6 @@ These are primitives used for SVG and HTML
 
 
 ## HTTP
-
-Helpers for HTTP requests as part of an [`Interface`](Web#Interface)
 
 @docs HttpRequest, HttpBody, HttpExpect, HttpError, HttpMetadata
 
@@ -110,7 +108,6 @@ Helpers for HTTP requests as part of an [`Interface`](Web#Interface)
 
 ## random
 
-Helpers for randomness as part of an [`Interface`](Web#Interface).
 Not familiar with random "generators"? [`elm/random`](https://package.elm-lang.org/packages/elm/random/latest)
 explains it nicely!
 
@@ -176,8 +173,6 @@ using [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packages/NoRedI
 
 ## console
 
-Helpers for console interactions as part of an [`Interface`](Web#Interface)
-
 @docs consoleLog, consoleWarn, consoleError
 
 
@@ -196,7 +191,7 @@ see [mdn on `Window.localStorage`](https://developer.mozilla.org/en-US/docs/Web/
 
 ## socket
 
-Helpers for web sockets as part of an [`Interface`](Web#Interface)
+web sockets
 
 @docs SocketConnectionEvent, SocketId
 
@@ -213,7 +208,7 @@ Helpers for web sockets as part of an [`Interface`](Web#Interface)
 
 ## File download
 
-Helpers for downloading a dynamically generated file as part of an [`Interface`](Web#Interface).
+Downloading a dynamically generated file.
 
 Security note: Browsers require downloads to be initiated by a user event.
 So rather than allowing malicious sites to put files on your computer however they please,
@@ -229,7 +224,7 @@ see for example [mpizenberg/elm-file](https://dark.elm.dmy.fr/packages/mpizenber
 
 ## audio
 
-Play sounds and music as part of an [`Interface`](Web#Interface).
+Play sounds and music.
 
     import Time
     import Web
@@ -282,8 +277,6 @@ To build an [`AudioParameterTimeline`](Web#AudioParameterTimeline):
 
 ## clipboard
 
-Helpers for clipboard interactions as part of an [`Interface`](Web#Interface)
-
 @docs clipboardRequest, clipboardReplaceBy
 
 Note: To listen for [copy, cut and paste events](https://developer.mozilla.org/en-US/docs/Web/API/ClipboardEvent),
@@ -292,7 +285,7 @@ use [`Web.domListenTo`](Web#domListenTo)
 
 ## geo location
 
-Observe the [`GeoLocation`](Web#GeoLocation) as part of an [`Interface`](Web#Interface)
+Observe the [`GeoLocation`](Web#GeoLocation)
 using the [web geolocation API](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API).
 
 @docs GeoLocation, geoLocationRequest, geoLocationChangeListen
@@ -399,7 +392,7 @@ to only notify users when they're on a different page
 
 ## window
 
-Observe and alter the page's global environment as part of an [`Interface`](Web#Interface)
+Observe and alter the page's global environment
 
 @docs animationFrameListen, windowVisibilityChangeListen, WindowVisibility
 @docs windowSizeRequest, windowSizeChangeListen
