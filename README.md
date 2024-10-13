@@ -6,7 +6,6 @@
 > 
 >   - move all `Web.X.y` module members to `Web.xY`
 >   - add module `Node`, split js package into `/web` and `/node` entrypoints
->   - internal: improve performance of identifying many interfaces that would accumulate over time
 >   - internal: replace `Dict` values to sorted assoc-list, `FastDict.Dict` or in the case of `Web.Interface`, a custom FastDict clone
 
 ### define an app in a simple, safe and declarative way

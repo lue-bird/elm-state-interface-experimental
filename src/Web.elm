@@ -2580,40 +2580,60 @@ interfaceSingleToStructuredId : InterfaceSingle future_ -> StructuredId
 interfaceSingleToStructuredId interfaceSingle =
     StructuredId.ofVariant
         (case interfaceSingle of
-            DocumentTitleReplaceBy _ ->
-                { tag = "DocumentTitleReplaceBy", value = StructuredId.ofUnit }
-
-            DocumentAuthorSet _ ->
-                { tag = "DocumentAuthorSet", value = StructuredId.ofUnit }
-
-            DocumentKeywordsSet _ ->
-                { tag = "DocumentKeywordsSet"
-                , value = StructuredId.ofUnit
+            DocumentTitleReplaceBy title ->
+                { tag = "DocumentTitleReplaceBy"
+                , value = title |> StructuredId.ofString
                 }
 
-            DocumentDescriptionSet _ ->
-                { tag = "DocumentDescriptionSet", value = StructuredId.ofUnit }
+            DocumentAuthorSet author ->
+                { tag = "DocumentAuthorSet"
+                , value = author |> StructuredId.ofString
+                }
+
+            DocumentKeywordsSet keywords ->
+                { tag = "DocumentKeywordsSet"
+                , value = keywords |> StructuredId.ofList StructuredId.ofString
+                }
+
+            DocumentDescriptionSet description ->
+                { tag = "DocumentDescriptionSet"
+                , value = description |> StructuredId.ofString
+                }
 
             ConsoleLog message ->
-                { tag = "ConsoleLog", value = message |> StructuredId.ofString }
+                { tag = "ConsoleLog"
+                , value = message |> StructuredId.ofString
+                }
 
             ConsoleWarn message ->
-                { tag = "ConsoleWarn", value = message |> StructuredId.ofString }
+                { tag = "ConsoleWarn"
+                , value = message |> StructuredId.ofString
+                }
 
             ConsoleError message ->
-                { tag = "ConsoleError", value = message |> StructuredId.ofString }
+                { tag = "ConsoleError"
+                , value = message |> StructuredId.ofString
+                }
 
-            NavigationReplaceUrl _ ->
-                { tag = "NavigationReplaceUrl", value = StructuredId.ofUnit }
+            NavigationReplaceUrl appUrl ->
+                { tag = "NavigationReplaceUrl"
+                , value = appUrl |> appUrlToStructuredId
+                }
 
-            NavigationPushUrl _ ->
-                { tag = "NavigationPushUrl", value = StructuredId.ofUnit }
+            NavigationPushUrl appUrl ->
+                { tag = "NavigationPushUrl"
+                , value = appUrl |> appUrlToStructuredId
+                }
 
             NavigationGo urlSteps ->
-                { tag = "NavigationGo", value = urlSteps |> StructuredId.ofInt }
+                { tag = "NavigationGo"
+                , value = urlSteps |> StructuredId.ofInt
+                }
 
-            NavigationLoad _ ->
-                { tag = "NavigationLoad", value = StructuredId.ofUnit }
+            NavigationLoad url ->
+                { tag = "NavigationLoad"
+                , value = url |> StructuredId.ofString
+                }
 
             NavigationReload () ->
                 { tag = "NavigationReload", value = StructuredId.ofUnit }
@@ -2627,8 +2647,10 @@ interfaceSingleToStructuredId interfaceSingle =
                         ]
                 }
 
-            ClipboardReplaceBy _ ->
-                { tag = "ClipboardReplaceBy", value = StructuredId.ofUnit }
+            ClipboardReplaceBy content ->
+                { tag = "ClipboardReplaceBy"
+                , value = content |> StructuredId.ofString
+                }
 
             AudioPlay audio ->
                 { tag = "AudioPlay"
@@ -2649,7 +2671,9 @@ interfaceSingleToStructuredId interfaceSingle =
                 }
 
             SocketDisconnect id ->
-                { tag = "SocketDisconnect", value = id |> socketIdToStructuredId }
+                { tag = "SocketDisconnect"
+                , value = id |> socketIdToStructuredId
+                }
 
             LocalStorageSet set ->
                 { tag = "LocalStorageSet"
@@ -2699,7 +2723,9 @@ interfaceSingleToStructuredId interfaceSingle =
                 { tag = "TimezoneNameRequest", value = StructuredId.ofUnit }
 
             TimeOnce once ->
-                { tag = "TimeOnce", value = once.pointInTime |> Time.LocalExtra.posixToStructureId }
+                { tag = "TimeOnce"
+                , value = once.pointInTime |> Time.LocalExtra.posixToStructureId
+                }
 
             RandomUnsignedInt32sRequest request ->
                 { tag = "RandomUnsignedInt32sRequest"
@@ -2774,6 +2800,23 @@ interfaceSingleToStructuredId interfaceSingle =
             GamepadsChangeListen _ ->
                 { tag = "GamepadsChangeListen", value = StructuredId.ofUnit }
         )
+
+
+appUrlToStructuredId : AppUrl -> StructuredId
+appUrlToStructuredId appUrl =
+    StructuredId.ofParts
+        [ appUrl.path |> StructuredId.ofList StructuredId.ofString
+        , appUrl.queryParameters
+            |> Dict.toList
+            |> StructuredId.ofList
+                (\( key, value ) ->
+                    StructuredId.ofParts
+                        [ key |> StructuredId.ofString
+                        , value |> StructuredId.ofList StructuredId.ofString
+                        ]
+                )
+        , appUrl.fragment |> StructuredId.ofMaybe StructuredId.ofString
+        ]
 
 
 {-| See indexToDigitCountPrefixed.
