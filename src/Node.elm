@@ -3,7 +3,7 @@ module Node exposing
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
-    , workingDirectoryPathRequest, launchArgumentsRequest, exit
+    , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
     , fileChangeListen, FileChange(..)
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
@@ -42,7 +42,7 @@ You can also [embed](#embed) a state-interface program as part of an existing ap
 
 ## process
 
-@docs workingDirectoryPathRequest, launchArgumentsRequest, exit
+@docs workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
 
 
 ## file system
@@ -239,6 +239,7 @@ type InterfaceSingle future
     | FileChangeListen { path : String, on : FileChange -> future }
     | WorkingDirectoryPathRequest (String -> future)
     | LaunchArgumentsRequest (List String -> future)
+    | ProcessTitleSet String
 
 
 {-| Did the file at a path get changed/created or moved away/removed?
@@ -447,6 +448,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         TerminalSizeChangeListen on ->
             TerminalSizeChangeListen (\size -> on size |> futureChange)
 
+        ProcessTitleSet newTitle ->
+            ProcessTitleSet newTitle
+
 
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
 httpRequestFutureMap futureChange request =
@@ -560,6 +564,18 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         TerminalSizeChangeListen _ ->
             []
 
+        ProcessTitleSet oldTitle ->
+            case interfaces.updated of
+                ProcessTitleSet updatedTitle ->
+                    if oldTitle == updatedTitle then
+                        []
+
+                    else
+                        [ fromSingeEdit (EditProcessTitle updatedTitle) ]
+
+                _ ->
+                    []
+
 
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
 -}
@@ -604,6 +620,11 @@ interfaceSingleEditToJson edit =
                         [ ( "path", write.path |> Json.Encode.string )
                         , ( "content", write.content |> Json.Encode.string )
                         ]
+                }
+
+            EditProcessTitle newTitle ->
+                { tag = "EditProcessTitle"
+                , value = newTitle |> Json.Encode.string
                 }
         )
 
@@ -700,6 +721,9 @@ interfaceSingleToJson interfaceSingle =
 
             TerminalSizeChangeListen _ ->
                 { tag = "TerminalSizeChangeListen", value = Json.Encode.null }
+
+            ProcessTitleSet newTitle ->
+                { tag = "TerminalSizeChangeListen", value = newTitle |> Json.Encode.string }
         )
 
 
@@ -855,6 +879,9 @@ interfaceSingleToStructuredId interfaceSingle =
 
             TerminalSizeChangeListen _ ->
                 { tag = "TerminalSizeChangeListen", value = StructuredId.ofUnit }
+
+            ProcessTitleSet newTitle ->
+                { tag = "ProcessTitleSet", value = StructuredId.ofUnit }
         )
 
 
@@ -1021,6 +1048,9 @@ interfaceSingleFutureJsonDecoder interface =
             terminalSizeJsonDecoder
                 |> Json.Decode.map on
                 |> Just
+
+        ProcessTitleSet _ ->
+            Nothing
 
 
 terminalSizeJsonDecoder : Json.Decode.Decoder { lines : Int, columns : Int }
@@ -1258,6 +1288,7 @@ describing changes to an existing interface with the same identity
 -}
 type InterfaceSingleEdit
     = EditFileUtf8 { path : String, content : String }
+    | EditProcessTitle String
 
 
 {-| Create a [`Program`](#Program):
@@ -1420,7 +1451,7 @@ Btw you do not need to specify `Node.exit 0`
 for every interface. Once every interface has completed,
 the process will exit with 0 on its own.
 
-Uses [`process.exitCode = ...`](https://nodejs.org/api/process.html#processexitcode)
+Uses [`process.exitCode = ...`](https://nodejs.org/api/process.html#processexitcode_1)
 instead of [`process.exit`](https://nodejs.org/api/process.html#processexitcode)
 to still make interfaces like writing an error come through before exiting.
 
@@ -1428,6 +1459,18 @@ to still make interfaces like writing an error come through before exiting.
 exit : Int -> Interface future_
 exit code =
     Exit code
+        |> interfaceFromSingle
+
+
+{-| Replace the title of the running process.
+This will usually display in the title bar of your terminal emulator or in activity monitors.
+
+Uses [`process.title = ...`](https://nodejs.org/api/process.html#processtitle)
+
+-}
+processTitleSet : String -> Interface future_
+processTitleSet newTitle =
+    ProcessTitleSet newTitle
         |> interfaceFromSingle
 
 

@@ -13,8 +13,8 @@ export interface ElmPorts {
 /** Small helper for creating a runnable elm program. Requires the `elm` binary to be available.
  * Feel free to use a custom loader that e.g. allows debug or uses an alternative compiler.
  * 
- * @param elmProjectDirectoryPath The path to the `review-mini/` elm application. Use `import.meta.dirname`
- * @param mainElmModuleNamePath 
+ * @param elmProjectDirectoryPath The path to the elm application. Use `import.meta.dirname`
+ * @param mainElmModuleNamePath usually Main.elm or src/Main.elm depending on where your index.js is
  * @returns An elm worker program you can start whenever you want which then provides its ports
  */
 export function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePath: string): { init: () => { ports: ElmPorts } } {
@@ -147,6 +147,9 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     process.exitCode = 0
                 })
             }
+            case "ProcessTitleSet": return (newTitle: string) => {
+                process.title = newTitle
+            }
             case "DirectoryMake": return (write: { path: string }) => {
                 fs.promises.mkdir(write.path, { recursive: true })
                     .then(() => { })
@@ -189,6 +192,9 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 const abortController = new AbortController()
                 abortControllers.set(id, abortController)
                 fileUtf8Write(write, abortController.signal)
+            }
+            case "EditProcessTitle": return (newTitle: string) => {
+                process.title = newTitle
             }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Edit." + tag)
