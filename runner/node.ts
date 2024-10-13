@@ -62,7 +62,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 interfaceAddImplementation(config.tag, sendToElm, abortController.signal)(config.value)
             }
             case "Edit": return (config: { tag: string, value: any }) => {
-                interfaceEditImplementation(id, config.tag)(config.value)
+                interfaceEditImplementation(id)(config.value)
             }
             case "Remove": return (_config: null) => {
                 const abortController = abortControllers.get(id)
@@ -196,17 +196,8 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
         }
     }
-    function interfaceEditImplementation(id: string, tag: string): ((config: any) => void) {
+    function interfaceEditImplementation(tag: string): ((config: any) => void) {
         switch (tag) {
-            case "EditUtf8Write": return (write: { content: string, path: string }) => {
-                abortControllers.get(id)?.abort()
-                const abortController = new AbortController()
-                abortControllers.set(id, abortController)
-                fileUtf8Write(write, abortController.signal)
-            }
-            case "EditProcessTitle": return (newTitle: string) => {
-                process.title = newTitle
-            }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Edit." + tag)
             }

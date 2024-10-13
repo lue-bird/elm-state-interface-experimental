@@ -493,17 +493,8 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         FileRemove _ ->
             []
 
-        FileUtf8Write oldWrite ->
-            case interfaces.updated of
-                FileUtf8Write updatedWrite ->
-                    if oldWrite.content == updatedWrite.content then
-                        []
-
-                    else
-                        [ fromSingeEdit (EditFileUtf8 updatedWrite) ]
-
-                _ ->
-                    []
+        FileUtf8Write _ ->
+            []
 
         FileChangeListen _ ->
             []
@@ -523,17 +514,8 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         TerminalSizeChangeListen _ ->
             []
 
-        ProcessTitleSet oldTitle ->
-            case interfaces.updated of
-                ProcessTitleSet updatedTitle ->
-                    if oldTitle == updatedTitle then
-                        []
-
-                    else
-                        [ fromSingeEdit (EditProcessTitle updatedTitle) ]
-
-                _ ->
-                    []
+        ProcessTitleSet _ ->
+            []
 
         StandardOutWrite _ ->
             []
@@ -581,19 +563,8 @@ interfaceSingleEditToJson : InterfaceSingleEdit -> Json.Encode.Value
 interfaceSingleEditToJson edit =
     Json.Encode.LocalExtra.variant
         (case edit of
-            EditFileUtf8 write ->
-                { tag = "EditFileUtf8"
-                , value =
-                    Json.Encode.object
-                        [ ( "path", write.path |> Json.Encode.string )
-                        , ( "content", write.content |> Json.Encode.string )
-                        ]
-                }
-
-            EditProcessTitle newTitle ->
-                { tag = "EditProcessTitle"
-                , value = newTitle |> Json.Encode.string
-                }
+            EditNoneYet ever ->
+                Basics.never ever
         )
 
 
@@ -771,7 +742,9 @@ interfaceSingleToStructuredId interfaceSingle =
                 { tag = "TimezoneNameRequest", value = StructuredId.ofUnit }
 
             TimeOnce once ->
-                { tag = "TimeOnce", value = once.pointInTime |> Time.LocalExtra.posixToStructureId }
+                { tag = "TimeOnce"
+                , value = once.pointInTime |> Time.LocalExtra.posixToStructureId
+                }
 
             RandomUnsignedInt32sRequest request ->
                 { tag = "RandomUnsignedInt32sRequest"
@@ -787,14 +760,22 @@ interfaceSingleToStructuredId interfaceSingle =
                 { tag = "Exit", value = StructuredId.ofUnit }
 
             DirectoryMake path ->
-                { tag = "DirectoryMake", value = path |> StructuredId.ofString }
+                { tag = "DirectoryMake"
+                , value = path |> StructuredId.ofString
+                }
 
             FileRemove path ->
-                { tag = "FileRemove", value = path |> StructuredId.ofString }
+                { tag = "FileRemove"
+                , value = path |> StructuredId.ofString
+                }
 
             FileUtf8Write write ->
                 { tag = "FileUtf8Write"
-                , value = write.path |> StructuredId.ofString
+                , value =
+                    StructuredId.ofParts
+                        [ write.path |> StructuredId.ofString
+                        , write.content |> StructuredId.ofString
+                        ]
                 }
 
             FileUtf8Request request ->
@@ -819,8 +800,10 @@ interfaceSingleToStructuredId interfaceSingle =
             TerminalSizeChangeListen _ ->
                 { tag = "TerminalSizeChangeListen", value = StructuredId.ofUnit }
 
-            ProcessTitleSet _ ->
-                { tag = "ProcessTitleSet", value = StructuredId.ofUnit }
+            ProcessTitleSet title ->
+                { tag = "ProcessTitleSet"
+                , value = title |> StructuredId.ofString
+                }
 
             StandardOutWrite text ->
                 { tag = "StandardOutWrite"
@@ -1232,8 +1215,7 @@ type InterfaceSingleDiff irrelevantFuture
 describing changes to an existing interface with the same identity
 -}
 type InterfaceSingleEdit
-    = EditFileUtf8 { path : String, content : String }
-    | EditProcessTitle String
+    = EditNoneYet Never
 
 
 {-| Create a [`Program`](#Program):
