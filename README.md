@@ -606,23 +606,22 @@ For now, some more niche interfaces like [`WebGL.Texture.loadWith`](https://dark
 
   - ⛵ add more [example projects](https://github.com/lue-bird/elm-state-interface-experimental/tree/main/example). Would you like to see something specific? Or maybe you're motivated to make one yourself 👀
   - 📐 `Web.domElement "div" ...` etc are a bit clumsy. Sadly, most ui packages out there only convert to a type inaccessible to `state-interface`, making them incompatible. Though a port of them would be awesome, a good first step may be creating a package for generating the html/svg/... elements, inspired by [`Orasund/elm-html-style`](https://dark.elm.dmy.fr/packages/Orasund/elm-html-style/latest/)
-  - 🔋 add the web APIs you miss the most. Maybe [MIDI](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API), [speech](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API), [sensors](https://developer.mozilla.org/en-US/docs/Web/API/Sensor_APIs) or [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)?
-  - 🗃️ add basic `node` or `deno` APIs (only with help!)
+  - 🔋 add the web APIs you miss the most. Maybe [MIDI](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API), [speech](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API), [sensors](https://developer.mozilla.org/en-US/docs/Web/API/Sensor_APIs), [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) or additional node APIs?
 
 If you have knowledge in these fields on the js side, have pointers or already 
 a basic implementation using ports, [come by](https://github.com/lue-bird/elm-state-interface-experimental/discussions/new/choose)!
 
 Note: The package is very much not designed to be easily extensible.
 Adding stuff _will_ force a major version bump.
-The module and interface structure is also not equipped to support multiple platforms.
 
 ## thanks 🌱
-  - [andrewMacmurray for `elm-concurrent-task`](https://dark.elm.dmy.fr/packages/andrewMacmurray/elm-concurrent-task/latest/) which was used as the base for many of the js implementations
+  - [andrewMacmurray for `elm-concurrent-task`](https://dark.elm.dmy.fr/packages/andrewMacmurray/elm-concurrent-task/latest/) which I used as the base for many of the js implementations
   - [elm-radio hosts for the episode about concurrent-task](https://elm-radio.com/episode/elm-concurrent-task) which motivated me to make a package out of it
   - [a-teammate (Malte H)](https://github.com/a-teammate) for lots of valuable feedback 💚
+  - [Robin Heggelund Hansen for gren-lang/node](https://packages.gren-lang.org/package/gren-lang/node/version/latest/overview) which I used as a kind of js implementation reference, and for showing me how to make node exist at the right time
+  - [Justin Blake for gren-tui](https://packages.gren-lang.org/package/blaix/gren-tui/version/latest/overview)
   - [MartinSStewart for `elm-audio`](https://dark.elm.dmy.fr/packages/MartinSStewart/elm-audio/latest/) which inspired the audio API
   - [noordstar for `elm-gamepad`](https://dark.elm.dmy.fr/packages/noordstar/elm-gamepad/latest) which inspired the gamepads API
-  - [kageurufu for `elm-websockets`](https://dark.elm.dmy.fr/packages/kageurufu/elm-websockets/latest/) which inspired me to also provide a websocket API
 
 ## where's X?
 To not be blocked on missing interfaces, you have the option of [custom elements](https://guide.elm-lang.org/interop/custom_elements), custom events and [data attributes](https://developer.mozilla.org/en-US/docs/Learn/HTML/Howto/Use_data_attributes) at least.
