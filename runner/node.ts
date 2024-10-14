@@ -41,6 +41,12 @@ export function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePat
 
 
 export function programStart(appConfig: { ports: ElmPorts }) {
+    function exit() {
+        appConfig.ports.toJs.unsubscribe(listenToElm)
+        abortControllers.clear() // disable any abort signal listeners
+        process.stdin.unref()
+        process.stdout.write("\u{001B}[?25h\n") // show cursor
+    }
     function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
         // console.log("elm → js: ", fromElm)
         function sendToElm(eventData: void) {
@@ -90,7 +96,15 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "StandardInRawListen": return (_config: null) => {
                 process.stdin.setRawMode(true)
                 function listen(buffer: Buffer) {
-                    sendToElm(buffer.toString())
+                    const stringInput = buffer.toString()
+                    if (stringInput == "\u0003") { // ctrl+c
+                        abortControllers.forEach((abortController) => {
+                            abortController.abort()
+                        })
+                        exit()
+                    } else {
+                        sendToElm(stringInput)
+                    }
                 }
                 process.stdin.addListener("data", listen)
                 abortSignal.addEventListener("abort", (_event) => {
@@ -123,9 +137,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 sendToElm(process.argv)
             }
             case "Exit": return (code: number) => {
-                appConfig.ports.toJs.unsubscribe(listenToElm)
-                abortControllers.clear() // disable any abort signal listeners
-                process.stdin.unref()
+                exit()
                 process.exitCode = code
             }
             case "ProcessTitleSet": return (newTitle: string) => {

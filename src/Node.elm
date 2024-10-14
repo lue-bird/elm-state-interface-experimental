@@ -1845,7 +1845,8 @@ For nice input parsing,
 see for example [gren-tui's `stringToInput`](https://github.com/blaix/gren-tui/blob/main/src/Tui.gren#L562).
 
 As long as [`Node.standardInRawListen`](#standardInRawListen) is part of the interface,
-the terminal won't echo input characters or exit on ctrl+c (no SIGINT).
+the terminal won't echo input characters.
+However, ctrl+c will still exit the process (SIGINT).
 
 Uses [`process.stdin.addListener("data", ...)`](https://nodejs.org/api/stream.html#event-data)
 in combination with [`process.stdin.setRawMode(true)`](https://nodejs.org/api/tty.html#readstreamsetrawmodemode)
