@@ -693,7 +693,7 @@ interfaceSingleToJson interfaceSingle =
                 { tag = "TerminalSizeChangeListen", value = Json.Encode.null }
 
             ProcessTitleSet newTitle ->
-                { tag = "TerminalSizeChangeListen", value = newTitle |> Json.Encode.string }
+                { tag = "ProcessTitleSet", value = newTitle |> Json.Encode.string }
 
             StandardOutWrite text ->
                 { tag = "StandardOutWrite", value = text |> Json.Encode.string }
@@ -883,7 +883,7 @@ interfaceSingleToStructuredId interfaceSingle =
                 { tag = "StandardInListen", value = StructuredId.ofUnit }
 
             StandardInRawListen _ ->
-                { tag = "StandardInListen", value = StructuredId.ofUnit }
+                { tag = "StandardInRawListen", value = StructuredId.ofUnit }
         )
 
 
