@@ -1,5 +1,8 @@
 port module Main exposing (State(..), main)
 
+{-| Shameless port of [blaix/gren-tui' clock example](https://github.com/blaix/gren-tui/tree/main/examples/v3/clock)
+-}
+
 import Ansi
 import Ansi.Color
 import Ansi.Cursor
