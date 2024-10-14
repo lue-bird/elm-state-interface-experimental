@@ -35,7 +35,19 @@ export function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePat
             .replace("(this)", "(globalThis)")
     )
     fs.unlinkSync(elmJsPath)
-    return (globalThis as any).Elm.Main
+    return elmResultExtractInit((globalThis as any).Elm)
+}
+function elmResultExtractInit(elmResult: any): { init: () => { ports: ElmPorts } } {
+    if (elmResult.init !== undefined) {
+        return elmResult
+    } else {
+        const elmResultInner = Object.entries(elmResult)[0]
+        if (elmResultInner === undefined) {
+            throw new Error("I was unable to extract an init function from the compiled elm. Did you edit the code?")
+        } else {
+            return elmResultExtractInit(elmResultInner[1])
+        }
+    }
 }
 
 
