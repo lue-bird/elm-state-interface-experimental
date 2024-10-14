@@ -70,7 +70,7 @@ function copyExampleDevelopmentToExample(sub) {
     "type": "module",
     "main": "src/index.js",
     "dependencies": {
-        "@lue-bird/elm-state-interface-experimental": "^2.0.1",
+        "@lue-bird/elm-state-interface-experimental": "^2.0.2",
         "vite": "^5.1.2",
         "vite-plugin-elm-watch": "^1.3.2"
     }
@@ -92,7 +92,7 @@ Web.programStart({ ports: elmApp.ports, domElement: document.getElementById("app
     "type": "module",
     "main": "src/index.js",
     "dependencies": {
-        "@lue-bird/elm-state-interface-experimental": "^2.0.1"
+        "@lue-bird/elm-state-interface-experimental": "^2.0.2"
     }
 }`
         )
