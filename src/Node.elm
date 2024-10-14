@@ -1471,10 +1471,15 @@ timePeriodicallyListen intervalDuration =
         |> interfaceFromSingle
 
 
-{-| Gracefully stop the process,
+{-| Very gracefully stop the process,
 completing all other current interface operations.
 Do not keep listens in the interface,
 otherwise the process will not die.
+
+Keep in mind that every process ends automatically
+once no interfaces that expect future data are left
+which means you only need [`Node.exit`](#exit) in case you want to exit
+with a non-zero error code.
 
 Uses [`process.exitCode = ...`](https://nodejs.org/api/process.html#processexitcode_1)
 instead of [`process.exit`](https://nodejs.org/api/process.html#processexitcode)

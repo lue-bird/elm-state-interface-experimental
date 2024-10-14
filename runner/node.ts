@@ -53,12 +53,6 @@ function elmResultExtractInit(elmResult: any): { init: () => { ports: ElmPorts }
 
 
 export function programStart(appConfig: { ports: ElmPorts }) {
-    function exit() {
-        appConfig.ports.toJs.unsubscribe(listenToElm)
-        abortControllers.clear() // disable any abort signal listeners
-        process.stdin.unref()
-        process.stdout.write("\u{001B}[?25h\n") // show cursor
-    }
     function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
         // console.log("elm → js: ", fromElm)
         function sendToElm(eventData: void) {
@@ -103,6 +97,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 process.stdin.addListener("data", listen)
                 abortSignal.addEventListener("abort", (_event) => {
                     process.stdin.removeListener("data", listen)
+                    process.stdin.unref()
                 })
             }
             case "StandardInRawListen": return (_config: null) => {
@@ -113,7 +108,8 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         abortControllers.forEach((abortController) => {
                             abortController.abort()
                         })
-                        exit()
+                        appConfig.ports.toJs.unsubscribe(listenToElm)
+                        process.stdout.write("\u{001B}[?25h\n") // show cursor
                     } else {
                         sendToElm(stringInput)
                     }
@@ -122,6 +118,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 abortSignal.addEventListener("abort", (_event) => {
                     process.stdin.removeListener("data", listen)
                     process.stdin.setRawMode(false)
+                    process.stdin.unref()
                 })
             }
             case "StandardOutWrite": return (text: string) => {
@@ -131,20 +128,25 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 process.stderr.write(text)
             }
             case "WorkingDirectoryPathRequest": return (_config: null) => {
-                sendToElm(process.cwd())
+                queueAbortable(abortSignal, () => {
+                    sendToElm(process.cwd())
+                })
             }
             case "LaunchArgumentsRequest": return (_config: null) => {
-                sendToElm(process.argv)
+                queueAbortable(abortSignal, () => {
+                    sendToElm(process.argv)
+                })
             }
             case "Exit": return (code: number) => {
-                exit()
                 process.exitCode = code
             }
             case "ProcessTitleSet": return (newTitle: string) => {
                 process.title = newTitle
             }
             case "TerminalSizeRequest": return (_config: null) => {
-                sendToElm({ lines: process.stdout.rows, columns: process.stdout.columns })
+                queueAbortable(abortSignal, () => {
+                    sendToElm({ lines: process.stdout.rows, columns: process.stdout.columns })
+                })
             }
             case "TerminalSizeChangeListen": return (_config: null) => {
                 function onResize(_event: any): void {
@@ -159,14 +161,20 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 httpFetch(config, abortSignal).then(sendToElm)
             }
             case "TimePosixRequest": return (_config: null) => {
-                sendToElm(Date.now())
+                queueAbortable(abortSignal, () => {
+                    sendToElm(Date.now())
+                })
             }
             case "TimezoneOffsetRequest": return (_config: null) => {
                 // Equivalent Elm Kernel code: https://github.com/elm/time/blob/1.0.0/src/Elm/Kernel/Time.js#L38-L52
-                sendToElm(new Date().getTimezoneOffset())
+                queueAbortable(abortSignal, () => {
+                    sendToElm(new Date().getTimezoneOffset())
+                })
             }
             case "TimezoneNameRequest": return (_config: null) => {
-                sendToElm(Intl.DateTimeFormat().resolvedOptions().timeZone)
+                queueAbortable(abortSignal, () => {
+                    sendToElm(Intl.DateTimeFormat().resolvedOptions().timeZone)
+                })
             }
             case "TimePeriodicallyListen": return (config: { milliSeconds: number }) => {
                 const timePeriodicallyListenId =
@@ -189,7 +197,9 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 })
             }
             case "RandomUnsignedInt32sRequest": return (config: number) => {
-                sendToElm(Array.from(crypto.getRandomValues(new Uint32Array(config))))
+                queueAbortable(abortSignal, () => {
+                    sendToElm(Array.from(crypto.getRandomValues(new Uint32Array(config))))
+                })
             }
             case "DirectoryMake": return (write: { path: string }) => {
                 fs.promises.mkdir(write.path, { recursive: true })
@@ -261,6 +271,14 @@ export function programStart(appConfig: { ports: ElmPorts }) {
 
 const abortControllers: Map<string, AbortController> = new Map()
 
+
+
+function queueAbortable(abortSignal: AbortSignal, action: () => void) {
+    const immediateId = setImmediate(action)
+    abortSignal.addEventListener("abort", _event => {
+        clearImmediate(immediateId)
+    })
+}
 
 
 
