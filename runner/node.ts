@@ -78,12 +78,24 @@ export function programStart(appConfig: { ports: ElmPorts }) {
     function interfaceAddImplementation(tag: string, sendToElm: (v: any) => void, abortSignal: AbortSignal): ((config: any) => void) {
         switch (tag) {
             case "StandardInListen": return (_config: null) => {
+                process.stdin.setRawMode(false)
                 function listen(buffer: Buffer) {
                     sendToElm(buffer.toString())
                 }
                 process.stdin.addListener("data", listen)
                 abortSignal.addEventListener("abort", (_event) => {
-                    process.stdin.removeListener("data", listen);
+                    process.stdin.removeListener("data", listen)
+                })
+            }
+            case "StandardInListenRaw": return (_config: null) => {
+                process.stdin.setRawMode(true)
+                function listen(buffer: Buffer) {
+                    sendToElm(buffer.toString())
+                }
+                process.stdin.addListener("data", listen)
+                abortSignal.addEventListener("abort", (_event) => {
+                    process.stdin.removeListener("data", listen)
+                    process.stdin.setRawMode(false)
                 })
             }
             case "StandardOutWrite": return (text: string) => {
