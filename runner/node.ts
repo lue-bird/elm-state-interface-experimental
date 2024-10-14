@@ -130,18 +130,6 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "StandardErrWrite": return (text: string) => {
                 process.stderr.write(text)
             }
-            case "ConsoleLog": return (message: string) => {
-                console.log(message)
-            }
-            case "ConsoleWarn": return (message: string) => {
-                console.warn(message)
-            }
-            case "ConsoleError": return (message: string) => {
-                console.error(message)
-            }
-            case "ConsoleError": return (_config: null) => {
-                console.clear()
-            }
             case "WorkingDirectoryPathRequest": return (_config: null) => {
                 sendToElm(process.cwd())
             }
