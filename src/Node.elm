@@ -4,7 +4,7 @@ module Node exposing
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
-    , standardOutWrite, standardErrWrite, standardInListen, standardInListenRaw
+    , standardOutWrite, standardErrWrite, standardInListen, standardInRawListen
     , terminalSizeRequest, terminalSizeChangeListen
     , FileKind(..), fileInfoRequest, directorySubNamesRequest
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
@@ -44,7 +44,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 ## process and terminal
 
 @docs workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
-@docs standardOutWrite, standardErrWrite, standardInListen, standardInListenRaw
+@docs standardOutWrite, standardErrWrite, standardInListen, standardInRawListen
 @docs terminalSizeRequest, terminalSizeChangeListen
 
 
@@ -213,7 +213,7 @@ type InterfaceSingle future
     | StandardOutWrite String
     | StandardErrWrite String
     | StandardInListen (String -> future)
-    | StandardInListenRaw (String -> future)
+    | StandardInRawListen (String -> future)
     | TerminalSizeRequest ({ lines : Int, columns : Int } -> future)
     | TerminalSizeChangeListen ({ lines : Int, columns : Int } -> future)
     | HttpRequest (HttpRequest future)
@@ -457,8 +457,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         StandardInListen on ->
             StandardInListen (\size -> on size |> futureChange)
 
-        StandardInListenRaw on ->
-            StandardInListenRaw (\size -> on size |> futureChange)
+        StandardInRawListen on ->
+            StandardInRawListen (\size -> on size |> futureChange)
 
 
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
@@ -564,7 +564,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         StandardInListen _ ->
             []
 
-        StandardInListenRaw _ ->
+        StandardInRawListen _ ->
             []
 
 
@@ -704,8 +704,8 @@ interfaceSingleToJson interfaceSingle =
             StandardInListen _ ->
                 { tag = "StandardInListen", value = Json.Encode.null }
 
-            StandardInListenRaw _ ->
-                { tag = "StandardInListenRaw", value = Json.Encode.null }
+            StandardInRawListen _ ->
+                { tag = "StandardInRawListen", value = Json.Encode.null }
         )
 
 
@@ -882,7 +882,7 @@ interfaceSingleToStructuredId interfaceSingle =
             StandardInListen _ ->
                 { tag = "StandardInListen", value = StructuredId.ofUnit }
 
-            StandardInListenRaw _ ->
+            StandardInRawListen _ ->
                 { tag = "StandardInListen", value = StructuredId.ofUnit }
         )
 
@@ -1067,7 +1067,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Json.Decode.map on
                 |> Just
 
-        StandardInListenRaw on ->
+        StandardInRawListen on ->
             Json.Decode.string
                 |> Json.Decode.map on
                 |> Just
@@ -1829,7 +1829,7 @@ httpRequest request =
 
 {-| Read text from standard in.
 If you want to intercept input before enter is sent,
-use [`Node.standardInListenRaw`](#standardInListenRaw)
+use [`Node.standardInRawListen`](#standardInRawListen)
 
 Uses [`process.stdin.addListener("data", ...)`](https://nodejs.org/api/stream.html#event-data)
 
@@ -1844,16 +1844,16 @@ standardInListen =
 For nice input parsing,
 see for example [gren-tui's `stringToInput`](https://github.com/blaix/gren-tui/blob/main/src/Tui.gren#L562).
 
-As long as [`Node.standardInListenRaw`](#standardInListenRaw) is part of the interface,
+As long as [`Node.standardInRawListen`](#standardInRawListen) is part of the interface,
 the terminal won't echo input characters or exit on ctrl+c (no SIGINT).
 
 Uses [`process.stdin.addListener("data", ...)`](https://nodejs.org/api/stream.html#event-data)
 in combination with [`process.stdin.setRawMode(true)`](https://nodejs.org/api/tty.html#readstreamsetrawmodemode)
 
 -}
-standardInListenRaw : Interface String
-standardInListenRaw =
-    StandardInListenRaw identity
+standardInRawListen : Interface String
+standardInRawListen =
+    StandardInRawListen identity
         |> interfaceFromSingle
 
 

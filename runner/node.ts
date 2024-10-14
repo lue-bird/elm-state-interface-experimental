@@ -87,7 +87,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     process.stdin.removeListener("data", listen)
                 })
             }
-            case "StandardInListenRaw": return (_config: null) => {
+            case "StandardInRawListen": return (_config: null) => {
                 process.stdin.setRawMode(true)
                 function listen(buffer: Buffer) {
                     sendToElm(buffer.toString())
