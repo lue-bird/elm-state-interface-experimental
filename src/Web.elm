@@ -1601,103 +1601,86 @@ domElementHeaderDiffMap fromDomEdit elements =
         ]
 
     else
-        { old = elements.old.styles, updated = elements.updated.styles }
-            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
-                { remove = identity, edit = Basics.identity }
-            |> List.LocalExtra.fromMaybe
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.attributes, updated = elements.updated.attributes }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                        (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
-                )
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
-                        (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
-                        { remove = \k -> { namespace = k.namespace, key = k.key }
-                        , edit = \entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value }
-                        }
-                )
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.stringProperties, updated = elements.updated.stringProperties }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                        (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
-                )
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.boolProperties, updated = elements.updated.boolProperties }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                        (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
-                )
-            |> List.LocalExtra.consJust
-                (if elements.old.scrollToPosition == elements.updated.scrollToPosition then
-                    Nothing
+        { styles =
+            { old = elements.old.styles, updated = elements.updated.styles }
+                |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                    (\d -> d)
+                    { remove = identity, edit = Basics.identity }
+        , attributes =
+            { old = elements.old.attributes, updated = elements.updated.attributes }
+                |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                    (\d -> d)
+                    { remove = identity, edit = Basics.identity }
+        , attributesNamespaced =
+            { old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
+                |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
+                    (\d -> d)
+                    { remove = \k -> { namespace = k.namespace, key = k.key }
+                    , edit = \entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value }
+                    }
+        , stringProperties =
+            { old = elements.old.stringProperties, updated = elements.updated.stringProperties }
+                |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                    (\d -> d)
+                    { remove = identity, edit = Basics.identity }
+        , boolProperties =
+            { old = elements.old.boolProperties, updated = elements.updated.boolProperties }
+                |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                    (\d -> d)
+                    { remove = identity, edit = Basics.identity }
+        , scrollToPosition =
+            if elements.old.scrollToPosition == elements.updated.scrollToPosition then
+                Nothing
 
-                 else
-                    ReplacementDomElementScrollToPosition elements.updated.scrollToPosition
-                        |> fromDomEdit
-                        |> Just
-                )
-            |> List.LocalExtra.consJust
-                (if elements.old.scrollToShow == elements.updated.scrollToShow then
-                    Nothing
+            else
+                elements.updated.scrollToPosition
+        , scrollToShow =
+            if elements.old.scrollToShow == elements.updated.scrollToShow then
+                Nothing
 
-                 else
-                    ReplacementDomElementScrollToShow elements.updated.scrollToShow
-                        |> fromDomEdit
-                        |> Just
-                )
-            |> List.LocalExtra.consJust
-                (case elements.old.scrollPositionRequest of
-                    Just _ ->
-                        Nothing
+            else
+                elements.updated.scrollToShow
+        , scrollPositionRequest =
+            case elements.old.scrollPositionRequest of
+                Just _ ->
+                    False
 
-                    Nothing ->
-                        case elements.updated.scrollPositionRequest of
-                            Nothing ->
-                                Nothing
+                Nothing ->
+                    case elements.updated.scrollPositionRequest of
+                        Nothing ->
+                            False
 
-                            Just _ ->
-                                replacementDomElementScrollPositionRequest
-                                    |> fromDomEdit
-                                    |> Just
-                )
-            |> List.LocalExtra.consJust
-                (let
-                    updatedElementEventListensId : List { key : String, value : DefaultActionHandling }
-                    updatedElementEventListensId =
-                        elements.updated.eventListens
-                            |> sortedKeyValueListToList
-                            |> List.LocalExtra.mapAnyOrder
-                                (\entry ->
-                                    { key = entry.key, value = entry.value.defaultActionHandling }
-                                )
-                 in
-                 if
-                    (elements.old.eventListens
+                        Just _ ->
+                            True
+        , eventListens =
+            let
+                updatedElementEventListensId : List { key : String, value : DefaultActionHandling }
+                updatedElementEventListensId =
+                    elements.updated.eventListens
                         |> sortedKeyValueListToList
                         |> List.LocalExtra.mapAnyOrder
                             (\entry ->
                                 { key = entry.key, value = entry.value.defaultActionHandling }
                             )
-                    )
-                        == updatedElementEventListensId
-                 then
-                    Nothing
-
-                 else
-                    ReplacementDomElementEventListens updatedElementEventListensId
-                        |> fromDomEdit
-                        |> Just
+            in
+            if
+                (elements.old.eventListens
+                    |> sortedKeyValueListToList
+                    |> List.LocalExtra.mapAnyOrder
+                        (\entry ->
+                            { key = entry.key, value = entry.value.defaultActionHandling }
+                        )
                 )
+                    == updatedElementEventListensId
+            then
+                Nothing
 
-
-replacementDomElementScrollPositionRequest : DomEdit
-replacementDomElementScrollPositionRequest =
-    ReplacementDomElementScrollPositionRequest ()
+            else
+                Just updatedElementEventListensId
+        }
+            |> DomElementHeaderReplacements
+            |> fromDomEdit
+            |> List.singleton
 
 
 sortedKeyValueListEditAndRemoveDiffMapBy :
@@ -1708,7 +1691,7 @@ sortedKeyValueListEditAndRemoveDiffMapBy :
         ({ old : SortedKeyValueList key value
          , updated : SortedKeyValueList key value
          }
-         -> Maybe fromRemoveAndEdit
+         -> fromRemoveAndEdit
         )
 sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDiffSingle dicts =
     let
@@ -1738,17 +1721,7 @@ sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDif
                 (dicts.updated |> sortedKeyValueListToList)
                 { remove = [], edit = [] }
     in
-    case diff.remove of
-        [] ->
-            case diff.edit of
-                [] ->
-                    Nothing
-
-                (_ :: _) as editsFilled ->
-                    { remove = [], edit = editsFilled } |> fromEditAndRemove |> Just
-
-        (_ :: _) as removeFilled ->
-            { remove = removeFilled, edit = diff.edit } |> fromEditAndRemove |> Just
+    { remove = diff.remove, edit = diff.edit } |> fromEditAndRemove
 
 
 {-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
@@ -1950,130 +1923,117 @@ editDomDiffToJson replacementInEditDomDiff =
             ReplacementDomNode node ->
                 { tag = "Node", value = node |> domTextOrElementHeaderInfoToJson }
 
-            ReplacementDomElementStyles styles ->
-                { tag = "Styles"
+            DomElementHeaderReplacements headerReplacements ->
+                { tag = "ElementHeader"
                 , value =
                     Json.Encode.object
-                        [ ( "remove", styles.remove |> Json.Encode.list Json.Encode.string )
-                        , ( "edit"
-                          , styles.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.string )
-                                            ]
+                        [ ( "styles"
+                          , Json.Encode.object
+                                [ ( "remove", headerReplacements.styles.remove |> Json.Encode.list Json.Encode.string )
+                                , ( "edit"
+                                  , headerReplacements.styles.edit
+                                        |> Json.Encode.list
+                                            (\editSingle ->
+                                                Json.Encode.object
+                                                    [ ( "key", editSingle.key |> Json.Encode.string )
+                                                    , ( "value", editSingle.value |> Json.Encode.string )
+                                                    ]
+                                            )
+                                  )
+                                ]
+                          )
+                        , ( "attributes"
+                          , Json.Encode.object
+                                [ ( "remove", headerReplacements.attributes.remove |> Json.Encode.list Json.Encode.string )
+                                , ( "edit"
+                                  , headerReplacements.attributes.edit
+                                        |> Json.Encode.list
+                                            (\editSingle ->
+                                                Json.Encode.object
+                                                    [ ( "key", editSingle.key |> Json.Encode.string )
+                                                    , ( "value", editSingle.value |> Json.Encode.string )
+                                                    ]
+                                            )
+                                  )
+                                ]
+                          )
+                        , ( "attributesNamespaced"
+                          , Json.Encode.object
+                                [ ( "remove"
+                                  , headerReplacements.attributesNamespaced.remove
+                                        |> Json.Encode.list
+                                            (\removeSingle ->
+                                                Json.Encode.object
+                                                    [ ( "namespace", removeSingle.namespace |> Json.Encode.string )
+                                                    , ( "key", removeSingle.key |> Json.Encode.string )
+                                                    ]
+                                            )
+                                  )
+                                , ( "edit"
+                                  , headerReplacements.attributesNamespaced.edit
+                                        |> Json.Encode.list
+                                            (\editSingle ->
+                                                Json.Encode.object
+                                                    [ ( "namespace", editSingle.namespace |> Json.Encode.string )
+                                                    , ( "key", editSingle.key |> Json.Encode.string )
+                                                    , ( "value", editSingle.value |> Json.Encode.string )
+                                                    ]
+                                            )
+                                  )
+                                ]
+                          )
+                        , ( "stringProperties"
+                          , Json.Encode.object
+                                [ ( "remove", headerReplacements.stringProperties.remove |> Json.Encode.list Json.Encode.string )
+                                , ( "edit"
+                                  , headerReplacements.stringProperties.edit
+                                        |> Json.Encode.list
+                                            (\editSingle ->
+                                                Json.Encode.object
+                                                    [ ( "key", editSingle.key |> Json.Encode.string )
+                                                    , ( "value", editSingle.value |> Json.Encode.string )
+                                                    ]
+                                            )
+                                  )
+                                ]
+                          )
+                        , ( "boolProperties"
+                          , Json.Encode.object
+                                [ ( "remove", headerReplacements.boolProperties.remove |> Json.Encode.list Json.Encode.string )
+                                , ( "edit"
+                                  , headerReplacements.boolProperties.edit
+                                        |> Json.Encode.list
+                                            (\editSingle ->
+                                                Json.Encode.object
+                                                    [ ( "key", editSingle.key |> Json.Encode.string )
+                                                    , ( "value", editSingle.value |> Json.Encode.bool )
+                                                    ]
+                                            )
+                                  )
+                                ]
+                          )
+                        , ( "scrollToPosition"
+                          , headerReplacements.scrollToPosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
+                          )
+                        , ( "scrollToShow"
+                          , headerReplacements.scrollToShow |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
+                          )
+                        , ( "scrollPositionRequest"
+                          , headerReplacements.scrollPositionRequest |> Json.Encode.bool
+                          )
+                        , ( "eventListens"
+                          , headerReplacements.eventListens
+                                |> Json.Encode.LocalExtra.nullable
+                                    (Json.Encode.list
+                                        (\entry ->
+                                            Json.Encode.object
+                                                [ ( "name", entry.key |> Json.Encode.string )
+                                                , ( "defaultActionHandling", entry.value |> defaultActionHandlingToJson )
+                                                ]
+                                        )
                                     )
                           )
                         ]
-                }
-
-            ReplacementDomElementAttributes attributes ->
-                { tag = "Attributes"
-                , value =
-                    Json.Encode.object
-                        [ ( "remove", attributes.remove |> Json.Encode.list Json.Encode.string )
-                        , ( "edit"
-                          , attributes.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.string )
-                                            ]
-                                    )
-                          )
-                        ]
-                }
-
-            ReplacementDomElementAttributesNamespaced attributesNamespaced ->
-                { tag = "AttributesNamespaced"
-                , value =
-                    Json.Encode.object
-                        [ ( "remove"
-                          , attributesNamespaced.remove
-                                |> Json.Encode.list
-                                    (\removeSingle ->
-                                        Json.Encode.object
-                                            [ ( "namespace", removeSingle.namespace |> Json.Encode.string )
-                                            , ( "key", removeSingle.key |> Json.Encode.string )
-                                            ]
-                                    )
-                          )
-                        , ( "edit"
-                          , attributesNamespaced.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "namespace", editSingle.namespace |> Json.Encode.string )
-                                            , ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.string )
-                                            ]
-                                    )
-                          )
-                        ]
-                }
-
-            ReplacementDomElementStringProperties stringProperties ->
-                { tag = "StringProperties"
-                , value =
-                    Json.Encode.object
-                        [ ( "remove", stringProperties.remove |> Json.Encode.list Json.Encode.string )
-                        , ( "edit"
-                          , stringProperties.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.string )
-                                            ]
-                                    )
-                          )
-                        ]
-                }
-
-            ReplacementDomElementBoolProperties boolProperties ->
-                { tag = "StringProperties"
-                , value =
-                    Json.Encode.object
-                        [ ( "remove", boolProperties.remove |> Json.Encode.list Json.Encode.string )
-                        , ( "edit"
-                          , boolProperties.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.bool )
-                                            ]
-                                    )
-                          )
-                        ]
-                }
-
-            ReplacementDomElementScrollToPosition maybePosition ->
-                { tag = "ScrollToPosition"
-                , value = maybePosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
-                }
-
-            ReplacementDomElementScrollToShow alignment ->
-                { tag = "ScrollToShow"
-                , value = alignment |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
-                }
-
-            ReplacementDomElementScrollPositionRequest () ->
-                { tag = "ScrollPositionRequest", value = Json.Encode.null }
-
-            ReplacementDomElementEventListens listens ->
-                { tag = "EventListens"
-                , value =
-                    listens
-                        |> Json.Encode.list
-                            (\entry ->
-                                Json.Encode.object
-                                    [ ( "name", entry.key |> Json.Encode.string )
-                                    , ( "defaultActionHandling", entry.value |> defaultActionHandlingToJson )
-                                    ]
-                            )
                 }
         )
 
@@ -4188,15 +4148,20 @@ type alias AudioParameterTimeline =
 -}
 type DomEdit
     = ReplacementDomNode (DomTextOrElementHeader ())
-    | ReplacementDomElementStyles { edit : List { key : String, value : String }, remove : List String }
-    | ReplacementDomElementAttributes { edit : List { key : String, value : String }, remove : List String }
-    | ReplacementDomElementAttributesNamespaced { edit : List { namespace : String, key : String, value : String }, remove : List { namespace : String, key : String } }
-    | ReplacementDomElementStringProperties { edit : List { key : String, value : String }, remove : List String }
-    | ReplacementDomElementBoolProperties { edit : List { key : String, value : Bool }, remove : List String }
-    | ReplacementDomElementScrollToPosition (Maybe { fromLeft : Float, fromTop : Float })
-    | ReplacementDomElementScrollToShow (Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment })
-    | ReplacementDomElementScrollPositionRequest ()
-    | ReplacementDomElementEventListens (List { key : String, value : DefaultActionHandling })
+    | DomElementHeaderReplacements
+        { styles : { edit : List { key : String, value : String }, remove : List String }
+        , attributes : { edit : List { key : String, value : String }, remove : List String }
+        , attributesNamespaced :
+            { edit : List { namespace : String, key : String, value : String }
+            , remove : List { namespace : String, key : String }
+            }
+        , stringProperties : { edit : List { key : String, value : String }, remove : List String }
+        , boolProperties : { edit : List { key : String, value : Bool }, remove : List String }
+        , scrollToPosition : Maybe { fromLeft : Float, fromTop : Float }
+        , scrollToShow : Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment }
+        , scrollPositionRequest : Bool
+        , eventListens : Maybe (List { key : String, value : DefaultActionHandling })
+        }
 
 
 {-| Create a [`Program`](#Program):

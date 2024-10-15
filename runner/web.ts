@@ -464,7 +464,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     function editDom(
         id: string,
         reversePath: number[],
-        replacement: { tag: "Node" | "Styles" | "Attributes" | "AttributesNamespaced" | "StringProperties" | "BoolProperties" | "ScrollToPosition" | "ScrollToShow" | "ScrollPositionRequest" | "EventListens", value: any },
+        replacement: { tag: "Node" | "ElementHeader", value: any },
         sendToElm: (v: any) => void
     ) {
         switch (replacement.tag) {
@@ -493,13 +493,13 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 }
                 break
             }
-            case "Styles": case "Attributes": case "AttributesNamespaced": case "StringProperties": case "BoolProperties": case "ScrollToPosition": case "ScrollToShow": case "ScrollPositionRequest": case "EventListens": {
+            case "ElementHeader": {
                 const oldDomNodeToEdit = domElementOrDummyInElementAtReversePath(domElementOrDummyAtIndex(appConfig.domElement, 0), reversePath)
                 if (oldDomNodeToEdit instanceof Element) {
                     editDomModifiers(
                         id,
                         oldDomNodeToEdit as (Element & ElementCSSInlineStyle),
-                        { tag: replacement.tag, value: replacement.value },
+                        replacement.value,
                         sendToElm
                     )
                 } else {
@@ -540,72 +540,62 @@ function getOrInitializeAudioContext(): AudioContext {
 function editDomModifiers(
     id: string,
     domElementToEdit: Element & ElementCSSInlineStyle,
-    replacement: {
-        tag: "Styles" | "Attributes" | "AttributesNamespaced" | "StringProperties" | "BoolProperties" | "ScrollToPosition" | "ScrollToShow" | "ScrollPositionRequest" | "EventListens",
-        value: any
+    replacements: {
+        styles: any,
+        attributes: any,
+        attributesNamespaced: any,
+        stringProperties: any,
+        boolProperties: any,
+        scrollToPosition: any | null,
+        scrollToShow: any | null,
+        scrollPositionRequest: boolean,
+        eventListens: any[]
     },
     sendToElm: (v: any) => void
 ) {
-    switch (replacement.tag) {
-        case "Styles": {
-            replacement.value.remove.forEach((styleKey: string) => {
-                domElementToEdit?.style.removeProperty(styleKey)
-            })
-            domElementAddStyles(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "Attributes": {
-            replacement.value.remove.forEach((attributeKey: string) => {
-                domElementToEdit.removeAttribute(attributeKey)
-            })
-            domElementAddAttributes(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "AttributesNamespaced": {
-            replacement.value.remove.forEach((attributeNamespacedId: { namespace: string, key: string }) => {
-                domElementToEdit.removeAttributeNS(attributeNamespacedId.namespace, attributeNamespacedId.key)
-            })
-            domElementAddAttributesNamespaced(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "StringProperties": {
-            replacement.value.remove.forEach((propertyKey: string) => {
-                (domElementToEdit as { [key: string]: any })[propertyKey] = ""
-            })
-            domElementSetStringProperties(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "BoolProperties": {
-            replacement.value.remove.forEach((propertyKey: string) => {
-                (domElementToEdit as { [key: string]: any })[propertyKey] = false
-            })
-            domElementSetBoolProperties(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "ScrollToPosition": {
-            if (replacement.value !== null) {
-                domElementToEdit.scrollTo({ top: replacement.value.fromTop, left: replacement.value.fromLeft })
-            }
-            break
-        }
-        case "ScrollToShow": {
-            if (replacement.value !== null) {
-                domElementToEdit.scrollIntoView({ inline: replacement.value.x, block: replacement.value.y })
-            }
-            break
-        }
-        case "ScrollPositionRequest": {
-            domElementAddScrollPositionRequest(domElementToEdit, sendToElm)
-            break
-        }
-        case "EventListens": {
-            domListenAbortControllers.get(id)?.forEach(abortController => {
-                abortController.abort()
-            })
-            domListenAbortControllers.delete(id)
-            domElementAddEventListens(id, domElementToEdit, replacement.value, sendToElm)
-            break
-        }
+    replacements.styles.remove.forEach((styleKey: string) => {
+        domElementToEdit?.style.removeProperty(styleKey)
+    })
+    domElementAddStyles(domElementToEdit, replacements.styles.edit)
+
+    replacements.attributes.remove.forEach((attributeKey: string) => {
+        domElementToEdit.removeAttribute(attributeKey)
+    })
+    domElementAddAttributes(domElementToEdit, replacements.attributes.edit)
+
+    replacements.attributesNamespaced.remove.forEach((attributeNamespacedId: { namespace: string, key: string }) => {
+        domElementToEdit.removeAttributeNS(attributeNamespacedId.namespace, attributeNamespacedId.key)
+    })
+    domElementAddAttributesNamespaced(domElementToEdit, replacements.attributesNamespaced.edit)
+
+    replacements.stringProperties.remove.forEach((propertyKey: string) => {
+        (domElementToEdit as { [key: string]: any })[propertyKey] = ""
+    })
+    domElementSetStringProperties(domElementToEdit, replacements.stringProperties.edit)
+
+    replacements.boolProperties.remove.forEach((propertyKey: string) => {
+        (domElementToEdit as { [key: string]: any })[propertyKey] = false
+    })
+    domElementSetBoolProperties(domElementToEdit, replacements.boolProperties.edit)
+
+    if (replacements.scrollToPosition !== null) {
+        domElementToEdit.scrollTo({ top: replacements.scrollToPosition.fromTop, left: replacements.scrollToPosition.fromLeft })
+    }
+
+    if (replacements.scrollToShow !== null) {
+        domElementToEdit.scrollIntoView({ inline: replacements.scrollToShow.x, block: replacements.scrollToShow.y })
+    }
+
+    if (replacements.scrollPositionRequest) {
+        domElementAddScrollPositionRequest(domElementToEdit, sendToElm)
+    }
+
+    if (replacements.eventListens !== null) {
+        domListenAbortControllers.get(id)?.forEach(abortController => {
+            abortController.abort()
+        })
+        domListenAbortControllers.delete(id)
+        domElementAddEventListens(id, domElementToEdit, replacements.eventListens, sendToElm)
     }
 }
 
