@@ -124,23 +124,44 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 }
             }
             case "DomNodeRender": return (config: { reversePath: number[], node: any }) => {
-                const oldDomNodeToEdit = domElementOrDummyInElementAtReversePath(domElementOrDummyAtIndex(appConfig.domElement, 0), config.reversePath)
-                switch (config.node.tag) {
-                    case "Text": {
-                        oldDomNodeToEdit.parentElement?.replaceChild(
-                            document.createTextNode(config.node.value),
-                            oldDomNodeToEdit
-                        )
+                let parentElement = domElementOrDummyAtIndex(appConfig.domElement, 0)
+                for (let pathIndex = config.reversePath.length - 1; pathIndex >= 1; pathIndex--) {
+                    parentElement = domElementOrDummyAtIndex(parentElement, config.reversePath[pathIndex] ?? 0)
+                }
+                const innerIndex = config.reversePath[0] ?? 0
+                const currentDomNodeAtPath = parentElement.childNodes.item(innerIndex)
+                if (currentDomNodeAtPath === null) {
+                    while (parentElement.childNodes.length <= innerIndex - 1) {
+                        parentElement.appendChild(document.createElement("div"))
                     }
-                    case "Element": {
-                        oldDomNodeToEdit.parentElement?.replaceChild(
-                            createDomElement(id, config.node.value, oldDomNodeToEdit.childNodes, sendToElm),
-                            oldDomNodeToEdit
-                        )
+                    switch (config.node.tag) {
+                        case "Text": {
+                            parentElement.appendChild(document.createTextNode(config.node.value))
+                        }
+                        case "Element": {
+                            parentElement.appendChild(
+                                createDomElement(config.node.value.namespace, config.node.value.tag, parentElement.childNodes)
+                            )
+                        }
+                    }
+                } else if ((currentDomNodeAtPath instanceof Element) && currentDomNodeAtPath.tagName !== config.node.tag) {
+                    switch (config.node.tag) {
+                        case "Text": {
+                            parentElement?.replaceChild(
+                                document.createTextNode(config.node.value),
+                                currentDomNodeAtPath
+                            )
+                        }
+                        case "Element": {
+                            parentElement?.replaceChild(
+                                createDomElement(config.node.value.namespace, config.node.value.tag, parentElement.childNodes),
+                                currentDomNodeAtPath
+                            )
+                        }
                     }
                 }
+
                 abortSignal.addEventListener("abort", _event => {
-                    domListenAbortControllers.delete(id)
                     // it is possible that the "newDomNode" has been replaced
                     // by e.g.a text where there was an Element previously
                     const appConfigDomELementChildElementOnDelete = domElementAtIndex(appConfig.domElement, 0)
@@ -156,6 +177,112 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                         toRemove.remove()
                     }
                 })
+            }
+            case "DomElementStyleSet": return (config: { reversePath: number[], containingElementNamespace: null | string, containingElementTag: string, key: string, value: string }) => {
+                const toEdit = domElementOrNewElementAtReversePath(appConfig.domElement, config.reversePath, config.containingElementNamespace, config.containingElementTag) as (Element & ElementCSSInlineStyle)
+                toEdit?.style.setProperty(config.key, config.value)
+                abortSignal.addEventListener("abort", (_event) => {
+                    toEdit?.style.removeProperty(config.key)
+                })
+            }
+            case "DomElementAttributeSet": return (config: { reversePath: number[], containingElementNamespace: null | string, containingElementTag: string, key: string, value: string }) => {
+                if (RE_js_html.test(config.value)) {
+                    console.error("This is an XSS vector. Please use an interface instead.")
+                } else if (config.key === "src" && RE_js_html.test(config.value)) {
+                    console.error("This is an XSS vector. Please use an interface instead.")
+                } else if (config.key === "action" || config.key === "href" && RE_js.test(config.value)) {
+                    console.error("This is an XSS vector. Please use an interface instead.")
+                } else {
+                    const toEdit = domElementOrNewElementAtReversePath(appConfig.domElement, config.reversePath, config.containingElementNamespace, config.containingElementTag)
+                    toEdit.setAttribute(noOnOrFormAction(config.key), config.value)
+                    abortSignal.addEventListener("abort", (_event) => {
+                        toEdit.removeAttribute(config.key)
+                    })
+                }
+            }
+            case "DomElementAttributeNamespacedSet": return (config: { reversePath: number[], containingElementNamespace: null | string, containingElementTag: string, namespace: string, key: string, value: string }) => {
+                const toEdit = domElementOrNewElementAtReversePath(appConfig.domElement, config.reversePath, config.containingElementNamespace, config.containingElementTag)
+                toEdit.setAttributeNS(config.namespace, config.key, config.value)
+                abortSignal.addEventListener("abort", (_event) => {
+                    toEdit.removeAttributeNS(config.namespace, config.key)
+                })
+            }
+            case "DomElementStringPropertySet": return (config: { reversePath: number[], containingElementNamespace: null | string, containingElementTag: string, key: string, value: string }) => {
+                const toEdit = domElementOrNewElementAtReversePath(appConfig.domElement, config.reversePath, config.containingElementNamespace, config.containingElementTag) as { [key: string]: any }
+                if ((Object.hasOwn(toEdit, config.key))
+                    && (typeof toEdit[config.key] !== "string")
+                ) {
+                    warn(`tried to set the existing non-string dom element property "${config.key}" to a string.`)
+                } else if ((config.key === "innerHTML") || (config.key === "outerHTML")) {
+                    window?.console.error("This is an XSS vector. Please parse the html string instead and construct the dom from that.")
+                } else if (RE_js_html.test(config.value)) {
+                    window?.console.error("This is an XSS vector. Please use an interface instead.")
+                } else if (config.key === "src" && RE_js_html.test(config.value)) {
+                    window?.console.error("This is an XSS vector. Please use an interface instead.")
+                } else if (config.key === "action" || config.key === "href" && RE_js.test(config.value)) {
+                    window?.console.error("This is an XSS vector. Please use an interface instead.")
+                } else {
+                    try {
+                        toEdit[config.key] = config.value
+                        abortSignal.addEventListener("abort", (_event) => {
+                            toEdit[config.key] = ""
+                        })
+                    } catch (error) {
+                        warn("tried to set the string property " + config.key + " failed: " + error)
+                    }
+                }
+            }
+            case "DomElementBoolPropertySet": return (config: { reversePath: number[], containingElementNamespace: null | string, containingElementTag: string, key: string, value: boolean }) => {
+                const toEdit = domElementOrNewElementAtReversePath(appConfig.domElement, config.reversePath, config.containingElementNamespace, config.containingElementTag) as { [key: string]: any }
+                if ((Object.hasOwn(toEdit, config.key))
+                    && (typeof toEdit[config.key] !== "boolean")
+                ) {
+                    warn(`tried to set the existing non-boolean dom element property "${config.key}" to a boolean.`)
+                } else {
+                    try {
+                        toEdit[config.key] = config.value
+                        abortSignal.addEventListener("abort", (_event) => {
+                            toEdit[config.key] = false
+                        })
+                    } catch (error) {
+                        warn("tried to set the string property " + config.key + " failed: " + error)
+                    }
+                }
+            }
+            case "DomElementScrollToPosition": return (config: any) => {
+                const toEdit = domElementOrNewElementAtReversePath(appConfig.domElement, config.reversePath, config.containingElementNamespace, config.containingElementTag) as { [key: string]: any }
+                // TODO wait for next render?
+                toEdit.scrollTo({ top: config.fromTop, left: config.fromLeft })
+            }
+            case "DomElementScrollToShow": return (config: any) => {
+                const toEdit = domElementOrNewElementAtReversePath(appConfig.domElement, config.reversePath, config.containingElementNamespace, config.containingElementTag) as { [key: string]: any }
+                // TODO wait for next render?
+                toEdit.scrollIntoView({ inline: config.x, block: config.y })
+            }
+            case "DomElementScrollPositionRequest": return (config: any) => {
+                window.requestAnimationFrame(_timestamp => {
+                    window.requestAnimationFrame(_timestamp => {
+                        const toEdit = domElementOrNewElementAtReversePath(appConfig.domElement, config.reversePath, config.containingElementNamespace, config.containingElementTag) as { [key: string]: any }
+                        sendToElm({ fromLeft: toEdit.scrollLeft, fromTop: toEdit.scrollTop })
+                    })
+                })
+            }
+            case "DomElementEventListen": return (config: { reversePath: number[], containingElementNamespace: null | string, containingElementTag: string, name: string, defaultActionHandling: "DefaultActionPrevent" | "DefaultActionExecute" }) => {
+                const toEdit = domElementOrNewElementAtReversePath(appConfig.domElement, config.reversePath, config.containingElementNamespace, config.containingElementTag)
+                toEdit.addEventListener(
+                    config.name,
+                    (triggeredEvent) => {
+                        sendToElm(triggeredEvent)
+                        switch (config.defaultActionHandling) {
+                            case "DefaultActionPrevent": {
+                                triggeredEvent.preventDefault()
+                                break
+                            }
+                            case "DefaultActionExecute": { break }
+                        }
+                    },
+                    { signal: abortSignal }
+                )
             }
             case "NotificationAskForPermission": return (_config: null) => {
                 askForNotificationPermissionIfNotAsked()
@@ -387,9 +514,6 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     }
     function interfaceEditImplementation(id: string, tag: string, sendToElm: (v: any) => void): ((config: any) => void) {
         switch (tag) {
-            case "EditDom": return (config: { reversePath: number[], replacement: any }) => {
-                editDom(id, config.reversePath, config.replacement, sendToElm)
-            }
             case "EditAudio": return (config: any) => {
                 editAudio(id, config)
             }
@@ -424,6 +548,42 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             parent.childNodes.item(index)
     }
 
+    function domElementOrNewElementAtReversePath(overallParent: Element, reversePath: number[], namespace: null | string, tag: string): Element {
+        let soFar: Element | null = overallParent
+        for (
+            let pathIndex = reversePath.length - 1;
+            pathIndex >= 1; // ! notice the 1
+            pathIndex--
+        ) {
+            soFar = domElementOrDummyAtIndex(soFar, reversePath[pathIndex] ?? 0)
+        }
+        return domElementOrNewElementAtIndex(soFar, reversePath[0] ?? 0, namespace, tag)
+    }
+    function domElementOrNewElementAtIndex(parent: Element, index: number, namespace: null | string, tag: string): Element {
+        const childNode = parent.childNodes.item(index)
+        if (childNode === null) {
+            while (parent.childNodes.length <= index - 1) {
+                parent.appendChild(document.createElement("div"))
+            }
+            const newDummy = namespace === null ?
+                document.createElement(noScript(tag))
+                :
+                document.createElementNS(namespace, noScript(tag))
+            parent.appendChild(newDummy)
+            return newDummy
+        } else if (!(childNode instanceof Element) || childNode.tagName !== tag) {
+            const newDummyReplacement =
+                namespace === null ?
+                    document.createElement(noScript(tag))
+                    :
+                    document.createElementNS(namespace, noScript(tag))
+            parent.replaceChild(newDummyReplacement, childNode)
+            return newDummyReplacement
+        } else {
+            return childNode
+        }
+    }
+
     function domElementOrDummyAtIndex(parent: Element, index: number): Element {
         const childNode = parent.childNodes.item(index)
         if (childNode === null) {
@@ -453,62 +613,6 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
         }
         return domNodeAtIndex(soFar, reversePath[0] ?? 0)
     }
-    function domElementOrDummyInElementAtReversePath(overallParent: Element, reversePath: number[]): ChildNode {
-        let soFar: Element | null = overallParent
-        for (let pathIndex = reversePath.length - 1; pathIndex >= 0; pathIndex--) {
-            soFar = domElementOrDummyAtIndex(soFar, reversePath[pathIndex] ?? 0)
-        }
-        return soFar
-    }
-
-    function editDom(
-        id: string,
-        reversePath: number[],
-        replacement: { tag: "Node" | "Styles" | "Attributes" | "AttributesNamespaced" | "StringProperties" | "BoolProperties" | "ScrollToPosition" | "ScrollToShow" | "ScrollPositionRequest" | "EventListens", value: any },
-        sendToElm: (v: any) => void
-    ) {
-        switch (replacement.tag) {
-            case "Node": {
-                const oldDomNodeToEdit = domNodeInElementAtReversePath(
-                    domElementOrDummyAtIndex(appConfig.domElement, 0),
-                    reversePath
-                )
-                if (oldDomNodeToEdit == null) {
-                    warn("the DOM node I wanted to replace has been moved. Try to disable potential interfering extensions")
-                } else {
-                    switch (replacement.value.tag) {
-                        case "Text": {
-                            oldDomNodeToEdit.parentElement?.replaceChild(
-                                document.createTextNode(replacement.value.value),
-                                oldDomNodeToEdit
-                            )
-                        }
-                        case "Element": {
-                            oldDomNodeToEdit.parentElement?.replaceChild(
-                                createDomElement(id, replacement.value.value, oldDomNodeToEdit.childNodes, sendToElm),
-                                oldDomNodeToEdit
-                            )
-                        }
-                    }
-                }
-                break
-            }
-            case "Styles": case "Attributes": case "AttributesNamespaced": case "StringProperties": case "BoolProperties": case "ScrollToPosition": case "ScrollToShow": case "ScrollPositionRequest": case "EventListens": {
-                const oldDomNodeToEdit = domElementOrDummyInElementAtReversePath(domElementOrDummyAtIndex(appConfig.domElement, 0), reversePath)
-                if (oldDomNodeToEdit instanceof Element) {
-                    editDomModifiers(
-                        id,
-                        oldDomNodeToEdit as (Element & ElementCSSInlineStyle),
-                        { tag: replacement.tag, value: replacement.value },
-                        sendToElm
-                    )
-                } else {
-                    warn("the DOM element I wanted to edit has been replaced by text. Try to disable potential interfering extensions")
-                }
-                break
-            }
-        }
-    }
 }
 
 
@@ -517,7 +621,6 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
 
 
 const abortControllers: Map<string, AbortController> = new Map()
-const domListenAbortControllers: Map<string, AbortController[]> = new Map()
 const audioPlaying: Map<string, AudioPlaying> = new Map()
 
 const audioBuffers: Map<string, AudioBuffer> = new Map()
@@ -537,77 +640,6 @@ function getOrInitializeAudioContext(): AudioContext {
     }
 }
 
-function editDomModifiers(
-    id: string,
-    domElementToEdit: Element & ElementCSSInlineStyle,
-    replacement: {
-        tag: "Styles" | "Attributes" | "AttributesNamespaced" | "StringProperties" | "BoolProperties" | "ScrollToPosition" | "ScrollToShow" | "ScrollPositionRequest" | "EventListens",
-        value: any
-    },
-    sendToElm: (v: any) => void
-) {
-    switch (replacement.tag) {
-        case "Styles": {
-            replacement.value.remove.forEach((styleKey: string) => {
-                domElementToEdit?.style.removeProperty(styleKey)
-            })
-            domElementAddStyles(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "Attributes": {
-            replacement.value.remove.forEach((attributeKey: string) => {
-                domElementToEdit.removeAttribute(attributeKey)
-            })
-            domElementAddAttributes(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "AttributesNamespaced": {
-            replacement.value.remove.forEach((attributeNamespacedId: { namespace: string, key: string }) => {
-                domElementToEdit.removeAttributeNS(attributeNamespacedId.namespace, attributeNamespacedId.key)
-            })
-            domElementAddAttributesNamespaced(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "StringProperties": {
-            replacement.value.remove.forEach((propertyKey: string) => {
-                (domElementToEdit as { [key: string]: any })[propertyKey] = ""
-            })
-            domElementSetStringProperties(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "BoolProperties": {
-            replacement.value.remove.forEach((propertyKey: string) => {
-                (domElementToEdit as { [key: string]: any })[propertyKey] = false
-            })
-            domElementSetBoolProperties(domElementToEdit, replacement.value.edit)
-            break
-        }
-        case "ScrollToPosition": {
-            if (replacement.value !== null) {
-                domElementToEdit.scrollTo({ top: replacement.value.fromTop, left: replacement.value.fromLeft })
-            }
-            break
-        }
-        case "ScrollToShow": {
-            if (replacement.value !== null) {
-                domElementToEdit.scrollIntoView({ inline: replacement.value.x, block: replacement.value.y })
-            }
-            break
-        }
-        case "ScrollPositionRequest": {
-            domElementAddScrollPositionRequest(domElementToEdit, sendToElm)
-            break
-        }
-        case "EventListens": {
-            domListenAbortControllers.get(id)?.forEach(abortController => {
-                abortController.abort()
-            })
-            domListenAbortControllers.delete(id)
-            domElementAddEventListens(id, domElementToEdit, replacement.value, sendToElm)
-            break
-        }
-    }
-}
 
 function getOrAddMeta(name: string): HTMLMetaElement {
     const maybeExistingMeta: HTMLMetaElement | undefined =
@@ -623,135 +655,16 @@ function getOrAddMeta(name: string): HTMLMetaElement {
     }
 }
 
-function createDomElement(id: string, node: any, subs: NodeListOf<ChildNode>, sendToElm: (v: any) => void): Element {
-    const createdDomElement: HTMLElement =
-        node.namespace !== null ?
-            document.createElementNS(node.namespace, noScript(node.tag))
+function createDomElement(namespace: null | string, tag: string, subs: NodeListOf<ChildNode>): Element {
+    const createdDomElement: Element =
+        namespace !== null ?
+            document.createElementNS(namespace, noScript(tag))
             :
-            document.createElement(noScript(node.tag))
-
-    domElementAddAttributes(createdDomElement, node.attributes)
-    domElementAddAttributesNamespaced(createdDomElement, node.attributesNamespaced)
-    domElementAddStyles(createdDomElement, node.styles)
-    domElementSetStringProperties(createdDomElement, node.stringProperties)
-    domElementSetBoolProperties(createdDomElement, node.boolProperties)
-    if (node.scrollToPosition !== null) {
-        node.scrollTo({ top: node.scrollToPosition.fromTop, left: node.scrollToPosition.fromLeft })
-    }
-    if (node.scrollToShow !== null) {
-        node.scrollIntoView({ inline: node.scrollToShow.x, block: node.scrollToShow.y })
-    }
-    if (node.scrollPositionRequest === true) {
-        domElementAddScrollPositionRequest(createdDomElement, sendToElm)
-    }
-    domElementAddEventListens(id, createdDomElement, node.eventListens, sendToElm)
+            document.createElement(noScript(tag))
     createdDomElement.append(...subs)
     return createdDomElement
 }
-function domElementAddScrollPositionRequest(domElement: Element, sendToElm: (v: any) => void) {
-    // guarantee it has painted drawn at least once
-    window.requestAnimationFrame(_timestamp => {
-        window.requestAnimationFrame(_timestamp => {
-            sendToElm({
-                tag: "ScrollPositionRequest",
-                value: { fromLeft: domElement.scrollLeft, fromTop: domElement.scrollTop }
-            })
-        })
-    })
-}
-function domElementAddStyles(domElement: Element & ElementCSSInlineStyle, styles: { key: string, value: string }[]) {
-    styles.forEach(styleSingle => {
-        domElement?.style.setProperty(styleSingle.key, styleSingle.value)
-    })
-}
-function domElementSetStringProperties(domElement: Element, properties: { key: string, value: string }[]) {
-    const domElementIndexable = (domElement as { [key: string]: any })
-    properties.forEach(property => {
-        if ((Object.hasOwn(domElement, property.key))
-            && (typeof domElementIndexable[property.key] !== "string")
-        ) {
-            warn(`tried to set the existing non-string dom element property "${property.key}" to a string.`)
-        } else if ((property.key === "innerHTML") || (property.key === "outerHTML")) {
-            window?.console.error("This is an XSS vector. Please parse the html string instead and construct the dom from that.")
-        } else if (RE_js_html.test(property.value)) {
-            window?.console.error("This is an XSS vector. Please use an interface instead.")
-        } else if (property.key === "src" && RE_js_html.test(property.value)) {
-            window?.console.error("This is an XSS vector. Please use an interface instead.")
-        } else if (property.key === "action" || property.key === "href" && RE_js.test(property.value)) {
-            window?.console.error("This is an XSS vector. Please use an interface instead.")
-        } else {
-            try {
-                domElementIndexable[property.key] = property.value
-            } catch (error) {
-                warn("tried to set the string property " + property.key + " failed: " + error)
-            }
-        }
-    })
-}
-function domElementSetBoolProperties(domElement: Element, properties: { key: string, value: boolean }[]) {
-    const domElementIndexable = (domElement as { [key: string]: any })
-    properties.forEach(property => {
-        if ((Object.hasOwn(domElement, property.key))
-            && (typeof domElementIndexable[property.key] !== "boolean")
-        ) {
-            warn(`tried to set the existing non-boolean dom element property "${property.key}" to a boolean.`)
-        } else {
-            try {
-                domElementIndexable[property.key] = property.value
-            } catch (error) {
-                warn("tried to set the string property " + property.key + " failed: " + error)
-            }
-        }
-    })
-}
-function domElementAddAttributes(domElement: Element, attributes: { key: string, value: string }[]) {
-    attributes.forEach(attribute => {
-        if (RE_js_html.test(attribute.value)) {
-            console.error("This is an XSS vector. Please use an interface instead.")
-        } else if (attribute.key === "src" && RE_js_html.test(attribute.value)) {
-            console.error("This is an XSS vector. Please use an interface instead.")
-        } else if (attribute.key === "action" || attribute.key === "href" && RE_js.test(attribute.value)) {
-            console.error("This is an XSS vector. Please use an interface instead.")
-        } else {
-            domElement.setAttribute(
-                noOnOrFormAction(attribute.key),
-                attribute.value
-            )
-        }
-    })
-}
-function domElementAddAttributesNamespaced(domElement: Element, attributesNamespaced: { namespace: string, key: string, value: string }[]) {
-    attributesNamespaced.forEach(attributeNamespaced => {
-        domElement.setAttributeNS(attributeNamespaced.namespace, attributeNamespaced.key, attributeNamespaced.value)
-    })
-}
-function domElementAddEventListens(
-    id: string,
-    domElement: Element,
-    eventListens: { name: string, defaultActionHandling: "DefaultActionPrevent" | "DefaultActionExecute" }[],
-    sendToElm: (v: any) => void
-) {
-    const elementAbortControllers =
-        eventListens.map(eventListen => {
-            const abortController: AbortController = new AbortController()
-            domElement.addEventListener(
-                eventListen.name,
-                (triggeredEvent) => {
-                    sendToElm({ tag: "EventListen", value: { name: eventListen.name, event: triggeredEvent } })
-                    switch (eventListen.defaultActionHandling) {
-                        case "DefaultActionPrevent": {
-                            triggeredEvent.preventDefault()
-                            break
-                        }
-                        case "DefaultActionExecute": { break }
-                    }
-                },
-                { signal: abortController.signal }
-            )
-            return abortController
-        })
-    domListenAbortControllers.set(id, elementAbortControllers)
-}
+
 
 // copied and edited from https://github.com/elm/virtual-dom/blob/master/src/Elm/Kernel/VirtualDom.js
 // XSS ATTACK VECTOR CHECKS

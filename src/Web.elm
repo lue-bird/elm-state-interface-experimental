@@ -3,7 +3,7 @@ module Web exposing
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
-    , DomElementHeader, DomElementVisibilityAlignment(..), DefaultActionHandling(..)
+    , DomElementVisibilityAlignment(..), DefaultActionHandling(..)
     , DomNode(..), domText
     , DomElement, domElement, svgElement, domElementNamespaced
     , domFutureMap, domRender
@@ -45,9 +45,7 @@ module Web exposing
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , DomModifierSingle(..)
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..)
-    , SortedKeyValueList(..)
-    , InternalFastDict(..), InternalFastDictInner(..), InternalFastDictNColor(..)
-    , interfaceSingleEdits, InterfaceSingleEdit(..), AudioEdit(..), DomEdit(..)
+    , interfaceSingleEdits, InterfaceSingleEdit(..), AudioEdit(..)
     )
 
 {-| A state-interface program that can run in the browser
@@ -75,7 +73,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 Primitives used for SVG and HTML
 (filling the same role as [`elm/virtual-dom`](https://dark.elm.dmy.fr/packages/elm/virtual-dom/latest/))
 
-@docs DomElementHeader, DomElementVisibilityAlignment, DefaultActionHandling
+@docs DomElementVisibilityAlignment, DefaultActionHandling
 
 @docs DomNode, domText
 @docs DomElement, domElement, svgElement, domElementNamespaced
@@ -429,11 +427,7 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 
 @docs ProgramState, ProgramEvent, InterfaceSingle, DomTextOrElementHeader
 
-@docs SortedKeyValueList
-
-@docs InternalFastDict, InternalFastDictInner, InternalFastDictNColor
-
-@docs interfaceSingleEdits, InterfaceSingleEdit, AudioEdit, DomEdit
+@docs interfaceSingleEdits, InterfaceSingleEdit, AudioEdit
 
 If you need more things like json encoders/decoders, [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new)
 
@@ -526,105 +520,6 @@ type ProgramState appState
         }
 
 
-
-{-
-
-   The vast majority of InternalFastDict-related code is copied from [miniBill/elm-fast-dict](https://dark.elm.dmy.fr/packages/miniBill/elm-fast-dict/latest/)
-   with below license
-
-
-
-   Copyright 2023-present Leonardo Taglialegne
-   Copyright 2014-present Evan Czaplicki
-
-   Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
-
-   1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
-
-   2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-
-   3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
--}
-
-
-{-| Alternative to `Dict` that internally allows fast creation from already sorted elements
-which significantly speeds up DOM interface creation.
--}
-type InternalFastDict key value
-    = InternalFastDict Int (InternalFastDictInner key value)
-
-
-{-| The color of an [`InternalFastDictInner`](#InternalFastDictInner) node. Leaves are considered Black.
--}
-type InternalFastDictNColor
-    = InternalFastDictRed
-    | InternalFastDictBlack
-
-
-{-| Structure of an [`InternalFastDict`](#InternalFastDict)
--}
-type InternalFastDictInner key value
-    = InternalFastDictInnerNode InternalFastDictNColor key value (InternalFastDictInner key value) (InternalFastDictInner key value)
-    | InternalFastDictLeaf
-
-
-{-| Create an empty dictionary.
--}
-internalFastDictEmpty : InternalFastDict key_ value_
-internalFastDictEmpty =
-    InternalFastDict 0 InternalFastDictLeaf
-
-
-internalFastDictBalance : InternalFastDictNColor -> k -> v -> InternalFastDictInner k v -> InternalFastDictInner k v -> InternalFastDictInner k v
-internalFastDictBalance color key value left right =
-    case right of
-        InternalFastDictInnerNode InternalFastDictRed rK rV rLeft rRight ->
-            case left of
-                InternalFastDictInnerNode InternalFastDictRed lK lV lLeft lRight ->
-                    InternalFastDictInnerNode
-                        InternalFastDictRed
-                        key
-                        value
-                        (InternalFastDictInnerNode InternalFastDictBlack lK lV lLeft lRight)
-                        (InternalFastDictInnerNode InternalFastDictBlack rK rV rLeft rRight)
-
-                _ ->
-                    InternalFastDictInnerNode color rK rV (InternalFastDictInnerNode InternalFastDictRed key value left rLeft) rRight
-
-        _ ->
-            case left of
-                InternalFastDictInnerNode InternalFastDictRed lK lV (InternalFastDictInnerNode InternalFastDictRed llK llV llLeft llRight) lRight ->
-                    InternalFastDictInnerNode
-                        InternalFastDictRed
-                        lK
-                        lV
-                        (InternalFastDictInnerNode InternalFastDictBlack llK llV llLeft llRight)
-                        (InternalFastDictInnerNode InternalFastDictBlack key value lRight right)
-
-                _ ->
-                    InternalFastDictInnerNode color key value left right
-
-
-{-| Fold over the key-value pairs in a dictionary from lowest key to highest key.
--}
-internalFastDictFoldl : (k -> v -> b -> b) -> b -> InternalFastDict k v -> b
-internalFastDictFoldl func acc (InternalFastDict _ dict) =
-    internalFastDictInnerFoldl func acc dict
-
-
-internalFastDictInnerFoldl : (k -> v -> b -> b) -> b -> InternalFastDictInner k v -> b
-internalFastDictInnerFoldl func acc dict =
-    case dict of
-        InternalFastDictLeaf ->
-            acc
-
-        InternalFastDictInnerNode _ key value left right ->
-            internalFastDictInnerFoldl func (func key value (internalFastDictInnerFoldl func acc left)) right
-
-
 {-| What's needed to create a state-interface [`program`](#program)
 -}
 type alias ProgramConfig state =
@@ -646,7 +541,7 @@ To change the value that comes back in the future, use [`Web.interfaceFutureMap`
 
 -}
 type alias Interface future =
-    InternalFastDict String (InterfaceSingle future)
+    FastDict.Dict String (InterfaceSingle future)
 
 
 {-| A "non-batched" [`Interface`](#Interface).
@@ -673,10 +568,72 @@ type InterfaceSingle future
     | AudioSourceLoad { url : String, on : Result AudioSourceLoadError AudioSource -> future }
     | AudioPlay Audio
     | DomNodeRender
-        { reversePath :
-            -- from outer inner to outer parent index
-            List Int
-        , node : DomTextOrElementHeader future
+        { reversePath : List Int
+        , node : DomTextOrElementHeader
+        }
+    | DomElementStyleSet
+        { reversePath : List Int
+        , containingElementNamespace : Maybe String
+        , containingElementTag : String
+        , key : String
+        , value : String
+        }
+    | DomElementAttributeSet
+        { reversePath : List Int
+        , containingElementNamespace : Maybe String
+        , containingElementTag : String
+        , key : String
+        , value : String
+        }
+    | DomElementAttributeNamespacedSet
+        { reversePath : List Int
+        , containingElementNamespace : Maybe String
+        , containingElementTag : String
+        , namespace : String
+        , key : String
+        , value : String
+        }
+    | DomElementStringPropertySet
+        { reversePath : List Int
+        , containingElementNamespace : Maybe String
+        , containingElementTag : String
+        , key : String
+        , value : String
+        }
+    | DomElementBoolPropertySet
+        { reversePath : List Int
+        , containingElementNamespace : Maybe String
+        , containingElementTag : String
+        , key : String
+        , value : Bool
+        }
+    | DomElementScrollToPosition
+        { reversePath : List Int
+        , containingElementNamespace : Maybe String
+        , containingElementTag : String
+        , fromLeft : Float
+        , fromTop : Float
+        }
+    | DomElementScrollToShow
+        { reversePath : List Int
+        , containingElementNamespace : Maybe String
+        , containingElementTag : String
+        , x : DomElementVisibilityAlignment
+        , y : DomElementVisibilityAlignment
+        }
+    | DomElementScrollPositionRequest
+        { reversePath : List Int
+        , containingElementNamespace : Maybe String
+        , containingElementTag : String
+        , on : { fromLeft : Float, fromTop : Float } -> future
+        }
+    | DomElementEventListen
+        { reversePath : List Int
+        , containingElementNamespace : Maybe String
+        , containingElementTag : String
+        , eventName : String
+        , value : DefaultActionHandling
+        , on : Json.Decode.Value -> future
         }
     | NotificationAskForPermission ()
     | NotificationShow { id : String, message : String, details : String, on : NotificationClicked -> future }
@@ -825,34 +782,13 @@ type HttpBody
     | HttpBodyUnsignedInt8s { mimeType : String, content : List Int }
 
 
-{-| Plain text or a [`DomElementHeader`](#DomElementHeader) for use in an [`Interface`](#Interface).
+{-| Plain text or a dom element kind
 -}
-type DomTextOrElementHeader future
+type DomTextOrElementHeader
     = DomHeaderText String
-    | DomElementHeader (DomElementHeader future)
-
-
-{-| Everything about a [tagged DOM element](Web#DomElement)
-except potential sub-[node](Web#DomNode)s
--}
-type alias DomElementHeader future =
-    RecordWithoutConstructorFunction
+    | DomElementKind
         { namespace : Maybe String
         , tag : String
-        , styles : SortedKeyValueList String String
-        , attributes : SortedKeyValueList String String
-        , attributesNamespaced : SortedKeyValueList { namespace : String, key : String } String
-        , stringProperties : SortedKeyValueList String String
-        , boolProperties : SortedKeyValueList String Bool
-        , scrollToPosition : Maybe { fromLeft : Float, fromTop : Float }
-        , scrollToShow : Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment }
-        , scrollPositionRequest : Maybe ({ fromLeft : Float, fromTop : Float } -> future)
-        , eventListens :
-            SortedKeyValueList
-                String
-                { on : Json.Decode.Value -> future
-                , defaultActionHandling : DefaultActionHandling
-                }
         }
 
 
@@ -888,126 +824,7 @@ type SocketId
 -}
 interfaceBatch : List (Interface future) -> Interface future
 interfaceBatch interfaces =
-    interfaces |> List.foldl internalFastDictUnion internalFastDictEmpty
-
-
-{-| Combine two dictionaries. If there is a collision, preference is given
-to the first dictionary.
--}
-internalFastDictUnion : InternalFastDict comparable v -> InternalFastDict comparable v -> InternalFastDict comparable v
-internalFastDictUnion ((InternalFastDict s1 _) as t1) ((InternalFastDict s2 _) as t2) =
-    if s1 > s2 then
-        internalFastDictFoldl internalFastDictInsertNoReplace t1 t2
-
-    else
-        internalFastDictFoldl internalFastDictInsert t2 t1
-
-
-{-| Insert a key-value pair into a dictionary. Replaces value when there is
-a collision.
--}
-internalFastDictInsert : comparable -> v -> InternalFastDict comparable v -> InternalFastDict comparable v
-internalFastDictInsert key value (InternalFastDict sz dict) =
-    let
-        ( result, isNew ) =
-            internalFastDictInnerInsert key value dict
-    in
-    if isNew then
-        InternalFastDict (sz + 1) result
-
-    else
-        InternalFastDict sz result
-
-
-internalFastDictInnerInsert : comparable -> v -> InternalFastDictInner comparable v -> ( InternalFastDictInner comparable v, Bool )
-internalFastDictInnerInsert key value dict =
-    -- Root node is always Black
-    case internalFastDictInsertHelp key value dict of
-        ( InternalFastDictInnerNode InternalFastDictRed k v l r, isNew ) ->
-            ( InternalFastDictInnerNode InternalFastDictBlack k v l r, isNew )
-
-        x ->
-            x
-
-
-internalFastDictInsertHelp : comparable -> v -> InternalFastDictInner comparable v -> ( InternalFastDictInner comparable v, Bool )
-internalFastDictInsertHelp key value dict =
-    case dict of
-        InternalFastDictLeaf ->
-            -- New nodes are always red. If it violates the rules, it will be fixed
-            -- when balancing.
-            ( InternalFastDictInnerNode InternalFastDictRed key value InternalFastDictLeaf InternalFastDictLeaf, True )
-
-        InternalFastDictInnerNode nColor nKey nValue nLeft nRight ->
-            case compare key nKey of
-                LT ->
-                    let
-                        ( newLeft, isNew ) =
-                            internalFastDictInsertHelp key value nLeft
-                    in
-                    ( internalFastDictBalance nColor nKey nValue newLeft nRight, isNew )
-
-                EQ ->
-                    ( InternalFastDictInnerNode nColor nKey value nLeft nRight, False )
-
-                GT ->
-                    let
-                        ( newRight, isNew ) =
-                            internalFastDictInsertHelp key value nRight
-                    in
-                    ( internalFastDictBalance nColor nKey nValue nLeft newRight, isNew )
-
-
-internalFastDictInsertNoReplace : comparable -> v -> InternalFastDict comparable v -> InternalFastDict comparable v
-internalFastDictInsertNoReplace key value (InternalFastDict sz dict) =
-    let
-        ( result, isNew ) =
-            internalFastDictInnerInsertNoReplace key value dict
-    in
-    if isNew then
-        InternalFastDict (sz + 1) result
-
-    else
-        InternalFastDict sz result
-
-
-internalFastDictInnerInsertNoReplace : comparable -> v -> InternalFastDictInner comparable v -> ( InternalFastDictInner comparable v, Bool )
-internalFastDictInnerInsertNoReplace key value dict =
-    -- Root node is always Black
-    case internalFastDictInsertHelpNoReplace key value dict of
-        ( InternalFastDictInnerNode InternalFastDictRed k v l r, isNew ) ->
-            ( InternalFastDictInnerNode InternalFastDictBlack k v l r, isNew )
-
-        x ->
-            x
-
-
-internalFastDictInsertHelpNoReplace : comparable -> v -> InternalFastDictInner comparable v -> ( InternalFastDictInner comparable v, Bool )
-internalFastDictInsertHelpNoReplace key value dict =
-    case dict of
-        InternalFastDictLeaf ->
-            -- New nodes are always red. If it violates the rules, it will be fixed
-            -- when balancing.
-            ( InternalFastDictInnerNode InternalFastDictRed key value InternalFastDictLeaf InternalFastDictLeaf, True )
-
-        InternalFastDictInnerNode nColor nKey nValue nLeft nRight ->
-            case compare key nKey of
-                LT ->
-                    let
-                        ( newLeft, isNew ) =
-                            internalFastDictInsertHelpNoReplace key value nLeft
-                    in
-                    ( internalFastDictBalance nColor nKey nValue newLeft nRight, isNew )
-
-                EQ ->
-                    ( dict, False )
-
-                GT ->
-                    let
-                        ( newRight, isNew ) =
-                            internalFastDictInsertHelpNoReplace key value nRight
-                    in
-                    ( internalFastDictBalance nColor nKey nValue nLeft newRight, isNew )
+    interfaces |> List.foldl FastDict.union FastDict.empty
 
 
 {-| Doing nothing as an [`Interface`](#Interface). These two examples are equivalent:
@@ -1024,7 +841,7 @@ and
 -}
 interfaceNone : Interface future_
 interfaceNone =
-    internalFastDictEmpty
+    FastDict.empty
 
 
 {-| Take what the [`Interface`](#Interface) can come back with and return a different future value.
@@ -1082,25 +899,10 @@ to a broader representation for the parent interface
 interfaceFutureMap : (future -> mappedFuture) -> (Interface future -> Interface mappedFuture)
 interfaceFutureMap futureChange interface =
     interface
-        |> internalFastDictMap
-            (\interfaceSingle ->
+        |> FastDict.map
+            (\_ interfaceSingle ->
                 interfaceSingle |> interfaceSingleFutureMap futureChange
             )
-
-
-internalFastDictMap : (a -> b) -> InternalFastDict k a -> InternalFastDict k b
-internalFastDictMap func (InternalFastDict sz dict) =
-    InternalFastDict sz (internalFastDictInnerMap func dict)
-
-
-internalFastDictInnerMap : (a -> b) -> InternalFastDictInner k a -> InternalFastDictInner k b
-internalFastDictInnerMap func dict =
-    case dict of
-        InternalFastDictLeaf ->
-            InternalFastDictLeaf
-
-        InternalFastDictInnerNode color key value left right ->
-            InternalFastDictInnerNode color key (func value) (internalFastDictInnerMap func left) (internalFastDictInnerMap func right)
 
 
 interfaceSingleFutureMap : (future -> mappedFuture) -> (InterfaceSingle future -> InterfaceSingle mappedFuture)
@@ -1164,10 +966,46 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             notificationAskForPermissionSingle
 
         DomNodeRender toRender ->
-            { reversePath = toRender.reversePath
-            , node = toRender.node |> domNodeFutureMap futureChange
-            }
-                |> DomNodeRender
+            DomNodeRender toRender
+
+        DomElementStyleSet set ->
+            DomElementStyleSet set
+
+        DomElementAttributeSet set ->
+            DomElementAttributeSet set
+
+        DomElementAttributeNamespacedSet set ->
+            DomElementAttributeNamespacedSet set
+
+        DomElementStringPropertySet set ->
+            DomElementStringPropertySet set
+
+        DomElementBoolPropertySet set ->
+            DomElementBoolPropertySet set
+
+        DomElementScrollToPosition scrollToPosition ->
+            DomElementScrollToPosition scrollToPosition
+
+        DomElementScrollToShow scrollToShow ->
+            DomElementScrollToShow scrollToShow
+
+        DomElementScrollPositionRequest request ->
+            DomElementScrollPositionRequest
+                { reversePath = request.reversePath
+                , containingElementNamespace = request.containingElementNamespace
+                , containingElementTag = request.containingElementTag
+                , on = \scrollPosition -> request.on scrollPosition |> futureChange
+                }
+
+        DomElementEventListen listen ->
+            DomElementEventListen
+                { reversePath = listen.reversePath
+                , containingElementNamespace = listen.containingElementNamespace
+                , containingElementTag = listen.containingElementTag
+                , eventName = listen.eventName
+                , value = listen.value
+                , on = \event -> listen.on event |> futureChange
+                }
 
         AudioSourceLoad sourceLoad ->
             { url = sourceLoad.url, on = \event -> sourceLoad.on event |> futureChange }
@@ -1286,16 +1124,6 @@ notificationAskForPermissionSingle =
     NotificationAskForPermission ()
 
 
-domNodeFutureMap : (future -> mappedFuture) -> (DomTextOrElementHeader future -> DomTextOrElementHeader mappedFuture)
-domNodeFutureMap futureChange domElementToMap =
-    case domElementToMap of
-        DomHeaderText text ->
-            DomHeaderText text
-
-        DomElementHeader domElementHeader ->
-            domElementHeader |> domElementHeaderFutureMap futureChange |> DomElementHeader
-
-
 httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
 httpRequestFutureMap futureChange request =
     { url = request.url
@@ -1315,44 +1143,6 @@ httpRequestFutureMap futureChange request =
     }
 
 
-domElementHeaderFutureMap : (future -> mappedFuture) -> (DomElementHeader future -> DomElementHeader mappedFuture)
-domElementHeaderFutureMap futureChange domElementToMap =
-    { namespace = domElementToMap.namespace
-    , tag = domElementToMap.tag
-    , styles = domElementToMap.styles
-    , attributes = domElementToMap.attributes
-    , attributesNamespaced = domElementToMap.attributesNamespaced
-    , stringProperties = domElementToMap.stringProperties
-    , boolProperties = domElementToMap.boolProperties
-    , scrollToPosition = domElementToMap.scrollToPosition
-    , scrollToShow = domElementToMap.scrollToShow
-    , scrollPositionRequest =
-        domElementToMap.scrollPositionRequest
-            |> Maybe.map (\request position -> position |> request |> futureChange)
-    , eventListens =
-        domElementToMap.eventListens
-            |> sortedKeyValueListMap
-                (\listen ->
-                    { on = \event -> listen.value.on event |> futureChange
-                    , defaultActionHandling = listen.value.defaultActionHandling
-                    }
-                )
-    }
-
-
-sortedKeyValueListMap :
-    ({ key : key, value : value } -> newValue)
-    -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
-sortedKeyValueListMap elementChange (SortedKeyValueList sortedKeyValueList) =
-    SortedKeyValueList
-        (sortedKeyValueList
-            |> List.map
-                (\entry ->
-                    { key = entry.key, value = elementChange entry }
-                )
-        )
-
-
 {-| The "msg" in a [`Web.program`](#program)
 -}
 type ProgramEvent appState
@@ -1368,22 +1158,6 @@ interfaceSingleEditsMap :
         )
 interfaceSingleEditsMap fromSingeEdit interfaces =
     case interfaces.old of
-        DomNodeRender domElementPreviouslyRendered ->
-            case interfaces.updated of
-                DomNodeRender domElementToRender ->
-                    { old = domElementPreviouslyRendered.node, updated = domElementToRender.node }
-                        |> domTextOrElementHeaderDiffMap
-                            (\diff ->
-                                { reversePath = domElementPreviouslyRendered.reversePath
-                                , replacement = diff
-                                }
-                                    |> EditDom
-                                    |> fromSingeEdit
-                            )
-
-                _ ->
-                    []
-
         AudioPlay previouslyPlayed ->
             case interfaces.updated of
                 AudioPlay toPlay ->
@@ -1408,6 +1182,36 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
 
                 _ ->
                     []
+
+        DomNodeRender _ ->
+            []
+
+        DomElementStyleSet _ ->
+            []
+
+        DomElementAttributeSet _ ->
+            []
+
+        DomElementAttributeNamespacedSet _ ->
+            []
+
+        DomElementStringPropertySet _ ->
+            []
+
+        DomElementBoolPropertySet _ ->
+            []
+
+        DomElementScrollToPosition _ ->
+            []
+
+        DomElementScrollToShow _ ->
+            []
+
+        DomElementScrollPositionRequest _ ->
+            []
+
+        DomElementEventListen _ ->
+            []
 
         DocumentTitleReplaceBy _ ->
             []
@@ -1542,269 +1346,6 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
             []
 
 
-domTextOrElementHeaderDiffMap :
-    (DomEdit -> fromDomEdit)
-    ->
-        ({ old : DomTextOrElementHeader state, updated : DomTextOrElementHeader state }
-         -> List fromDomEdit
-        )
-domTextOrElementHeaderDiffMap fromDomEdit nodes =
-    case nodes.old of
-        DomHeaderText oldText ->
-            case nodes.updated of
-                DomElementHeader updatedElement ->
-                    [ updatedElement
-                        |> domElementHeaderFutureMap (\_ -> ())
-                        |> DomElementHeader
-                        |> ReplacementDomNode
-                        |> fromDomEdit
-                    ]
-
-                DomHeaderText updatedText ->
-                    if oldText == updatedText ++ "" then
-                        []
-
-                    else
-                        [ updatedText
-                            |> DomHeaderText
-                            |> ReplacementDomNode
-                            |> fromDomEdit
-                        ]
-
-        DomElementHeader oldElement ->
-            case nodes.updated of
-                DomHeaderText updatedText ->
-                    [ updatedText
-                        |> DomHeaderText
-                        |> ReplacementDomNode
-                        |> fromDomEdit
-                    ]
-
-                DomElementHeader updatedElement ->
-                    { old = oldElement, updated = updatedElement }
-                        |> domElementHeaderDiffMap fromDomEdit
-
-
-domElementHeaderDiffMap :
-    (DomEdit -> fromDomEdit)
-    ->
-        ({ old : DomElementHeader future, updated : DomElementHeader future }
-         -> List fromDomEdit
-        )
-domElementHeaderDiffMap fromDomEdit elements =
-    if elements.old.tag /= elements.updated.tag then
-        [ elements.updated
-            |> domElementHeaderFutureMap (\_ -> ())
-            |> DomElementHeader
-            |> ReplacementDomNode
-            |> fromDomEdit
-        ]
-
-    else
-        { old = elements.old.styles, updated = elements.updated.styles }
-            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
-                { remove = identity, edit = Basics.identity }
-            |> List.LocalExtra.fromMaybe
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.attributes, updated = elements.updated.attributes }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                        (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
-                )
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
-                        (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
-                        { remove = \k -> { namespace = k.namespace, key = k.key }
-                        , edit = \entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value }
-                        }
-                )
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.stringProperties, updated = elements.updated.stringProperties }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                        (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
-                )
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.boolProperties, updated = elements.updated.boolProperties }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                        (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
-                )
-            |> List.LocalExtra.consJust
-                (if elements.old.scrollToPosition == elements.updated.scrollToPosition then
-                    Nothing
-
-                 else
-                    ReplacementDomElementScrollToPosition elements.updated.scrollToPosition
-                        |> fromDomEdit
-                        |> Just
-                )
-            |> List.LocalExtra.consJust
-                (if elements.old.scrollToShow == elements.updated.scrollToShow then
-                    Nothing
-
-                 else
-                    ReplacementDomElementScrollToShow elements.updated.scrollToShow
-                        |> fromDomEdit
-                        |> Just
-                )
-            |> List.LocalExtra.consJust
-                (case elements.old.scrollPositionRequest of
-                    Just _ ->
-                        Nothing
-
-                    Nothing ->
-                        case elements.updated.scrollPositionRequest of
-                            Nothing ->
-                                Nothing
-
-                            Just _ ->
-                                replacementDomElementScrollPositionRequest
-                                    |> fromDomEdit
-                                    |> Just
-                )
-            |> List.LocalExtra.consJust
-                (let
-                    updatedElementEventListensId : List { key : String, value : DefaultActionHandling }
-                    updatedElementEventListensId =
-                        elements.updated.eventListens
-                            |> sortedKeyValueListToList
-                            |> List.LocalExtra.mapAnyOrder
-                                (\entry ->
-                                    { key = entry.key, value = entry.value.defaultActionHandling }
-                                )
-                 in
-                 if
-                    (elements.old.eventListens
-                        |> sortedKeyValueListToList
-                        |> List.LocalExtra.mapAnyOrder
-                            (\entry ->
-                                { key = entry.key, value = entry.value.defaultActionHandling }
-                            )
-                    )
-                        == updatedElementEventListensId
-                 then
-                    Nothing
-
-                 else
-                    ReplacementDomElementEventListens updatedElementEventListensId
-                        |> fromDomEdit
-                        |> Just
-                )
-
-
-replacementDomElementScrollPositionRequest : DomEdit
-replacementDomElementScrollPositionRequest =
-    ReplacementDomElementScrollPositionRequest ()
-
-
-sortedKeyValueListEditAndRemoveDiffMapBy :
-    (key -> comparable_)
-    -> ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
-    -> { remove : key -> removeSingle, edit : { key : key, value : value } -> editSingle }
-    ->
-        ({ old : SortedKeyValueList key value
-         , updated : SortedKeyValueList key value
-         }
-         -> Maybe fromRemoveAndEdit
-        )
-sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDiffSingle dicts =
-    let
-        diff : { remove : List removeSingle, edit : List editSingle }
-        diff =
-            sortedKeyValueListMergeBy keyToComparable
-                (\removed soFar ->
-                    { edit = soFar.edit
-                    , remove = asDiffSingle.remove removed.key :: soFar.remove
-                    }
-                )
-                (\old updated soFar ->
-                    if old == updated.value then
-                        soFar
-
-                    else
-                        { remove = soFar.remove
-                        , edit = asDiffSingle.edit updated :: soFar.edit
-                        }
-                )
-                (\updated soFar ->
-                    { remove = soFar.remove
-                    , edit = asDiffSingle.edit updated :: soFar.edit
-                    }
-                )
-                (dicts.old |> sortedKeyValueListToList)
-                (dicts.updated |> sortedKeyValueListToList)
-                { remove = [], edit = [] }
-    in
-    case diff.remove of
-        [] ->
-            case diff.edit of
-                [] ->
-                    Nothing
-
-                (_ :: _) as editsFilled ->
-                    { remove = [], edit = editsFilled } |> fromEditAndRemove |> Just
-
-        (_ :: _) as removeFilled ->
-            { remove = removeFilled, edit = diff.edit } |> fromEditAndRemove |> Just
-
-
-{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
-The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
--}
-sortedKeyValueListMergeBy :
-    (key -> comparable_)
-    -> ({ key : key, value : a } -> folded -> folded)
-    -> (a -> { key : key, value : b } -> folded -> folded)
-    -> ({ key : key, value : b } -> folded -> folded)
-    -> List { key : key, value : a }
-    -> List { key : key, value : b }
-    -> folded
-    -> folded
-sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
-    case aSortedKeyValueList of
-        [] ->
-            bSortedKeyValueList |> List.foldl onlyB initialFolded
-
-        aLowest :: aWithoutLowest ->
-            case bSortedKeyValueList of
-                [] ->
-                    aWithoutLowest
-                        |> List.foldl onlyA
-                            (onlyA aLowest initialFolded)
-
-                bLowest :: bWithoutLowest ->
-                    case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
-                        EQ ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bWithoutLowest
-                                (bothAB aLowest.value bLowest initialFolded)
-
-                        LT ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bSortedKeyValueList
-                                (onlyA aLowest initialFolded)
-
-                        GT ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aSortedKeyValueList
-                                bWithoutLowest
-                                (onlyB bLowest initialFolded)
-
-
 audioDiffMap :
     (AudioEdit -> fromAudioEdit)
     -> ({ old : Audio, updated : Audio } -> List fromAudioEdit)
@@ -1840,23 +1381,6 @@ audioDiffMap fromAudioEdit audios =
                     |> fromAudioEdit
                     |> Just
             )
-
-
-namespacedKeyToComparable : { namespace : String, key : String } -> String
-namespacedKeyToComparable namespacedKey =
-    namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
-
-
-{-| Alternative to `Dict` optimized for fast merge and fast creation.
-Would be a terrible fit if we needed fast insert and get.
--}
-type SortedKeyValueList key value
-    = SortedKeyValueList (List { key : key, value : value })
-
-
-sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
-sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
-    sortedKeyValueList
 
 
 {-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
@@ -1895,15 +1419,6 @@ interfaceSingleEditToJson : InterfaceSingleEdit -> Json.Encode.Value
 interfaceSingleEditToJson edit =
     Json.Encode.LocalExtra.variant
         (case edit of
-            EditDom editDomDiff ->
-                { tag = "EditDom"
-                , value =
-                    Json.Encode.object
-                        [ ( "reversePath", editDomDiff.reversePath |> Json.Encode.list Json.Encode.int )
-                        , ( "replacement", editDomDiff.replacement |> editDomDiffToJson )
-                        ]
-                }
-
             EditAudio audioEdit ->
                 { tag = "EditAudio"
                 , value =
@@ -1939,141 +1454,6 @@ interfaceSingleEditToJson edit =
                         , ( "message", editNotificationDiff.message |> Json.Encode.string )
                         , ( "details", editNotificationDiff.details |> Json.Encode.string )
                         ]
-                }
-        )
-
-
-editDomDiffToJson : DomEdit -> Json.Encode.Value
-editDomDiffToJson replacementInEditDomDiff =
-    Json.Encode.LocalExtra.variant
-        (case replacementInEditDomDiff of
-            ReplacementDomNode node ->
-                { tag = "Node", value = node |> domTextOrElementHeaderInfoToJson }
-
-            ReplacementDomElementStyles styles ->
-                { tag = "Styles"
-                , value =
-                    Json.Encode.object
-                        [ ( "remove", styles.remove |> Json.Encode.list Json.Encode.string )
-                        , ( "edit"
-                          , styles.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.string )
-                                            ]
-                                    )
-                          )
-                        ]
-                }
-
-            ReplacementDomElementAttributes attributes ->
-                { tag = "Attributes"
-                , value =
-                    Json.Encode.object
-                        [ ( "remove", attributes.remove |> Json.Encode.list Json.Encode.string )
-                        , ( "edit"
-                          , attributes.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.string )
-                                            ]
-                                    )
-                          )
-                        ]
-                }
-
-            ReplacementDomElementAttributesNamespaced attributesNamespaced ->
-                { tag = "AttributesNamespaced"
-                , value =
-                    Json.Encode.object
-                        [ ( "remove"
-                          , attributesNamespaced.remove
-                                |> Json.Encode.list
-                                    (\removeSingle ->
-                                        Json.Encode.object
-                                            [ ( "namespace", removeSingle.namespace |> Json.Encode.string )
-                                            , ( "key", removeSingle.key |> Json.Encode.string )
-                                            ]
-                                    )
-                          )
-                        , ( "edit"
-                          , attributesNamespaced.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "namespace", editSingle.namespace |> Json.Encode.string )
-                                            , ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.string )
-                                            ]
-                                    )
-                          )
-                        ]
-                }
-
-            ReplacementDomElementStringProperties stringProperties ->
-                { tag = "StringProperties"
-                , value =
-                    Json.Encode.object
-                        [ ( "remove", stringProperties.remove |> Json.Encode.list Json.Encode.string )
-                        , ( "edit"
-                          , stringProperties.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.string )
-                                            ]
-                                    )
-                          )
-                        ]
-                }
-
-            ReplacementDomElementBoolProperties boolProperties ->
-                { tag = "StringProperties"
-                , value =
-                    Json.Encode.object
-                        [ ( "remove", boolProperties.remove |> Json.Encode.list Json.Encode.string )
-                        , ( "edit"
-                          , boolProperties.edit
-                                |> Json.Encode.list
-                                    (\editSingle ->
-                                        Json.Encode.object
-                                            [ ( "key", editSingle.key |> Json.Encode.string )
-                                            , ( "value", editSingle.value |> Json.Encode.bool )
-                                            ]
-                                    )
-                          )
-                        ]
-                }
-
-            ReplacementDomElementScrollToPosition maybePosition ->
-                { tag = "ScrollToPosition"
-                , value = maybePosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
-                }
-
-            ReplacementDomElementScrollToShow alignment ->
-                { tag = "ScrollToShow"
-                , value = alignment |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
-                }
-
-            ReplacementDomElementScrollPositionRequest () ->
-                { tag = "ScrollPositionRequest", value = Json.Encode.null }
-
-            ReplacementDomElementEventListens listens ->
-                { tag = "EventListens"
-                , value =
-                    listens
-                        |> Json.Encode.list
-                            (\entry ->
-                                Json.Encode.object
-                                    [ ( "name", entry.key |> Json.Encode.string )
-                                    , ( "defaultActionHandling", entry.value |> defaultActionHandlingToJson )
-                                    ]
-                            )
                 }
         )
 
@@ -2169,7 +1549,114 @@ interfaceSingleToJson interfaceSingle =
                 , value =
                     Json.Encode.object
                         [ ( "reversePath", render.reversePath |> Json.Encode.list Json.Encode.int )
-                        , ( "node", render.node |> domTextOrElementHeaderInfoToJson )
+                        , ( "node", render.node |> domTextOrElementHeaderToJson )
+                        ]
+                }
+
+            DomElementStyleSet set ->
+                { tag = "DomElementStyleSet"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", set.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "containingElementNamespace", set.containingElementNamespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "containingElementTag", set.containingElementTag |> Json.Encode.string )
+                        , ( "key", set.key |> Json.Encode.string )
+                        , ( "value", set.value |> Json.Encode.string )
+                        ]
+                }
+
+            DomElementAttributeSet set ->
+                { tag = "DomElementAttributeSet"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", set.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "containingElementNamespace", set.containingElementNamespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "containingElementTag", set.containingElementTag |> Json.Encode.string )
+                        , ( "key", set.key |> Json.Encode.string )
+                        , ( "value", set.value |> Json.Encode.string )
+                        ]
+                }
+
+            DomElementAttributeNamespacedSet set ->
+                { tag = "DomElementAttributeNamespacedSet"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", set.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "containingElementNamespace", set.containingElementNamespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "containingElementTag", set.containingElementTag |> Json.Encode.string )
+                        , ( "namespace", set.namespace |> Json.Encode.string )
+                        , ( "key", set.key |> Json.Encode.string )
+                        , ( "value", set.value |> Json.Encode.string )
+                        ]
+                }
+
+            DomElementStringPropertySet set ->
+                { tag = "DomElementStringPropertySet"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", set.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "containingElementNamespace", set.containingElementNamespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "containingElementTag", set.containingElementTag |> Json.Encode.string )
+                        , ( "key", set.key |> Json.Encode.string )
+                        , ( "value", set.value |> Json.Encode.string )
+                        ]
+                }
+
+            DomElementBoolPropertySet set ->
+                { tag = "DomElementBoolPropertySet"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", set.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "containingElementNamespace", set.containingElementNamespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "containingElementTag", set.containingElementTag |> Json.Encode.string )
+                        , ( "key", set.key |> Json.Encode.string )
+                        , ( "value", set.value |> Json.Encode.bool )
+                        ]
+                }
+
+            DomElementScrollToPosition scrollToPosition ->
+                { tag = "DomElementScrollToPosition"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", scrollToPosition.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "containingElementNamespace", scrollToPosition.containingElementNamespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "containingElementTag", scrollToPosition.containingElementTag |> Json.Encode.string )
+                        , ( "fromLeft", scrollToPosition.fromLeft |> Json.Encode.float )
+                        , ( "fromTop", scrollToPosition.fromTop |> Json.Encode.float )
+                        ]
+                }
+
+            DomElementScrollToShow scrollToShow ->
+                { tag = "DomElementScrollToShow"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", scrollToShow.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "containingElementNamespace", scrollToShow.containingElementNamespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "containingElementTag", scrollToShow.containingElementTag |> Json.Encode.string )
+                        , ( "x", scrollToShow.x |> domElementVisibilityAlignmentToJson )
+                        , ( "y", scrollToShow.y |> domElementVisibilityAlignmentToJson )
+                        ]
+                }
+
+            DomElementScrollPositionRequest request ->
+                { tag = "DomElementScrollPositionRequest"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", request.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "containingElementNamespace", request.containingElementNamespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "containingElementTag", request.containingElementTag |> Json.Encode.string )
+                        ]
+                }
+
+            DomElementEventListen listen ->
+                { tag = "DomElementEventListen"
+                , value =
+                    Json.Encode.object
+                        [ ( "reversePath", listen.reversePath |> Json.Encode.list Json.Encode.int )
+                        , ( "containingElementNamespace", listen.containingElementNamespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "containingElementTag", listen.containingElementTag |> Json.Encode.string )
+                        , ( "name", listen.eventName |> Json.Encode.string )
+                        , ( "defaultActionHandling", listen.value |> defaultActionHandlingToJson )
                         ]
                 }
 
@@ -2283,6 +1770,26 @@ interfaceSingleToJson interfaceSingle =
         )
 
 
+domTextOrElementHeaderToJson : DomTextOrElementHeader -> Json.Encode.Value
+domTextOrElementHeaderToJson domTextOrElementHeader =
+    Json.Encode.LocalExtra.variant
+        (case domTextOrElementHeader of
+            DomHeaderText text ->
+                { tag = "DomHeaderText"
+                , value = text |> Json.Encode.string
+                }
+
+            DomElementKind domElementHeader ->
+                { tag = "DomElementHeader"
+                , value =
+                    Json.Encode.object
+                        [ ( "namespace", domElementHeader.namespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
+                        , ( "tag", domElementHeader.tag |> Json.Encode.string )
+                        ]
+                }
+        )
+
+
 socketIdToJson : SocketId -> Json.Encode.Value
 socketIdToJson (SocketId index) =
     index |> Json.Encode.int
@@ -2372,6 +1879,33 @@ audioToJson audio =
         ]
 
 
+defaultActionHandlingToJson : DefaultActionHandling -> Json.Encode.Value
+defaultActionHandlingToJson defaultActionHandling =
+    Json.Encode.string
+        (case defaultActionHandling of
+            DefaultActionPrevent ->
+                "DefaultActionPrevent"
+
+            DefaultActionExecute ->
+                "DefaultActionExecute"
+        )
+
+
+domElementVisibilityAlignmentToJson : DomElementVisibilityAlignment -> Json.Encode.Value
+domElementVisibilityAlignmentToJson alignment =
+    Json.Encode.string
+        (case alignment of
+            DomElementStart ->
+                "start"
+
+            DomElementEnd ->
+                "end"
+
+            DomElementCenter ->
+                "center"
+        )
+
+
 audioParameterTimelineToJson : AudioParameterTimeline -> Json.Encode.Value
 audioParameterTimelineToJson timeline =
     Json.Encode.object
@@ -2409,171 +1943,6 @@ audioProcessingToJson processing =
                 , value = Json.Encode.object [ ( "cutoffFrequency", highpass.cutoffFrequency |> audioParameterTimelineToJson ) ]
                 }
         )
-
-
-domTextOrElementHeaderInfoToJson : DomTextOrElementHeader future_ -> Json.Encode.Value
-domTextOrElementHeaderInfoToJson domNodeId =
-    Json.Encode.LocalExtra.variant
-        (case domNodeId of
-            DomHeaderText text ->
-                { tag = "Text", value = text |> Json.Encode.string }
-
-            DomElementHeader element ->
-                { tag = "Element", value = element |> domElementHeaderInfoToJson }
-        )
-
-
-domElementHeaderInfoToJson : DomElementHeader future_ -> Json.Encode.Value
-domElementHeaderInfoToJson header =
-    Json.Encode.object
-        [ ( "namespace", header.namespace |> Json.Encode.LocalExtra.nullable Json.Encode.string )
-        , ( "tag", header.tag |> Json.Encode.string )
-        , ( "styles", header.styles |> domElementStylesToJson )
-        , ( "attributes", header.attributes |> domElementAttributesToJson )
-        , ( "attributesNamespaced", header.attributesNamespaced |> domElementAttributesNamespacedToJson )
-        , ( "stringProperties", header.stringProperties |> domElementStringPropertiesToJson )
-        , ( "boolProperties", header.boolProperties |> domElementBoolPropertiesToJson )
-        , ( "scrollToPosition"
-          , header.scrollToPosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
-          )
-        , ( "scrollToShow"
-          , header.scrollToShow |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
-          )
-        , ( "scrollPositionRequest"
-          , Json.Encode.bool
-                (case header.scrollPositionRequest of
-                    Nothing ->
-                        False
-
-                    Just _ ->
-                        True
-                )
-          )
-        , ( "eventListens"
-          , header.eventListens
-                |> sortedKeyValueListToList
-                |> Json.Encode.list
-                    (\entry ->
-                        Json.Encode.object
-                            [ ( "name", entry.key |> Json.Encode.string )
-                            , ( "defaultActionHandling", entry.value.defaultActionHandling |> defaultActionHandlingToJson )
-                            ]
-                    )
-          )
-        ]
-
-
-domElementAttributesNamespacedToJson :
-    SortedKeyValueList
-        { namespace : String, key : String }
-        String
-    -> Json.Encode.Value
-domElementAttributesNamespacedToJson attributes =
-    attributes
-        |> sortedKeyValueListToList
-        |> Json.Encode.list
-            (\entry ->
-                Json.Encode.object
-                    [ ( "namespace", entry.key.namespace |> Json.Encode.string )
-                    , ( "key", entry.key.key |> Json.Encode.string )
-                    , ( "value", entry.value |> Json.Encode.string )
-                    ]
-            )
-
-
-domElementAttributesToJson : SortedKeyValueList String String -> Json.Encode.Value
-domElementAttributesToJson attributes =
-    attributes
-        |> sortedKeyValueListToList
-        |> Json.Encode.list
-            (\entry ->
-                Json.Encode.object
-                    [ ( "key", entry.key |> Json.Encode.string )
-                    , ( "value", entry.value |> Json.Encode.string )
-                    ]
-            )
-
-
-domElementStylesToJson : SortedKeyValueList String String -> Json.Encode.Value
-domElementStylesToJson styles =
-    styles
-        |> sortedKeyValueListToList
-        |> Json.Encode.list
-            (\entry ->
-                Json.Encode.object
-                    [ ( "key", entry.key |> Json.Encode.string )
-                    , ( "value", entry.value |> Json.Encode.string )
-                    ]
-            )
-
-
-domElementBoolPropertiesToJson : SortedKeyValueList String Bool -> Json.Encode.Value
-domElementBoolPropertiesToJson boolProperties =
-    boolProperties
-        |> sortedKeyValueListToList
-        |> Json.Encode.list
-            (\entry ->
-                Json.Encode.object
-                    [ ( "key", entry.key |> Json.Encode.string )
-                    , ( "value", entry.value |> Json.Encode.bool )
-                    ]
-            )
-
-
-domElementStringPropertiesToJson : SortedKeyValueList String String -> Json.Encode.Value
-domElementStringPropertiesToJson stringProperties =
-    stringProperties
-        |> sortedKeyValueListToList
-        |> Json.Encode.list
-            (\entry ->
-                Json.Encode.object
-                    [ ( "key", entry.key |> Json.Encode.string )
-                    , ( "value", entry.value |> Json.Encode.string )
-                    ]
-            )
-
-
-defaultActionHandlingToJson : DefaultActionHandling -> Json.Encode.Value
-defaultActionHandlingToJson defaultActionHandling =
-    Json.Encode.string
-        (case defaultActionHandling of
-            DefaultActionPrevent ->
-                "DefaultActionPrevent"
-
-            DefaultActionExecute ->
-                "DefaultActionExecute"
-        )
-
-
-domElementVisibilityAlignmentsToJson : { y : DomElementVisibilityAlignment, x : DomElementVisibilityAlignment } -> Json.Encode.Value
-domElementVisibilityAlignmentsToJson alignments =
-    Json.Encode.object
-        [ ( "x", alignments.x |> domElementVisibilityAlignmentToJson )
-        , ( "y", alignments.y |> domElementVisibilityAlignmentToJson )
-        ]
-
-
-domElementVisibilityAlignmentToJson : DomElementVisibilityAlignment -> Json.Encode.Value
-domElementVisibilityAlignmentToJson alignment =
-    Json.Encode.string
-        (case alignment of
-            DomElementStart ->
-                "start"
-
-            DomElementEnd ->
-                "end"
-
-            DomElementCenter ->
-                "center"
-        )
-
-
-domElementScrollPositionToJson : { fromLeft : Float, fromTop : Float } -> Json.Encode.Value
-domElementScrollPositionToJson position =
-    Json.Encode.object
-        [ ( "fromLeft", position.fromLeft |> Json.Encode.float )
-        , ( "fromTop", position.fromTop |> Json.Encode.float )
-        ]
 
 
 interfaceSingleToStructuredId : InterfaceSingle future_ -> StructuredId
@@ -2690,7 +2059,97 @@ interfaceSingleToStructuredId interfaceSingle =
             DomNodeRender render ->
                 { tag = "DomNodeRender"
                 , value =
-                    render.reversePath |> reverseIndexListToDigitCountPrefixedStructureId
+                    StructuredId.ofParts
+                        [ render.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                        , render.node |> domTextOrElementHeaderToStructuredId
+                        ]
+                }
+
+            DomElementStyleSet set ->
+                { tag = "DomElementStyleSet"
+                , value =
+                    StructuredId.ofParts
+                        [ set.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                        , set.key |> StructuredId.ofString
+                        , set.value |> StructuredId.ofString
+                        ]
+                }
+
+            DomElementAttributeSet set ->
+                { tag = "DomElementAttributeSet"
+                , value =
+                    StructuredId.ofParts
+                        [ set.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                        , set.key |> StructuredId.ofString
+                        , set.value |> StructuredId.ofString
+                        ]
+                }
+
+            DomElementAttributeNamespacedSet set ->
+                { tag = "DomElementAttributeNamespacedSet"
+                , value =
+                    StructuredId.ofParts
+                        [ set.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                        , set.namespace |> StructuredId.ofString
+                        , set.key |> StructuredId.ofString
+                        , set.value |> StructuredId.ofString
+                        ]
+                }
+
+            DomElementStringPropertySet set ->
+                { tag = "DomElementStringPropertySet"
+                , value =
+                    StructuredId.ofParts
+                        [ set.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                        , set.key |> StructuredId.ofString
+                        , set.value |> StructuredId.ofString
+                        ]
+                }
+
+            DomElementBoolPropertySet set ->
+                { tag = "DomElementBoolPropertySet"
+                , value =
+                    StructuredId.ofParts
+                        [ set.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                        , set.key |> StructuredId.ofString
+                        , set.value |> StructuredId.ofBool
+                        ]
+                }
+
+            DomElementScrollToPosition scrollToPosition ->
+                { tag = "DomElementBoolPropertySet"
+                , value =
+                    StructuredId.ofParts
+                        [ scrollToPosition.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                        , scrollToPosition.fromLeft |> StructuredId.ofFloat
+                        , scrollToPosition.fromTop |> StructuredId.ofFloat
+                        ]
+                }
+
+            DomElementScrollToShow scrollToShow ->
+                { tag = "DomElementBoolPropertySet"
+                , value =
+                    StructuredId.ofParts
+                        [ scrollToShow.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                        , scrollToShow.x |> domElementVisibilityAlignmentToStructuredId
+                        , scrollToShow.y |> domElementVisibilityAlignmentToStructuredId
+                        ]
+                }
+
+            DomElementScrollPositionRequest request ->
+                { tag = "DomElementScrollPositionRequest"
+                , value =
+                    request.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                }
+
+            DomElementEventListen listen ->
+                { tag = "DomElementEventListen"
+                , value =
+                    StructuredId.ofParts
+                        [ listen.reversePath |> reverseIndexListToDigitCountPrefixedStructuredId
+                        , listen.eventName |> StructuredId.ofString
+                        , listen.value |> defaultActionHandlingToStructuredId
+                        ]
                 }
 
             AudioSourceLoad sourceLoad ->
@@ -2802,6 +2261,53 @@ interfaceSingleToStructuredId interfaceSingle =
         )
 
 
+domTextOrElementHeaderToStructuredId : DomTextOrElementHeader -> StructuredId
+domTextOrElementHeaderToStructuredId domTextOrElementHeader =
+    StructuredId.ofVariant
+        (case domTextOrElementHeader of
+            DomHeaderText text ->
+                { tag = "DomHeaderText"
+                , value = text |> StructuredId.ofString
+                }
+
+            DomElementKind domElementHeader ->
+                { tag = "DomElementHeader"
+                , value =
+                    StructuredId.ofParts
+                        [ domElementHeader.namespace |> StructuredId.ofMaybe StructuredId.ofString
+                        , domElementHeader.tag |> StructuredId.ofString
+                        ]
+                }
+        )
+
+
+defaultActionHandlingToStructuredId : DefaultActionHandling -> StructuredId
+defaultActionHandlingToStructuredId defaultActionHandling =
+    (case defaultActionHandling of
+        DefaultActionPrevent ->
+            "DefaultActionPrevent"
+
+        DefaultActionExecute ->
+            "DefaultActionExecute"
+    )
+        |> StructuredId.ofString
+
+
+domElementVisibilityAlignmentToStructuredId : DomElementVisibilityAlignment -> StructuredId
+domElementVisibilityAlignmentToStructuredId domElementVisibilityAlignment =
+    (case domElementVisibilityAlignment of
+        DomElementStart ->
+            "DomElementStart"
+
+        DomElementEnd ->
+            "DomElementEnd"
+
+        DomElementCenter ->
+            "DomElementCenter"
+    )
+        |> StructuredId.ofString
+
+
 appUrlToStructuredId : AppUrl -> StructuredId
 appUrlToStructuredId appUrl =
     StructuredId.ofParts
@@ -2826,8 +2332,8 @@ The problem with StructuredId.ofList is: that with e.g. `"[]"` vs `"[0]"` any di
 So we instead represent it as `"\"\""` vs `"\"0\""` because any digit is > `'"'`
 
 -}
-reverseIndexListToDigitCountPrefixedStructureId : List Int -> StructuredId
-reverseIndexListToDigitCountPrefixedStructureId indexes =
+reverseIndexListToDigitCountPrefixedStructuredId : List Int -> StructuredId
+reverseIndexListToDigitCountPrefixedStructuredId indexes =
     StructuredId.ofString
         (indexes
             |> commaSeparatedReverseMap
@@ -2918,7 +2424,7 @@ programInit appConfig =
         , appState = appConfig.initialState
         }
     , initialInterface
-        |> internalFastDictFoldl
+        |> FastDict.foldl
             (\id new soFar ->
                 appConfig.ports.toJs
                     ({ id = id, diff = new |> Add } |> toJsToJson)
@@ -2940,7 +2446,7 @@ programSubscriptions appConfig (State state) =
                     (Json.Decode.field "id" Json.Decode.string
                         |> Json.Decode.andThen
                             (\originalInterfaceId ->
-                                case state.interface |> internalFastDictGet originalInterfaceId of
+                                case state.interface |> FastDict.get originalInterfaceId of
                                     Just interfaceSingleAcceptingFuture ->
                                         case interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder of
                                             Just eventDataDecoder ->
@@ -2952,7 +2458,7 @@ programSubscriptions appConfig (State state) =
                                     Nothing ->
                                         "no associated interface found among ids\n"
                                             ++ (state.interface
-                                                    |> internalFastDictToList
+                                                    |> FastDict.toList
                                                     |> List.map Tuple.first
                                                     |> String.join "\n"
                                                )
@@ -2962,29 +2468,6 @@ programSubscriptions appConfig (State state) =
                     )
                 |> Result.LocalExtra.valueOrOnError JsEventFailedToDecode
         )
-
-
-internalFastDictGet : comparable -> InternalFastDict comparable value -> Maybe value
-internalFastDictGet targetKey (InternalFastDict _ dict) =
-    getInner targetKey dict
-
-
-getInner : comparable -> InternalFastDictInner comparable v -> Maybe v
-getInner targetKey dict =
-    case dict of
-        InternalFastDictLeaf ->
-            Nothing
-
-        InternalFastDictInnerNode _ key value left right ->
-            case compare targetKey key of
-                LT ->
-                    getInner targetKey left
-
-                EQ ->
-                    Just value
-
-                GT ->
-                    getInner targetKey right
 
 
 {-| [json `Decoder`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Decode#Decoder)
@@ -3064,46 +2547,39 @@ interfaceSingleFutureJsonDecoder interface =
         AudioPlay _ ->
             Nothing
 
-        DomNodeRender toRender ->
-            case toRender.node of
-                DomHeaderText _ ->
-                    Nothing
+        DomNodeRender _ ->
+            Nothing
 
-                DomElementHeader element ->
-                    let
-                        eventListenDecoder : Json.Decode.Decoder future
-                        eventListenDecoder =
-                            Json.Decode.LocalExtra.variant "EventListen"
-                                (Json.Decode.map2 (\eventListen event -> eventListen.on event)
-                                    (Json.Decode.field "name"
-                                        (Json.Decode.string
-                                            |> Json.Decode.andThen
-                                                (\specificEventName ->
-                                                    case element.eventListens |> sortedKeyValueListGetAtStringKey specificEventName of
-                                                        Nothing ->
-                                                            Json.Decode.fail "received event of a kind that isn't listened for"
+        DomElementStyleSet _ ->
+            Nothing
 
-                                                        Just eventListen ->
-                                                            eventListen |> Json.Decode.succeed
-                                                )
-                                        )
-                                    )
-                                    (Json.Decode.field "event" Json.Decode.value)
-                                )
-                    in
-                    (case element.scrollPositionRequest of
-                        Nothing ->
-                            eventListenDecoder
+        DomElementAttributeSet _ ->
+            Nothing
 
-                        Just request ->
-                            Json.Decode.oneOf
-                                [ eventListenDecoder
-                                , Json.Decode.LocalExtra.variant "ScrollPositionRequest"
-                                    domElementScrollPositionJsonDecoder
-                                    |> Json.Decode.map request
-                                ]
-                    )
-                        |> Just
+        DomElementAttributeNamespacedSet _ ->
+            Nothing
+
+        DomElementStringPropertySet _ ->
+            Nothing
+
+        DomElementBoolPropertySet _ ->
+            Nothing
+
+        DomElementScrollToPosition _ ->
+            Nothing
+
+        DomElementScrollToShow _ ->
+            Nothing
+
+        DomElementScrollPositionRequest request ->
+            domElementScrollPositionJsonDecoder
+                |> Json.Decode.map request.on
+                |> Just
+
+        DomElementEventListen listen ->
+            Json.Decode.value
+                |> Json.Decode.map listen.on
+                |> Just
 
         NotificationAskForPermission () ->
             Nothing
@@ -3223,23 +2699,6 @@ interfaceSingleFutureJsonDecoder interface =
 
         GamepadsChangeListen toFuture ->
             gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
-
-
-{-| The fact that this can only be implemented linearly might seem shocking.
-In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
--}
-sortedKeyValueListGetAtStringKey : String -> SortedKeyValueList String value -> Maybe value
-sortedKeyValueListGetAtStringKey keyToFind sortedKeyValueList =
-    sortedKeyValueList
-        |> sortedKeyValueListToList
-        |> List.LocalExtra.firstJustMap
-            (\entry ->
-                if entry.key == keyToFind ++ "" then
-                    Just entry.value
-
-                else
-                    Nothing
-            )
 
 
 audioSourceLoadErrorJsonDecoder : Json.Decode.Decoder AudioSourceLoadError
@@ -3973,7 +3432,7 @@ interfacesDiffMap :
          -> List combined
         )
 interfacesDiffMap idAndDiffCombine interfaces =
-    internalFastDictMerge
+    FastDict.merge
         (\removedId _ soFar ->
             idAndDiffCombine { id = removedId, diff = remove } :: soFar
         )
@@ -3994,72 +3453,9 @@ interfacesDiffMap idAndDiffCombine interfaces =
         []
 
 
-{-| The most general way of combining two dictionaries. You provide three
-accumulators for when a given key appears:
-
-1.  Only in the left dictionary.
-2.  In both dictionaries.
-3.  Only in the right dictionary.
-
-You then traverse all the keys from lowest to highest, building up whatever
-you want.
-
--}
-internalFastDictMerge :
-    (comparable -> a -> result -> result)
-    -> (comparable -> a -> b -> result -> result)
-    -> (comparable -> b -> result -> result)
-    -> InternalFastDict comparable a
-    -> InternalFastDict comparable b
-    -> result
-    -> result
-internalFastDictMerge leftStep bothStep rightStep leftDict rightDict initialResult =
-    let
-        stepState : comparable -> b -> ( List ( comparable, a ), result ) -> ( List ( comparable, a ), result )
-        stepState rKey rValue ( list, result ) =
-            case list of
-                [] ->
-                    ( [], rightStep rKey rValue result )
-
-                ( lKey, lValue ) :: rest ->
-                    if lKey < rKey then
-                        stepState rKey rValue ( rest, leftStep lKey lValue result )
-
-                    else if lKey > rKey then
-                        ( list, rightStep rKey rValue result )
-
-                    else
-                        ( rest, bothStep lKey lValue rValue result )
-
-        ( leftovers, intermediateResult ) =
-            internalFastDictFoldl stepState ( internalFastDictToList leftDict, initialResult ) rightDict
-    in
-    List.foldl (\( k, v ) result -> leftStep k v result) intermediateResult leftovers
-
-
 remove : InterfaceSingleDiff irrelevantFuture_
 remove =
     Remove ()
-
-
-internalFastDictToList : InternalFastDict k v -> List ( k, v )
-internalFastDictToList dict =
-    internalFastDictFoldr (\key value list -> ( key, value ) :: list) [] dict
-
-
-internalFastDictFoldr : (k -> v -> b -> b) -> b -> InternalFastDict k v -> b
-internalFastDictFoldr func acc (InternalFastDict _ dict) =
-    internalFastDictFoldrInner func acc dict
-
-
-internalFastDictFoldrInner : (k -> v -> b -> b) -> b -> InternalFastDictInner k v -> b
-internalFastDictFoldrInner func acc t =
-    case t of
-        InternalFastDictLeaf ->
-            acc
-
-        InternalFastDictInnerNode _ key value left right ->
-            internalFastDictFoldrInner func (func key value (internalFastDictFoldrInner func acc right)) left
 
 
 {-| A Request can fail in a couple ways:
@@ -4112,8 +3508,7 @@ type InterfaceSingleDiff irrelevantFuture
 describing changes to an existing interface with the same identity
 -}
 type InterfaceSingleEdit
-    = EditDom { reversePath : List Int, replacement : DomEdit }
-    | EditAudio { url : String, startTime : Time.Posix, replacement : AudioEdit }
+    = EditAudio { url : String, startTime : Time.Posix, replacement : AudioEdit }
     | EditNotification { id : String, message : String, details : String }
 
 
@@ -4184,21 +3579,6 @@ type alias AudioParameterTimeline =
     }
 
 
-{-| What parts of a node are replaced. Either all modifiers of a certain kind or the whole node
--}
-type DomEdit
-    = ReplacementDomNode (DomTextOrElementHeader ())
-    | ReplacementDomElementStyles { edit : List { key : String, value : String }, remove : List String }
-    | ReplacementDomElementAttributes { edit : List { key : String, value : String }, remove : List String }
-    | ReplacementDomElementAttributesNamespaced { edit : List { namespace : String, key : String, value : String }, remove : List { namespace : String, key : String } }
-    | ReplacementDomElementStringProperties { edit : List { key : String, value : String }, remove : List String }
-    | ReplacementDomElementBoolProperties { edit : List { key : String, value : Bool }, remove : List String }
-    | ReplacementDomElementScrollToPosition (Maybe { fromLeft : Float, fromTop : Float })
-    | ReplacementDomElementScrollToShow (Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment })
-    | ReplacementDomElementScrollPositionRequest ()
-    | ReplacementDomElementEventListens (List { key : String, value : DefaultActionHandling })
-
-
 {-| Create a [`Program`](#Program):
 
   - The state is everything the program knows (what The Elm Architecture calls model).
@@ -4242,17 +3622,9 @@ type alias Program state =
 
 interfaceFromSingle : InterfaceSingle future -> Interface future
 interfaceFromSingle interfaceSingle =
-    internalFastDictOne
+    FastDict.singleton
         (interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString)
         interfaceSingle
-
-
-{-| Create a dictionary with one key-value pair.
--}
-internalFastDictOne : key -> value -> InternalFastDict key value
-internalFastDictOne key value =
-    -- Root node is always Black
-    InternalFastDict 1 (InternalFastDictInnerNode InternalFastDictBlack key value InternalFastDictLeaf InternalFastDictLeaf)
 
 
 {-| An [`Interface`](Web#Interface) for getting the current [POSIX time](https://dark.elm.dmy.fr/packages/elm/time/latest/Time#Posix).
@@ -4618,10 +3990,6 @@ httpExpectString =
     HttpExpectString identity
 
 
-
--- Expect
-
-
 {-| Discard the response body.
 -}
 httpExpectWhatever : HttpExpect (Result HttpError ())
@@ -4647,6 +4015,10 @@ httpGet options =
     , body = HttpBodyEmpty
     , expect = options.expect
     }
+
+
+
+-- Expect
 
 
 {-| Add custom headers to the [`Web.HttpRequest`](Web#HttpRequest).
@@ -4687,10 +4059,6 @@ httpPost options =
     }
 
 
-
--- request
-
-
 {-| An [`Interface`](Web#Interface) for handling an [`HttpRequest`](Web#HttpRequest)
 using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
 -}
@@ -4714,6 +4082,10 @@ fileDownloadBytes fileDownloadConfig =
         , content = fileDownloadConfig.content |> Bytes.LocalExtra.toUnsignedInt8List
         }
         |> interfaceFromSingle
+
+
+
+-- request
 
 
 {-| An [`Interface`](Web#Interface) for printing a message with general information
@@ -5041,10 +4413,6 @@ pushUrl appUrl =
         |> interfaceFromSingle
 
 
-
--- elm/browser on "How do I manage URL from a Browser.element?" https://github.com/elm/browser/blob/master/notes/navigation-in-elements.md
-
-
 {-| An [`Interface`](Web#Interface) for going forward a given number of pages.
 If there are no more pages in the future, this will do nothing.
 
@@ -5070,6 +4438,10 @@ navigateBack : Int -> Interface future_
 navigateBack urlSteps =
     NavigationGo urlSteps
         |> interfaceFromSingle
+
+
+
+-- elm/browser on "How do I manage URL from a Browser.element?" https://github.com/elm/browser/blob/master/notes/navigation-in-elements.md
 
 
 {-| An [`Interface`](Web#Interface) for leaving the current page and loading the given [URL](https://dark.elm.dmy.fr/packages/elm/url/latest/).
@@ -5185,53 +4557,67 @@ geoLocationChangeListen =
 -}
 domRender : DomNode future -> Interface future
 domRender domNode =
-    nodeFlattenToReverseList [] { reversePath = [], node = domNode } []
-        |> internalFastDictFromReverseSortedListBy
-            (\interfaceSingle ->
-                interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString
-            )
+    nodeFlatten interfaceNone { reversePath = [], node = domNode } []
 
 
-nodeFlattenToReverseList :
-    List (InterfaceSingle future)
+nodeFlatten :
+    Interface future
     -> { reversePath : List Int, node : DomNode future }
     -> List { reversePath : List Int, node : DomNode future }
-    -> List (InterfaceSingle future)
-nodeFlattenToReverseList soFar current nodesRemaining =
+    -> Interface future
+nodeFlatten soFar current nodesRemaining =
     case current.node of
         DomText string ->
             let
-                soFarWithText : List (InterfaceSingle future)
+                soFarWithText : Interface future
                 soFarWithText =
-                    ({ reversePath = current.reversePath, node = DomHeaderText string }
-                        |> DomNodeRender
-                    )
-                        :: soFar
+                    interfaceInsertFromSingle
+                        ({ reversePath = current.reversePath, node = DomHeaderText string }
+                            |> DomNodeRender
+                        )
+                        soFar
             in
             case nodesRemaining of
                 [] ->
                     soFarWithText
 
                 next :: remainingWithoutNext ->
-                    nodeFlattenToReverseList soFarWithText next remainingWithoutNext
+                    nodeFlatten soFarWithText next remainingWithoutNext
 
         DomElement element ->
             case element.subs of
                 [] ->
                     let
-                        soFarWithElement : List (InterfaceSingle future)
+                        soFarWithElement : Interface future
                         soFarWithElement =
-                            ({ reversePath = current.reversePath, node = DomElementHeader element.header }
-                                |> DomNodeRender
-                            )
-                                :: soFar
+                            interfaceInsertFromSingle
+                                (DomNodeRender
+                                    { reversePath = current.reversePath
+                                    , node = DomElementKind { tag = element.tag, namespace = element.namespace }
+                                    }
+                                )
+                                (element.modifier
+                                    |> Rope.foldl
+                                        (\modifierSingle soFarWithModifiersSoFar ->
+                                            soFarWithModifiersSoFar
+                                                |> interfaceInsertFromSingle
+                                                    (modifierSingle
+                                                        |> domModifierSingleToInterface
+                                                            { reversePath = current.reversePath
+                                                            , tag = element.tag
+                                                            , namespace = element.namespace
+                                                            }
+                                                    )
+                                        )
+                                        soFar
+                                )
                     in
                     case nodesRemaining of
                         [] ->
                             soFarWithElement
 
                         next :: remainingWithoutNext ->
-                            nodeFlattenToReverseList soFarWithElement next remainingWithoutNext
+                            nodeFlatten soFarWithElement next remainingWithoutNext
 
                 sub0 :: sub1Up ->
                     let
@@ -5250,71 +4636,116 @@ nodeFlattenToReverseList soFar current nodesRemaining =
                                     )
                                     { index = sub1Up |> List.length, mapped = nodesRemaining }
                     in
-                    nodeFlattenToReverseList
-                        (({ reversePath = current.reversePath, node = DomElementHeader element.header }
-                            |> DomNodeRender
-                         )
-                            :: soFar
+                    nodeFlatten
+                        (interfaceInsertFromSingle
+                            (DomNodeRender
+                                { reversePath = current.reversePath
+                                , node = DomElementKind { tag = element.tag, namespace = element.namespace }
+                                }
+                            )
+                            soFar
                         )
                         { reversePath = 0 :: current.reversePath, node = sub0 }
                         updatedRemaining.mapped
 
 
-{-| Builds a Dict from an already sorted list.
+domModifierSingleToInterface :
+    { reversePath : List Int, namespace : Maybe String, tag : String }
+    -> DomModifierSingle future
+    -> InterfaceSingle future
+domModifierSingleToInterface containingElement domModifierSingle =
+    case domModifierSingle of
+        Style style ->
+            DomElementStyleSet
+                { reversePath = containingElement.reversePath
+                , containingElementNamespace = containingElement.namespace
+                , containingElementTag = containingElement.tag
+                , key = style.key
+                , value = style.value
+                }
 
-⚠️ DANGER ⚠️ This does _not_ check that the list is sorted.
+        Attribute attr ->
+            case attr.namespace of
+                Nothing ->
+                    DomElementAttributeSet
+                        { reversePath = containingElement.reversePath
+                        , containingElementNamespace = containingElement.namespace
+                        , containingElementTag = containingElement.tag
+                        , key = attr.key
+                        , value = attr.value
+                        }
 
--}
-internalFastDictFromReverseSortedListBy : (v -> comparable) -> List v -> InternalFastDict comparable v
-internalFastDictFromReverseSortedListBy entryToKeyValue entries =
-    let
-        elementCount : Int
-        elementCount =
-            entries |> List.length
+                Just namespace ->
+                    DomElementAttributeNamespacedSet
+                        { reversePath = containingElement.reversePath
+                        , containingElementNamespace = containingElement.namespace
+                        , containingElementTag = containingElement.tag
+                        , key = attr.key
+                        , namespace = namespace
+                        , value = attr.value
+                        }
 
-        redLayer : Int
-        redLayer =
-            toFloat elementCount |> logBase 2 |> floor
+        StringProperty prop ->
+            DomElementStringPropertySet
+                { reversePath = containingElement.reversePath
+                , containingElementNamespace = containingElement.namespace
+                , containingElementTag = containingElement.tag
+                , key = prop.key
+                , value = prop.value
+                }
 
-        go : Int -> Int -> Int -> List v -> ( InternalFastDictInner comparable v, List v )
-        go layer fromIncluded toExcluded acc =
-            if fromIncluded >= toExcluded then
-                ( InternalFastDictLeaf, acc )
+        BoolProperty prop ->
+            DomElementBoolPropertySet
+                { reversePath = containingElement.reversePath
+                , containingElementNamespace = containingElement.namespace
+                , containingElementTag = containingElement.tag
+                , key = prop.key
+                , value = prop.value
+                }
 
-            else
-                let
-                    mid : Int
-                    mid =
-                        fromIncluded + (toExcluded - fromIncluded) // 2
+        ScrollToPosition scroll ->
+            DomElementScrollToPosition
+                { reversePath = containingElement.reversePath
+                , containingElementNamespace = containingElement.namespace
+                , containingElementTag = containingElement.tag
+                , fromLeft = scroll.fromLeft
+                , fromTop = scroll.fromTop
+                }
 
-                    ( lchild, accAfterLeft ) =
-                        go (layer + 1) fromIncluded mid acc
-                in
-                case accAfterLeft of
-                    [] ->
-                        ( InternalFastDictLeaf, acc )
+        ScrollToShow scrollToShow ->
+            DomElementScrollToShow
+                { reversePath = containingElement.reversePath
+                , containingElementNamespace = containingElement.namespace
+                , containingElementTag = containingElement.tag
+                , x = scrollToShow.x
+                , y = scrollToShow.y
+                }
 
-                    head :: tail ->
-                        let
-                            ( rchild, accAfterRight ) =
-                                go (layer + 1) (mid + 1) toExcluded tail
+        ScrollPositionRequest request ->
+            DomElementScrollPositionRequest
+                { reversePath = containingElement.reversePath
+                , containingElementNamespace = containingElement.namespace
+                , containingElementTag = containingElement.tag
+                , on = request
+                }
 
-                            color : InternalFastDictNColor
-                            color =
-                                if layer > 0 && layer == redLayer then
-                                    InternalFastDictRed
+        Listen entry ->
+            DomElementEventListen
+                { reversePath = containingElement.reversePath
+                , containingElementNamespace = containingElement.namespace
+                , containingElementTag = containingElement.tag
+                , eventName = entry.eventName
+                , value = entry.defaultActionHandling
+                , on = entry.on
+                }
 
-                                else
-                                    InternalFastDictBlack
-                        in
-                        ( InternalFastDictInnerNode color (head |> entryToKeyValue) head rchild lchild
-                        , accAfterRight
-                        )
-    in
-    InternalFastDict elementCount
-        (go 0 0 elementCount entries
-            |> Tuple.first
-        )
+
+interfaceInsertFromSingle : InterfaceSingle future -> Interface future -> Interface future
+interfaceInsertFromSingle interfaceSingle interface =
+    interface
+        |> FastDict.insert
+            (interfaceSingle |> interfaceSingleToStructuredId |> StructuredId.toString)
+            interfaceSingle
 
 
 {-| Wire events from this [`Web.DomNode`](Web#DomNode) to a specific event, for example
@@ -5343,14 +4774,17 @@ domFutureMap futureChange domElementToMap =
             DomText string
 
         DomElement element ->
-            element |> elementFutureMap futureChange |> DomElement
+            DomElement (element |> elementFutureMap futureChange)
 
 
 elementFutureMap : (future -> mappedFuture) -> (DomElement future -> DomElement mappedFuture)
 elementFutureMap futureChange domElementToMap =
-    { header = domElementToMap.header |> domElementHeaderFutureMap futureChange
+    { tag = domElementToMap.tag
+    , namespace = domElementToMap.namespace
+    , modifier = domElementToMap.modifier |> domModifierFutureMap futureChange
     , subs =
-        domElementToMap.subs |> List.map (\node -> node |> domFutureMap futureChange)
+        domElementToMap.subs
+            |> List.map (\node -> node |> domFutureMap futureChange)
     }
 
 
@@ -5368,225 +4802,12 @@ domElementWithMaybeNamespace :
     -> List (DomNode future)
     -> DomNode future
 domElementWithMaybeNamespace maybeNamespace tag modifiers subs =
-    let
-        modifiersFlat :
-            { namespace : Maybe String
-            , tag : String
-            , scrollToPosition : Maybe { fromLeft : Float, fromTop : Float }
-            , scrollToShow : Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment }
-            , scrollPositionRequest : Maybe ({ fromLeft : Float, fromTop : Float } -> future)
-            , eventListens : List { key : String, value : { on : Json.Decode.Value -> future, defaultActionHandling : DefaultActionHandling } }
-            , styles : List { key : String, value : String }
-            , stringProperties : List { key : String, value : String }
-            , boolProperties : List { key : String, value : Bool }
-            , attributesNamespaced : List { key : { namespace : String, key : String }, value : String }
-            , attributes : List { key : String, value : String }
-            }
-        modifiersFlat =
-            modifiers
-                |> domModifierBatch
-                |> Rope.foldl
-                    (\modifier soFar ->
-                        case modifier of
-                            ScrollToPosition position ->
-                                { scrollToPosition = position |> Just
-                                , namespace = soFar.namespace
-                                , tag = soFar.tag
-                                , scrollToShow = soFar.scrollToShow
-                                , scrollPositionRequest = soFar.scrollPositionRequest
-                                , eventListens = soFar.eventListens
-                                , styles = soFar.styles
-                                , stringProperties = soFar.stringProperties
-                                , boolProperties = soFar.boolProperties
-                                , attributes = soFar.attributes
-                                , attributesNamespaced = soFar.attributesNamespaced
-                                }
-
-                            ScrollToShow alignment ->
-                                { scrollToShow = alignment |> Just
-                                , namespace = soFar.namespace
-                                , tag = soFar.tag
-                                , scrollToPosition = soFar.scrollToPosition
-                                , scrollPositionRequest = soFar.scrollPositionRequest
-                                , eventListens = soFar.eventListens
-                                , styles = soFar.styles
-                                , stringProperties = soFar.stringProperties
-                                , boolProperties = soFar.boolProperties
-                                , attributes = soFar.attributes
-                                , attributesNamespaced = soFar.attributesNamespaced
-                                }
-
-                            ScrollPositionRequest positionRequest ->
-                                { scrollPositionRequest = positionRequest |> Just
-                                , namespace = soFar.namespace
-                                , tag = soFar.tag
-                                , scrollToPosition = soFar.scrollToPosition
-                                , scrollToShow = soFar.scrollToShow
-                                , eventListens = soFar.eventListens
-                                , styles = soFar.styles
-                                , stringProperties = soFar.stringProperties
-                                , boolProperties = soFar.boolProperties
-                                , attributes = soFar.attributes
-                                , attributesNamespaced = soFar.attributesNamespaced
-                                }
-
-                            Listen listen ->
-                                { eventListens =
-                                    { key = listen.eventName
-                                    , value =
-                                        { on = listen.on
-                                        , defaultActionHandling = listen.defaultActionHandling
-                                        }
-                                    }
-                                        :: soFar.eventListens
-                                , namespace = soFar.namespace
-                                , tag = soFar.tag
-                                , scrollToPosition = soFar.scrollToPosition
-                                , scrollToShow = soFar.scrollToShow
-                                , scrollPositionRequest = soFar.scrollPositionRequest
-                                , styles = soFar.styles
-                                , stringProperties = soFar.stringProperties
-                                , boolProperties = soFar.boolProperties
-                                , attributes = soFar.attributes
-                                , attributesNamespaced = soFar.attributesNamespaced
-                                }
-
-                            Style keyValue ->
-                                { styles = keyValue :: soFar.styles
-                                , namespace = soFar.namespace
-                                , tag = soFar.tag
-                                , scrollToPosition = soFar.scrollToPosition
-                                , scrollToShow = soFar.scrollToShow
-                                , scrollPositionRequest = soFar.scrollPositionRequest
-                                , eventListens = soFar.eventListens
-                                , stringProperties = soFar.stringProperties
-                                , boolProperties = soFar.boolProperties
-                                , attributes = soFar.attributes
-                                , attributesNamespaced = soFar.attributesNamespaced
-                                }
-
-                            StringProperty keyValue ->
-                                { stringProperties =
-                                    keyValue :: soFar.stringProperties
-                                , namespace = soFar.namespace
-                                , tag = soFar.tag
-                                , scrollToPosition = soFar.scrollToPosition
-                                , scrollToShow = soFar.scrollToShow
-                                , scrollPositionRequest = soFar.scrollPositionRequest
-                                , eventListens = soFar.eventListens
-                                , styles = soFar.styles
-                                , boolProperties = soFar.boolProperties
-                                , attributes = soFar.attributes
-                                , attributesNamespaced = soFar.attributesNamespaced
-                                }
-
-                            BoolProperty keyValue ->
-                                { boolProperties =
-                                    keyValue :: soFar.boolProperties
-                                , namespace = soFar.namespace
-                                , tag = soFar.tag
-                                , scrollToPosition = soFar.scrollToPosition
-                                , scrollToShow = soFar.scrollToShow
-                                , scrollPositionRequest = soFar.scrollPositionRequest
-                                , eventListens = soFar.eventListens
-                                , styles = soFar.styles
-                                , stringProperties = soFar.stringProperties
-                                , attributes = soFar.attributes
-                                , attributesNamespaced = soFar.attributesNamespaced
-                                }
-
-                            Attribute keyValue ->
-                                case keyValue.namespace of
-                                    Just namespace ->
-                                        { attributesNamespaced =
-                                            { key = { namespace = namespace, key = keyValue.key }
-                                            , value = keyValue.value
-                                            }
-                                                :: soFar.attributesNamespaced
-                                        , namespace = soFar.namespace
-                                        , tag = soFar.tag
-                                        , scrollToPosition = soFar.scrollToPosition
-                                        , scrollToShow = soFar.scrollToShow
-                                        , scrollPositionRequest = soFar.scrollPositionRequest
-                                        , eventListens = soFar.eventListens
-                                        , styles = soFar.styles
-                                        , stringProperties = soFar.stringProperties
-                                        , boolProperties = soFar.boolProperties
-                                        , attributes = soFar.attributes
-                                        }
-
-                                    Nothing ->
-                                        { attributes =
-                                            { key = keyValue.key, value = keyValue.value }
-                                                :: soFar.attributes
-                                        , namespace = soFar.namespace
-                                        , tag = soFar.tag
-                                        , scrollToPosition = soFar.scrollToPosition
-                                        , scrollToShow = soFar.scrollToShow
-                                        , scrollPositionRequest = soFar.scrollPositionRequest
-                                        , eventListens = soFar.eventListens
-                                        , styles = soFar.styles
-                                        , stringProperties = soFar.stringProperties
-                                        , boolProperties = soFar.boolProperties
-                                        , attributesNamespaced = soFar.attributesNamespaced
-                                        }
-                    )
-                    { namespace = maybeNamespace
-                    , tag = tag
-                    , scrollToPosition = Nothing
-                    , scrollToShow = Nothing
-                    , scrollPositionRequest = Nothing
-                    , eventListens = []
-                    , styles = []
-                    , stringProperties = []
-                    , boolProperties = []
-                    , attributes = []
-                    , attributesNamespaced = []
-                    }
-    in
-    { header =
+    DomElement
         { namespace = maybeNamespace
         , tag = tag
-        , scrollToPosition = modifiersFlat.scrollToPosition
-        , scrollToShow = modifiersFlat.scrollToShow
-        , scrollPositionRequest = modifiersFlat.scrollPositionRequest
-        , eventListens =
-            modifiersFlat.eventListens |> sortedKeyValueListFromList
-        , styles =
-            modifiersFlat.styles |> sortedKeyValueListFromList
-        , stringProperties =
-            modifiersFlat.stringProperties |> sortedKeyValueListFromList
-        , boolProperties =
-            modifiersFlat.boolProperties |> sortedKeyValueListFromList
-        , attributes =
-            modifiersFlat.attributes |> sortedKeyValueListFromList
-        , attributesNamespaced =
-            modifiersFlat.attributesNamespaced |> sortedKeyValueListFromListBy namespacedKeyToComparable
+        , modifier = modifiers |> Rope.fromList |> Rope.concat
+        , subs = subs
         }
-    , subs = subs
-    }
-        |> DomElement
-
-
-{-| Sort a given list of { key, value } elements to create a [`SortedKeyValueList`](#SortedKeyValueList)
--}
-sortedKeyValueListFromList : List { value : value, key : comparable } -> SortedKeyValueList comparable value
-sortedKeyValueListFromList unsortedList =
-    SortedKeyValueList (unsortedList |> List.sortBy .key)
-
-
-{-| Sort a given list of { key, value } elements
-by a given comparable representation of the key
-to create a [`SortedKeyValueList`](Web#SortedKeyValueList)
--}
-sortedKeyValueListFromListBy :
-    (key -> comparable_)
-    -> (List { value : value, key : key } -> SortedKeyValueList key value)
-sortedKeyValueListFromListBy keyToComparable unsortedList =
-    SortedKeyValueList
-        (unsortedList
-            |> List.sortBy (\entry -> entry.key |> keyToComparable)
-        )
 
 
 {-| Create a DOM element with a given tag, [`DomModifier`](#DomModifier)s and sub-[node](Web#DomNode)s.
@@ -5906,7 +5127,9 @@ type DomNode future
 -}
 type alias DomElement future =
     RecordWithoutConstructorFunction
-        { header : DomElementHeader future
+        { tag : String
+        , namespace : Maybe String
+        , modifier : DomModifier future
         , subs : List (DomNode future)
         }
 

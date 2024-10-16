@@ -1,6 +1,6 @@
 module StructuredId exposing
     ( StructuredId, toString
-    , ofUnit, ofInt, ofString
+    , ofUnit, ofBool, ofInt, ofFloat, ofString
     , ofParts, ofVariant, ofMaybe, ofList
     )
 
@@ -11,7 +11,7 @@ which makes it possible to use as a key in a `Dict`
 
 @docs StructuredId, toString
 
-@docs ofUnit, ofInt, ofString
+@docs ofUnit, ofBool, ofInt, ofFloat, ofString
 @docs ofParts, ofVariant, ofMaybe, ofList
 
 -}
@@ -42,6 +42,16 @@ ofString =
 ofInt : Int -> StructuredId
 ofInt =
     Json.Encode.int
+
+
+ofFloat : Float -> StructuredId
+ofFloat =
+    Json.Encode.float
+
+
+ofBool : Bool -> StructuredId
+ofBool =
+    Json.Encode.bool
 
 
 ofParts : List StructuredId -> StructuredId
