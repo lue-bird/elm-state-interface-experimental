@@ -53,6 +53,9 @@ function elmResultExtractInit(elmResult: any): { init: () => { ports: ElmPorts }
 
 
 export function programStart(appConfig: { ports: ElmPorts }) {
+    process.addListener("exit", (_event) => {
+        process.stdout.write("\u{001B}[?25h\n") // show cursor
+    })
     function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
         // console.log("elm → js: ", fromElm)
         function sendToElm(eventData: void) {
