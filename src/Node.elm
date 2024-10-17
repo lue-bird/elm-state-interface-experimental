@@ -10,7 +10,7 @@ module Node exposing
     , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
     , fileChangeListen, FileChange(..)
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
-    , httpRequest
+    , httpRequestSend
     , httpGet, httpPost, httpAddHeaders
     , httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
     , httpBodyJson, httpBodyBytes
@@ -59,7 +59,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 @docs HttpRequest, HttpBody, HttpExpect, HttpError, HttpMetadata
 
-@docs httpRequest
+@docs httpRequestSend
 @docs httpGet, httpPost, httpAddHeaders
 @docs httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
 @docs httpBodyJson, httpBodyBytes
@@ -216,7 +216,7 @@ type InterfaceSingle future
     | StandardInRawListen (String -> future)
     | TerminalSizeRequest ({ lines : Int, columns : Int } -> future)
     | TerminalSizeChangeListen ({ lines : Int, columns : Int } -> future)
-    | HttpRequest (HttpRequest future)
+    | HttpRequestSend (HttpRequest future)
     | TimePosixRequest (Time.Posix -> future)
     | TimezoneOffsetRequest (Int -> future)
     | TimeOnce { pointInTime : Time.Posix, on : Time.Posix -> future }
@@ -364,8 +364,8 @@ interfaceFutureMap futureChange interface =
 interfaceSingleFutureMap : (future -> mappedFuture) -> (InterfaceSingle future -> InterfaceSingle mappedFuture)
 interfaceSingleFutureMap futureChange interfaceSingle =
     case interfaceSingle of
-        HttpRequest request ->
-            request |> httpRequestFutureMap futureChange |> HttpRequest
+        HttpRequestSend request ->
+            request |> httpRequestFutureMap futureChange |> HttpRequestSend
 
         TimePosixRequest requestTimeNow ->
             (\event -> requestTimeNow event |> futureChange)
@@ -495,7 +495,7 @@ interfaceSingleEditsMap :
         )
 interfaceSingleEditsMap fromSingeEdit interfaces =
     case interfaces.old of
-        HttpRequest _ ->
+        HttpRequestSend _ ->
             []
 
         TimePosixRequest _ ->
@@ -613,8 +613,8 @@ interfaceSingleToJson : InterfaceSingle future_ -> Json.Encode.Value
 interfaceSingleToJson interfaceSingle =
     Json.Encode.LocalExtra.variant
         (case interfaceSingle of
-            HttpRequest httpRequestInfo ->
-                { tag = "HttpRequest", value = httpRequestInfo |> httpRequestInfoToJson }
+            HttpRequestSend httpRequestInfo ->
+                { tag = "HttpRequestSend", value = httpRequestInfo |> httpRequestInfoToJson }
 
             TimePosixRequest _ ->
                 { tag = "TimePosixRequest", value = Json.Encode.null }
@@ -781,8 +781,8 @@ interfaceSingleToStructuredId : InterfaceSingle future_ -> StructuredId
 interfaceSingleToStructuredId interfaceSingle =
     StructuredId.ofVariant
         (case interfaceSingle of
-            HttpRequest request ->
-                { tag = "HttpRequest"
+            HttpRequestSend request ->
+                { tag = "HttpRequestSend"
                 , value = request.url |> StructuredId.ofString
                 }
 
@@ -954,7 +954,7 @@ for the transformed event data coming back
 interfaceSingleFutureJsonDecoder : InterfaceSingle future -> Maybe (Json.Decode.Decoder future)
 interfaceSingleFutureJsonDecoder interface =
     case interface of
-        HttpRequest request ->
+        HttpRequestSend request ->
             Json.Decode.oneOf
                 [ Json.Decode.LocalExtra.variant "Success" (httpSuccessResponseJsonDecoder request.expect)
                 , Json.Decode.LocalExtra.variant "Error" httpErrorJsonDecoder
@@ -1826,9 +1826,9 @@ httpPost options =
 {-| An [`Interface`](Node#Interface) for handling an [`HttpRequest`](Node#HttpRequest)
 using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
 -}
-httpRequest : HttpRequest future -> Interface future
-httpRequest request =
-    HttpRequest request
+httpRequestSend : HttpRequest future -> Interface future
+httpRequestSend request =
+    HttpRequestSend request
         |> interfaceFromSingle
 
 

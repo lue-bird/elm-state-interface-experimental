@@ -160,7 +160,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     process.stdout.removeListener("resize", onResize)
                 })
             }
-            case "HttpRequest": return (config: HttpRequest) => {
+            case "HttpRequestSend": return (config: HttpRequest) => {
                 httpFetch(config, abortSignal).then(sendToElm)
             }
             case "TimePosixRequest": return (_config: null) => {

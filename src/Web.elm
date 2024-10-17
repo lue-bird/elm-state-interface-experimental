@@ -16,7 +16,7 @@ module Web exposing
     , navigateForward, navigateBack, navigationListen
     , navigateTo, reload
     , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
-    , httpRequest
+    , httpRequestSend
     , httpGet, httpPost, httpAddHeaders
     , httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
     , httpBodyJson, httpBodyBytes
@@ -100,7 +100,7 @@ Primitives used for SVG and HTML
 
 @docs HttpRequest, HttpBody, HttpExpect, HttpError, HttpMetadata
 
-@docs httpRequest
+@docs httpRequestSend
 @docs httpGet, httpPost, httpAddHeaders
 @docs httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
 @docs httpBodyJson, httpBodyBytes
@@ -680,7 +680,7 @@ type InterfaceSingle future
         }
     | NotificationAskForPermission ()
     | NotificationShow { id : String, message : String, details : String, on : NotificationClicked -> future }
-    | HttpRequest (HttpRequest future)
+    | HttpRequestSend (HttpRequest future)
     | TimePosixRequest (Time.Posix -> future)
     | TimezoneOffsetRequest (Int -> future)
     | TimeOnce { pointInTime : Time.Posix, on : Time.Posix -> future }
@@ -1185,8 +1185,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             }
                 |> NotificationShow
 
-        HttpRequest request ->
-            request |> httpRequestFutureMap futureChange |> HttpRequest
+        HttpRequestSend request ->
+            request |> httpRequestFutureMap futureChange |> HttpRequestSend
 
         LocalStorageRequest request ->
             { key = request.key, on = \event -> event |> request.on |> futureChange }
@@ -1466,7 +1466,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         NotificationAskForPermission () ->
             []
 
-        HttpRequest _ ->
+        HttpRequestSend _ ->
             []
 
         TimePosixRequest _ ->
@@ -2191,8 +2191,8 @@ interfaceSingleToJson interfaceSingle =
                         ]
                 }
 
-            HttpRequest httpRequestInfo ->
-                { tag = "HttpRequest", value = httpRequestInfo |> httpRequestInfoToJson }
+            HttpRequestSend httpRequestInfo ->
+                { tag = "HttpRequestSend", value = httpRequestInfo |> httpRequestInfoToJson }
 
             TimePosixRequest _ ->
                 { tag = "TimePosixRequest", value = Json.Encode.null }
@@ -2708,8 +2708,8 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value = show.id |> StructuredId.ofString
                 }
 
-            HttpRequest request ->
-                { tag = "HttpRequest"
+            HttpRequestSend request ->
+                { tag = "HttpRequestSend"
                 , value = request.url |> StructuredId.ofString
                 }
 
@@ -3113,7 +3113,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Json.Decode.map show.on
                 |> Just
 
-        HttpRequest request ->
+        HttpRequestSend request ->
             Json.Decode.oneOf
                 [ Json.Decode.LocalExtra.variant "Success" (httpSuccessResponseJsonDecoder request.expect)
                 , Json.Decode.LocalExtra.variant "Error" httpErrorJsonDecoder
@@ -4694,9 +4694,9 @@ httpPost options =
 {-| An [`Interface`](Web#Interface) for handling an [`HttpRequest`](Web#HttpRequest)
 using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
 -}
-httpRequest : HttpRequest future -> Interface future
-httpRequest request =
-    request |> HttpRequest |> interfaceFromSingle
+httpRequestSend : HttpRequest future -> Interface future
+httpRequestSend request =
+    request |> HttpRequestSend |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for downloading a given file
