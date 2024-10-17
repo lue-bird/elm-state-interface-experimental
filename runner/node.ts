@@ -206,9 +206,15 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
             case "DirectoryMake": return (path: string) => {
                 fs.promises.mkdir(path, { recursive: true })
-                    .then(() => { })
-                    .catch((err) => {
-                        warn("failed to make directory " + err)
+                    .then((_createdPath) => {
+                        if (!abortSignal.aborted) {
+                            sendToElm({ tag: "Ok", value: null })
+                        }
+                    })
+                    .catch((error) => {
+                        if (!abortSignal.aborted) {
+                            sendToElm({ tag: "Err", value: error })
+                        }
                     })
             }
             case "FileRemove": return (path: string) => {

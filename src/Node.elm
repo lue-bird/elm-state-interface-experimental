@@ -224,7 +224,10 @@ type InterfaceSingle future
     | TimezoneNameRequest (String -> future)
     | RandomUnsignedInt32sRequest { count : Int, on : List Int -> future }
     | Exit Int
-    | DirectoryMake String
+    | DirectoryMake
+        { path : String
+        , on : Result { code : String, message : String } () -> future
+        }
     | FileRemove String
     | FileUtf8Write { content : String, path : String }
     | FileUtf8Request { path : String, on : String -> future }
@@ -400,8 +403,11 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         Exit code ->
             Exit code
 
-        DirectoryMake path ->
-            DirectoryMake path
+        DirectoryMake make ->
+            DirectoryMake
+                { path = make.path
+                , on = \result -> make.on result |> futureChange
+                }
 
         FileRemove path ->
             FileRemove path
@@ -645,8 +651,8 @@ interfaceSingleToJson interfaceSingle =
             Exit code ->
                 { tag = "Exit", value = code |> Json.Encode.int }
 
-            DirectoryMake path ->
-                { tag = "DirectoryMake", value = path |> Json.Encode.string }
+            DirectoryMake make ->
+                { tag = "DirectoryMake", value = make.path |> Json.Encode.string }
 
             FileRemove path ->
                 { tag = "FileRemove", value = path |> Json.Encode.string }
@@ -813,9 +819,9 @@ interfaceSingleToStructuredId interfaceSingle =
             Exit _ ->
                 { tag = "Exit", value = StructuredId.ofUnit }
 
-            DirectoryMake path ->
+            DirectoryMake make ->
                 { tag = "DirectoryMake"
-                , value = path |> StructuredId.ofString
+                , value = make.path |> StructuredId.ofString
                 }
 
             FileRemove path ->
@@ -989,8 +995,22 @@ interfaceSingleFutureJsonDecoder interface =
         Exit _ ->
             Nothing
 
-        DirectoryMake _ ->
-            Nothing
+        DirectoryMake make ->
+            Json.Decode.oneOf
+                [ Json.Decode.LocalExtra.variant "Ok"
+                    (Json.Decode.null (Ok ()))
+                , Json.Decode.LocalExtra.variant "Err"
+                    (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+                        (Json.Decode.field "code"
+                            (Json.Decode.oneOf [ Json.Decode.string, Json.Decode.succeed "" ])
+                        )
+                        (Json.Decode.field "message"
+                            (Json.Decode.oneOf [ Json.Decode.string, Json.Decode.succeed "" ])
+                        )
+                    )
+                ]
+                |> Json.Decode.map make.on
+                |> Just
 
         FileRemove _ ->
             Nothing
@@ -1544,15 +1564,15 @@ launchArgumentsRequest =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Node#Interface) for creating a directory
-at a given path.
+{-| An [`Interface`](Node#Interface) for creating a directory including its parent directories
+at a given path unless it already exists.
 
-Uses [`fs.mkdir`](https://nodejs.org/api/fs.html#fspromisesmkdirpath-options)
+Uses [`fs.mkdir({ recursive : true })`](https://nodejs.org/api/fs.html#fspromisesmkdirpath-options)
 
 -}
-directoryMake : String -> Interface future_
+directoryMake : String -> Interface (Result { code : String, message : String } ())
 directoryMake path =
-    DirectoryMake path
+    DirectoryMake { path = path, on = identity }
         |> interfaceFromSingle
 
 
