@@ -204,8 +204,8 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     sendToElm(Array.from(crypto.getRandomValues(new Uint32Array(config))))
                 })
             }
-            case "DirectoryMake": return (write: { path: string }) => {
-                fs.promises.mkdir(write.path, { recursive: true })
+            case "DirectoryMake": return (path: string) => {
+                fs.promises.mkdir(path, { recursive: true })
                     .then(() => { })
                     .catch((err) => {
                         warn("failed to make directory " + err)
