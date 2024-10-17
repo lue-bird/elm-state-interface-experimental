@@ -24,9 +24,7 @@ module Web exposing
     , consoleLog, consoleWarn, consoleError
     , localStorageRequest, localStorageSet, localStorageRemove
     , localStorageSetOnADifferentTabListen, localStorageRemoveOnADifferentTabListen
-    , SocketConnectionEvent(..), SocketId(..)
-    , socketConnectTo, socketDisconnect
-    , socketMessage, socketMessageListen
+    , SocketEvent(..), socketListenAndMaybeSend
     , fileDownloadBytes
     , Audio, AudioSource, AudioSourceLoadError(..), AudioProcessing(..), AudioParameterTimeline
     , audioSourceLoad, audioFromSource, audioPlay
@@ -189,24 +187,12 @@ see [mdn on `Window.localStorage`](https://developer.mozilla.org/en-US/docs/Web/
 @docs localStorageSetOnADifferentTabListen, localStorageRemoveOnADifferentTabListen
 
 
-## socket
+## web sockets
 
-web sockets
-
-@docs SocketConnectionEvent, SocketId
+@docs SocketEvent, socketListenAndMaybeSend
 
 
-### connection
-
-@docs socketConnectTo, socketDisconnect
-
-
-### communicate
-
-@docs socketMessage, socketMessageListen
-
-
-## File download
+## file download
 
 Downloading a dynamically generated file.
 
@@ -693,10 +679,11 @@ type InterfaceSingle future
     | WindowVisibilityChangeListen (WindowVisibility -> future)
     | WindowAnimationFrameListen (Time.Posix -> future)
     | WindowPreferredLanguagesChangeListen (List String -> future)
-    | SocketConnect { address : String, on : SocketConnectionEvent -> future }
-    | SocketMessage { id : SocketId, data : String }
-    | SocketDisconnect SocketId
-    | SocketMessageListen { id : SocketId, on : String -> future }
+    | SocketListen
+        { address : String
+        , on : SocketEvent -> future
+        }
+    | SocketDataSend { address : String, data : String }
     | LocalStorageSet { key : String, value : Maybe String }
     | LocalStorageRequest { key : String, on : Maybe String -> future }
     | LocalStorageRemoveOnADifferentTabListen { key : String, on : AppUrl -> future }
@@ -728,17 +715,11 @@ type NotificationClicked
     = NotificationClicked
 
 
-{-| An indication that connection has changed
-after having initiated [`Web.socketConnectTo`](Web#socketConnectTo).
-
-  - `SocketConnected`: connection has been opened. Gives access to a [`Web.SocketId`](#SocketId)
-  - `SocketDisconnected`: connection has been closed with
-      - the close `code` sent by the server
-      - The `reason` indicating why the server closed the connection, specific to the particular server and sub-protocol
-
+{-| An indication how the connection has changed or a message has been sent.
 -}
-type SocketConnectionEvent
-    = SocketConnected SocketId
+type SocketEvent
+    = SocketConnected
+    | SocketDataReceived String
     | SocketDisconnected { code : Int, reason : String }
 
 
@@ -875,13 +856,6 @@ to keep or overwrite the browser's default action
 type DefaultActionHandling
     = DefaultActionPrevent
     | DefaultActionExecute
-
-
-{-| Local identifier for a [web socket](#socket) for this session
-that can be used to [communicate](Web#communicate)
--}
-type SocketId
-    = SocketId Int
 
 
 {-| Combine multiple [`Interface`](#Interface)s into one
@@ -1151,11 +1125,14 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         AudioPlay audio ->
             AudioPlay audio
 
-        SocketMessage message ->
-            SocketMessage message
+        SocketListen listen ->
+            SocketListen
+                { address = listen.address
+                , on = \event -> listen.on event |> futureChange
+                }
 
-        SocketDisconnect id ->
-            SocketDisconnect id
+        SocketDataSend send ->
+            SocketDataSend send
 
         LocalStorageSet localStorageItem ->
             LocalStorageSet localStorageItem
@@ -1172,10 +1149,6 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         AudioSourceLoad sourceLoad ->
             { url = sourceLoad.url, on = \event -> sourceLoad.on event |> futureChange }
                 |> AudioSourceLoad
-
-        SocketConnect connect ->
-            { address = connect.address, on = \event -> event |> connect.on |> futureChange }
-                |> SocketConnect
 
         NotificationShow show ->
             { id = show.id
@@ -1256,10 +1229,6 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         DocumentEventListen listen ->
             { eventName = listen.eventName, on = listen.on |> Json.Decode.map futureChange }
                 |> DocumentEventListen
-
-        SocketMessageListen messageListen ->
-            { id = messageListen.id, on = \event -> event |> messageListen.on |> futureChange }
-                |> SocketMessageListen
 
         LocalStorageRemoveOnADifferentTabListen listen ->
             { key = listen.key, on = \event -> event |> listen.on |> futureChange }
@@ -1505,16 +1474,10 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         WindowPreferredLanguagesChangeListen _ ->
             []
 
-        SocketConnect _ ->
+        SocketListen _ ->
             []
 
-        SocketMessage _ ->
-            []
-
-        SocketDisconnect _ ->
-            []
-
-        SocketMessageListen _ ->
+        SocketDataSend _ ->
             []
 
         LocalStorageSet _ ->
@@ -2138,18 +2101,20 @@ interfaceSingleToJson interfaceSingle =
             AudioPlay audio ->
                 { tag = "AudioPlay", value = audio |> audioToJson }
 
-            SocketMessage message ->
-                { tag = "SocketMessage"
+            SocketListen listen ->
+                { tag = "SocketListen"
                 , value =
                     Json.Encode.object
-                        [ ( "id", message.id |> socketIdToJson )
-                        , ( "data", message.data |> Json.Encode.string )
-                        ]
+                        [ ( "address", listen.address |> Json.Encode.string ) ]
                 }
 
-            SocketDisconnect id ->
-                { tag = "SocketDisconnect"
-                , value = id |> socketIdToJson
+            SocketDataSend send ->
+                { tag = "SocketDataSend"
+                , value =
+                    Json.Encode.object
+                        [ ( "address", send.address |> Json.Encode.string )
+                        , ( "data", send.data |> Json.Encode.string )
+                        ]
                 }
 
             LocalStorageSet set ->
@@ -2175,11 +2140,6 @@ interfaceSingleToJson interfaceSingle =
 
             AudioSourceLoad sourceLoad ->
                 { tag = "AudioSourceLoad", value = sourceLoad.url |> Json.Encode.string }
-
-            SocketConnect connect ->
-                { tag = "SocketConnect"
-                , value = Json.Encode.object [ ( "address", connect.address |> Json.Encode.string ) ]
-                }
 
             NotificationShow show ->
                 { tag = "NotificationShow"
@@ -2258,9 +2218,6 @@ interfaceSingleToJson interfaceSingle =
             DocumentEventListen listen ->
                 { tag = "DocumentEventListen", value = listen.eventName |> Json.Encode.string }
 
-            SocketMessageListen listen ->
-                { tag = "SocketMessageListen", value = listen.id |> socketIdToJson }
-
             LocalStorageRemoveOnADifferentTabListen listen ->
                 { tag = "LocalStorageRemoveOnADifferentTabListen"
                 , value =
@@ -2281,11 +2238,6 @@ interfaceSingleToJson interfaceSingle =
             GamepadsChangeListen _ ->
                 { tag = "GamepadsChangeListen", value = Json.Encode.null }
         )
-
-
-socketIdToJson : SocketId -> Json.Encode.Value
-socketIdToJson (SocketId index) =
-    index |> Json.Encode.int
 
 
 httpRequestInfoToJson : HttpRequest future_ -> Json.Encode.Value
@@ -2661,18 +2613,18 @@ interfaceSingleToStructuredId interfaceSingle =
                         ]
                 }
 
-            SocketMessage message ->
-                { tag = "SocketMessage"
-                , value =
-                    StructuredId.ofParts
-                        [ message.id |> socketIdToStructuredId
-                        , message.data |> StructuredId.ofString
-                        ]
+            SocketListen listen ->
+                { tag = "SocketListen"
+                , value = listen.address |> StructuredId.ofString
                 }
 
-            SocketDisconnect id ->
-                { tag = "SocketDisconnect"
-                , value = id |> socketIdToStructuredId
+            SocketDataSend message ->
+                { tag = "SocketDataSend"
+                , value =
+                    StructuredId.ofParts
+                        [ message.address |> StructuredId.ofString
+                        , message.data |> StructuredId.ofString
+                        ]
                 }
 
             LocalStorageSet set ->
@@ -2696,11 +2648,6 @@ interfaceSingleToStructuredId interfaceSingle =
             AudioSourceLoad sourceLoad ->
                 { tag = "AudioSourceLoad"
                 , value = sourceLoad.url |> StructuredId.ofString
-                }
-
-            SocketConnect connect ->
-                { tag = "SocketConnect"
-                , value = StructuredId.ofString connect.address
                 }
 
             NotificationShow show ->
@@ -2777,11 +2724,6 @@ interfaceSingleToStructuredId interfaceSingle =
             TimePeriodicallyListen listen ->
                 { tag = "TimePeriodicallyListen"
                 , value = listen.intervalDurationMilliSeconds |> StructuredId.ofInt
-                }
-
-            SocketMessageListen listen ->
-                { tag = "SocketMessageListen"
-                , value = listen.id |> socketIdToStructuredId
                 }
 
             LocalStorageRemoveOnADifferentTabListen listen ->
@@ -2896,11 +2838,6 @@ commaPrefixedMap soFar elementToString list =
             commaPrefixedMap (elementToString element0 ++ "," ++ soFar)
                 elementToString
                 element1Up
-
-
-socketIdToStructuredId : SocketId -> StructuredId
-socketIdToStructuredId (SocketId raw) =
-    raw |> StructuredId.ofInt
 
 
 {-| The "init" part for an embedded program
@@ -3171,19 +3108,13 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Json.Decode.map toFuture
                 |> Just
 
-        SocketConnect connect ->
-            socketConnectionEventJsonDecoder
-                |> Json.Decode.map connect.on
+        SocketListen listen ->
+            socketEventJsonDecoder
+                |> Json.Decode.map listen.on
                 |> Just
 
-        SocketMessage _ ->
+        SocketDataSend _ ->
             Nothing
-
-        SocketDisconnect _ ->
-            Nothing
-
-        SocketMessageListen messageListen ->
-            Json.Decode.string |> Json.Decode.map messageListen.on |> Just
 
         LocalStorageSet _ ->
             Nothing
@@ -3274,23 +3205,20 @@ notificationResponseJsonDecoder =
     Json.Decode.map (\() -> NotificationClicked) (Json.Decode.LocalExtra.onlyString "Clicked")
 
 
-socketConnectionEventJsonDecoder : Json.Decode.Decoder SocketConnectionEvent
-socketConnectionEventJsonDecoder =
+socketEventJsonDecoder : Json.Decode.Decoder SocketEvent
+socketEventJsonDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.map SocketConnected (Json.Decode.LocalExtra.variant "SocketConnected" socketIdJsonDecoder)
-        , Json.Decode.map SocketDisconnected
-            (Json.Decode.LocalExtra.variant "SocketDisconnected"
-                (Json.Decode.map2 (\code reason -> { code = code, reason = reason })
-                    (Json.Decode.field "code" Json.Decode.int)
-                    (Json.Decode.field "reason" Json.Decode.string)
-                )
+        [ Json.Decode.LocalExtra.variant "SocketConnected" (Json.Decode.null SocketConnected)
+        , Json.Decode.LocalExtra.variant "SocketDataReceived"
+            (Json.Decode.map SocketDataReceived
+                Json.Decode.string
+            )
+        , Json.Decode.LocalExtra.variant "SocketDisconnected"
+            (Json.Decode.map2 (\code reason -> SocketDisconnected { code = code, reason = reason })
+                (Json.Decode.field "code" Json.Decode.int)
+                (Json.Decode.field "reason" Json.Decode.string)
             )
         ]
-
-
-socketIdJsonDecoder : Json.Decode.Decoder SocketId
-socketIdJsonDecoder =
-    Json.Decode.map SocketId Json.Decode.int
 
 
 geoLocationJsonDecoder : Json.Decode.Decoder GeoLocation
@@ -4371,62 +4299,56 @@ svgElement tag modifiers subs =
     domElementNamespaced "http://www.w3.org/2000/svg" tag modifiers subs
 
 
-{-| An [`Interface`](Web#Interface) for opening a connection on a given address,
-notifying you when it's [connected or disconnected](Web#SocketConnectionEvent)
+{-| An [`Interface`](Web#Interface) for detecting when data has been sent from the server at a given address
+or the connection has changed, see [`Web.SocketEvent`](Web#SocketEvent).
 
-Once this detects it's available, make sure to set your state's [`SocketId`](Web#SocketId) so you can actually [send](#socketMessage)
-and [receive](#socketMessageListen) messages.
-And once it's disconnected, set your state's [`SocketId`](Web#SocketId) back to nothing:
-
-    case state.socketId of
-        Nothing ->
-            Web.socketConnectTo "ws://127.0.0.1:9000"
-                |> Web.interfaceMap
-                    (\connectionChanged ->
-                        case connectionChanged of
-                            Web.SocketConnected socketId ->
-                                { state | socketId = socketId |> Just }
-
-                            Web.SocketDisconnected ->
-                                { state | socketId = Nothing }
-                    )
-
-        Just socketId ->
-            Web.socketMessage socketId "Meow"
-
--}
-socketConnectTo : String -> Interface SocketConnectionEvent
-socketConnectTo address =
-    SocketConnect { address = address, on = identity }
-        |> interfaceFromSingle
-
-
-{-| An [`Interface`](Web#Interface) for closing a given connection
--}
-socketDisconnect : SocketId -> Interface future_
-socketDisconnect id =
-    SocketDisconnect id
-        |> interfaceFromSingle
-
-
-{-| An [`Interface`](Web#Interface) for sending data to the server.
-
+You also have the ability to send data to the server whenever necessary.
 It's common to pair this with [`Json.Encode.encode 0`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Encode#encode)
 to send json.
 
--}
-socketMessage : SocketId -> String -> Interface future_
-socketMessage id data =
-    SocketMessage { id = id, data = data }
-        |> interfaceFromSingle
+    case state.answer of
+        Nothing ->
+            Web.socketListenAndMaybeSend
+                { address = "ws://127.0.0.1:9000"
+                , dataToSend = Just "Are you still on?"
+                }
+                |> Web.interfaceFutureMap
+                    (\socketEvent ->
+                        case socketEvent of
+                            Web.SocketDataReceived answer ->
+                                { state | answer = Just answer }
 
+                            Web.SocketConnected ->
+                                state
 
-{-| An [`Interface`](Web#Interface) for detecting when data has been sent from the server
+                            Web.SocketDisconnected _ ->
+                                state
+                    )
+
+        Just _ ->
+            Web.domRender (Web.domText "Just wanted to hear your voice, thx bye!")
+
+"Removing" [`Web.socketListenAndMaybeSend`](#socketListenAndMaybeSend) from your interface will close the connection.
+
 -}
-socketMessageListen : SocketId -> Interface String
-socketMessageListen id =
-    SocketMessageListen { id = id, on = identity }
-        |> interfaceFromSingle
+socketListenAndMaybeSend : { address : String, dataToSend : Maybe String } -> Interface SocketEvent
+socketListenAndMaybeSend info =
+    let
+        listenInterface : Interface SocketEvent
+        listenInterface =
+            SocketListen { address = info.address, on = identity }
+                |> interfaceFromSingle
+    in
+    case info.dataToSend of
+        Nothing ->
+            listenInterface
+
+        Just dataToSend ->
+            [ listenInterface
+            , SocketDataSend { address = info.address, data = dataToSend }
+                |> interfaceFromSingle
+            ]
+                |> interfaceBatch
 
 
 {-| An [`Interface`](Web#Interface) for generating a given count of cryptographically sound unsigned 32-bit `Int`s.

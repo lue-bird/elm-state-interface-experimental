@@ -256,52 +256,42 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                     { signal: abortSignal }
                 )
             }
-            case "SocketConnect": return (config: { address: string }) => {
+            case "SocketListen": return (config: { address: string }) => {
                 const createdSocket = new WebSocket(config.address)
-                sockets.push(createdSocket)
-                const socketId = sockets.length
+                sockets.set(config.address, createdSocket)
                 createdSocket.addEventListener(
                     "open",
-                    _event => {
-                        sendToElm({ tag: "SocketConnected", value: socketId })
+                    (_event) => {
+                        sendToElm({ tag: "SocketConnected", value: null })
                     },
                     { signal: abortSignal }
                 )
                 createdSocket.addEventListener(
                     "close",
-                    event => {
-                        sendToElm({ tag: "SocketDisconnected", value: { code: event.code, reason: event.reason } })
-                        sockets[socketId] = null
+                    (event) => {
+                        sendToElm({ tag: "SocketDisconnected", value: event })
                     },
                     { signal: abortSignal }
                 )
+                createdSocket.addEventListener(
+                    "message",
+                    (event) => {
+                        sendToElm({ tag: "SocketDataReceived", value: event.data })
+                    },
+                    { signal: abortSignal }
+                )
+
+                abortSignal.addEventListener("abort", (_event) => {
+                    createdSocket.close()
+                    sockets.delete(config.address)
+                })
             }
-            case "SocketMessage": return (config: { id: number, data: string }) => {
-                const socketToMessage = sockets.at(config.id)
-                if (socketToMessage !== undefined && socketToMessage !== null) {
-                    socketToMessage.send(config.data)
+            case "SocketDataSend": return (config: { address: string, data: string }) => {
+                const socket = sockets.get(config.address)
+                if (socket !== undefined) {
+                    socket.send(config.data)
                 } else {
-                    warn("trying to send messages on closed socket")
-                }
-            }
-            case "SocketDisconnect": return (index: number) => {
-                const socketToDisconnect = sockets.at(index)
-                if (socketToDisconnect !== undefined && socketToDisconnect !== null) {
-                    socketToDisconnect.close()
-                } else { } // socket is already closed
-            }
-            case "SocketMessageListen": return (index: number) => {
-                const socketToListenToMessagesFrom = sockets.at(index)
-                if (socketToListenToMessagesFrom !== undefined && socketToListenToMessagesFrom !== null) {
-                    socketToListenToMessagesFrom.addEventListener(
-                        "message",
-                        event => {
-                            sendToElm(event.data)
-                        },
-                        { signal: abortSignal }
-                    )
-                } else {
-                    warn("trying to listen to messages on closed socket")
+                    notifyOfBug("trying to send messages on closed socket")
                 }
             }
             case "LocalStorageSet": return (config: { key: string, value: string | null }) => {
@@ -523,7 +513,7 @@ const audioPlaying: Map<string, AudioPlaying> = new Map()
 const audioBuffers: Map<string, AudioBuffer> = new Map()
 let audioContext: AudioContext | null = null
 
-const sockets: (WebSocket | null)[] = []
+const sockets: Map<string, (WebSocket)> = new Map()
 
 
 //// other helpers
