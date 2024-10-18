@@ -715,12 +715,12 @@ type NotificationClicked
     = NotificationClicked
 
 
-{-| An indication how the connection has changed or a message has been sent.
+{-| How the connection has changed or what message has been sent
 -}
 type SocketEvent
-    = SocketConnected
+    = SocketOpened
     | SocketDataReceived String
-    | SocketDisconnected { code : Int, reason : String }
+    | SocketClosed { code : Int, reason : String }
 
 
 {-| Position and (if available) altitude of the device on Earth, as well as the accuracy with which these properties are calculated.
@@ -3208,13 +3208,13 @@ notificationResponseJsonDecoder =
 socketEventJsonDecoder : Json.Decode.Decoder SocketEvent
 socketEventJsonDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.LocalExtra.variant "SocketConnected" (Json.Decode.null SocketConnected)
+        [ Json.Decode.LocalExtra.variant "SocketOpened" (Json.Decode.null SocketOpened)
         , Json.Decode.LocalExtra.variant "SocketDataReceived"
             (Json.Decode.map SocketDataReceived
                 Json.Decode.string
             )
-        , Json.Decode.LocalExtra.variant "SocketDisconnected"
-            (Json.Decode.map2 (\code reason -> SocketDisconnected { code = code, reason = reason })
+        , Json.Decode.LocalExtra.variant "SocketClosed"
+            (Json.Decode.map2 (\code reason -> SocketClosed { code = code, reason = reason })
                 (Json.Decode.field "code" Json.Decode.int)
                 (Json.Decode.field "reason" Json.Decode.string)
             )
@@ -4318,10 +4318,10 @@ to send json.
                             Web.SocketDataReceived answer ->
                                 { state | answer = Just answer }
 
-                            Web.SocketConnected ->
+                            Web.SocketOpened ->
                                 state
 
-                            Web.SocketDisconnected _ ->
+                            Web.SocketClosed _ ->
                                 state
                     )
 

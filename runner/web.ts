@@ -262,14 +262,14 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 createdSocket.addEventListener(
                     "open",
                     (_event) => {
-                        sendToElm({ tag: "SocketConnected", value: null })
+                        sendToElm({ tag: "SocketOpened", value: null })
                     },
                     { signal: abortSignal }
                 )
                 createdSocket.addEventListener(
                     "close",
                     (event) => {
-                        sendToElm({ tag: "SocketDisconnected", value: event })
+                        sendToElm({ tag: "SocketClosed", value: event })
                     },
                     { signal: abortSignal }
                 )
