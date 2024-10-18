@@ -1,6 +1,7 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as child_process from "node:child_process"
+import * as http from "node:http"
 
 export interface ElmPorts {
     toJs: {
@@ -57,6 +58,8 @@ export function programStart(appConfig: { ports: ElmPorts }) {
         process.stdout.write("\u{001B}[?25h") // show cursor
     })
     function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
+        // uncomment for debugging
+        // (process.stdout as any)?._handle?.setBlocking(true) // make log sync https://github.com/nodejs/node/issues/11568#issuecomment-282765300
         // console.log("elm → js: ", fromElm)
         function sendToElm(eventData: void) {
             const toElm = {
@@ -162,6 +165,77 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
             case "HttpRequestSend": return (config: HttpRequest) => {
                 httpFetch(config, abortSignal).then(sendToElm)
+            }
+            case "HttpRequestListen": return (config: { port: number }) => {
+                const server = http.createServer()
+                server.addListener("request", (request, responseBuilder) => {
+                    let dataChunks: Uint8Array[] = []
+                    request.addListener("data", (dataChunk) => {
+                        dataChunks.push(dataChunk)
+                    })
+                    sendToElm({
+                        tag: "HttpRequestReceived", value: {
+                            method: request.method,
+                            headers:
+                                Object.entries(request.headers)
+                                    .map(([name, value]) => ({ name: name, value: value })),
+                            data: Buffer.concat(dataChunks).toString()
+                        }
+                    })
+                    function sendResponse(response: HttpServerResponse) {
+                        responseBuilder.writeHead(
+                            response.statusCode,
+                            Object.fromEntries(response.headers.map((header) => {
+                                // removing the type makes ts think that  tuple: string[]
+                                const tuple: [string, string] = [header.name, header.value]
+                                return tuple
+                            }))
+                        )
+                        responseBuilder.write(Buffer.from(response.data))
+                        responseBuilder.end()
+                        sendToElm({ tag: "HttpResponseSent", value: null })
+                    }
+                    const responseAlreadyWaiting =
+                        httpResponsesAwaitingRequest.get(config.port)
+                    if (responseAlreadyWaiting === undefined) {
+                        httpRequestsAwaitingResponse.set(config.port, sendResponse)
+                    } else {
+                        sendResponse(responseAlreadyWaiting)
+                    }
+                })
+                server.addListener("error", (error: { code: number, message: string }) => {
+                    sendToElm({ tag: "HttpServerFailed", value: { code: error.code, message: error.message } })
+                })
+                server.listen(config.port)
+                sendToElm({ tag: "HttpServerOpened", value: null })
+
+                abortSignal.addEventListener("abort", (_event) => {
+                    server.close()
+                })
+            }
+            case "HttpResponseSend": return (config: {
+                port: number,
+                statusCode: number,
+                headers: { name: string, value: string }[],
+                data: string
+            }) => {
+                const response: HttpServerResponse = {
+                    statusCode: config.statusCode,
+                    headers: config.headers,
+                    data: config.data
+                }
+                const httpRequestAwaitingResponse = httpRequestsAwaitingResponse.get(config.port)
+                if (httpRequestAwaitingResponse === undefined) {
+                    httpResponsesAwaitingRequest.set(config.port, response)
+                    abortSignal.addEventListener("abort", (_event) => {
+                        if (httpResponsesAwaitingRequest.get(config.port) === response) {
+                            httpResponsesAwaitingRequest.delete(config.port)
+                        }
+                    })
+                } else {
+                    httpRequestAwaitingResponse(response)
+                    httpRequestsAwaitingResponse.delete(config.port)
+                }
             }
             case "TimePosixRequest": return (_config: null) => {
                 queueAbortable(abortSignal, () => {
@@ -278,8 +352,20 @@ export function programStart(appConfig: { ports: ElmPorts }) {
     }
 }
 
-const abortControllers: Map<string, AbortController> = new Map()
+const abortControllers: Map<string, AbortController> =
+    new Map()
+const httpRequestsAwaitingResponse: Map<number /* port */, ((response: HttpServerResponse) => void)> =
+    new Map()
+const httpResponsesAwaitingRequest: Map<number /* port */, HttpServerResponse> =
+    new Map()
 
+
+
+type HttpServerResponse = {
+    statusCode: number,
+    headers: { name: string, value: string }[],
+    data: string
+}
 
 
 function queueAbortable(abortSignal: AbortSignal, action: () => void) {
@@ -288,7 +374,6 @@ function queueAbortable(abortSignal: AbortSignal, action: () => void) {
         clearImmediate(immediateId)
     })
 }
-
 
 
 function fileUtf8Write(write: { path: string, content: string }, abortSignal: AbortSignal | undefined) {
@@ -304,7 +389,7 @@ function fileUtf8Write(write: { path: string, content: string }, abortSignal: Ab
 function watchPath(
     pathToWatch: string,
     abortSignal: AbortSignal,
-    on: (event: { tag: "Removed" | "AddedOrChanged", value: string }) => void
+    sendToElm: (event: { tag: "Removed" | "AddedOrChanged", value: string }) => void
 ) {
     // most editors chunk up their file edits in 2, see
     // https://stackoverflow.com/questions/12978924/fs-watch-fired-twice-when-i-change-the-watched-file
@@ -317,11 +402,15 @@ function watchPath(
             if (debounced) {
                 debounced = false
                 if (fileName !== null) {
-                    const fullPath = path.join(pathToWatch, fileName)
+                    const fullPath =
+                        path.basename(pathToWatch) == fileName ?
+                            pathToWatch
+                            :
+                            path.join(pathToWatch, fileName)
                     if (fs.existsSync(fullPath)) {
-                        on({ tag: "AddedOrChanged", value: fullPath })
+                        sendToElm({ tag: "AddedOrChanged", value: fullPath })
                     } else {
-                        on({ tag: "Removed", value: fullPath })
+                        sendToElm({ tag: "Removed", value: fullPath })
                     }
                 }
             } else {

@@ -14,6 +14,7 @@ module Node exposing
     , httpGet, httpPost, httpAddHeaders
     , httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
     , httpBodyJson, httpBodyBytes
+    , httpRequestListenAndMaybeRespond, HttpServerEvent(..)
     , randomUnsignedInt32sRequest
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..)
@@ -57,12 +58,20 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 ## HTTP
 
+
+### client
+
 @docs HttpRequest, HttpBody, HttpExpect, HttpError, HttpMetadata
 
 @docs httpRequestSend
 @docs httpGet, httpPost, httpAddHeaders
 @docs httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
 @docs httpBodyJson, httpBodyBytes
+
+
+### server
+
+@docs httpRequestListenAndMaybeRespond, HttpServerEvent
 
 
 ## random
@@ -217,6 +226,16 @@ type InterfaceSingle future
     | TerminalSizeRequest ({ lines : Int, columns : Int } -> future)
     | TerminalSizeChangeListen ({ lines : Int, columns : Int } -> future)
     | HttpRequestSend (HttpRequest future)
+    | HttpRequestListen
+        { portNumber : Int
+        , on : HttpServerEvent -> future
+        }
+    | HttpResponseSend
+        { portNumber : Int
+        , statusCode : Int
+        , headers : List { name : String, value : String }
+        , data : String
+        }
     | TimePosixRequest (Time.Posix -> future)
     | TimezoneOffsetRequest (Int -> future)
     | TimeOnce { pointInTime : Time.Posix, on : Time.Posix -> future }
@@ -239,6 +258,19 @@ type InterfaceSingle future
             -> future
         }
     | DirectorySubNamesRequest { path : String, on : List String -> future }
+
+
+{-| How the connection has changed or what request has been sent.
+-}
+type HttpServerEvent
+    = HttpServerOpened
+    | HttpRequestReceived
+        { method : String
+        , headers : List { name : String, value : String }
+        , data : String
+        }
+    | HttpResponseSent
+    | HttpServerFailed { code : String, message : String }
 
 
 {-| Does the path point to a directory or "content"-file
@@ -369,6 +401,15 @@ interfaceSingleFutureMap futureChange interfaceSingle =
     case interfaceSingle of
         HttpRequestSend request ->
             request |> httpRequestFutureMap futureChange |> HttpRequestSend
+
+        HttpRequestListen listen ->
+            HttpRequestListen
+                { portNumber = listen.portNumber
+                , on = \request -> listen.on request |> futureChange
+                }
+
+        HttpResponseSend send ->
+            HttpResponseSend send
 
         TimePosixRequest requestTimeNow ->
             (\event -> requestTimeNow event |> futureChange)
@@ -504,6 +545,12 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         HttpRequestSend _ ->
             []
 
+        HttpRequestListen _ ->
+            []
+
+        HttpResponseSend _ ->
+            []
+
         TimePosixRequest _ ->
             []
 
@@ -621,6 +668,31 @@ interfaceSingleToJson interfaceSingle =
         (case interfaceSingle of
             HttpRequestSend httpRequestInfo ->
                 { tag = "HttpRequestSend", value = httpRequestInfo |> httpRequestInfoToJson }
+
+            HttpRequestListen listen ->
+                { tag = "HttpRequestListen"
+                , value = Json.Encode.object [ ( "port", listen.portNumber |> Json.Encode.int ) ]
+                }
+
+            HttpResponseSend send ->
+                { tag = "HttpResponseSend"
+                , value =
+                    Json.Encode.object
+                        [ ( "port", send.portNumber |> Json.Encode.int )
+                        , ( "statusCode", send.statusCode |> Json.Encode.int )
+                        , ( "headers"
+                          , send.headers
+                                |> Json.Encode.list
+                                    (\header ->
+                                        Json.Encode.object
+                                            [ ( "name", header.name |> Json.Encode.string )
+                                            , ( "value", header.value |> Json.Encode.string )
+                                            ]
+                                    )
+                          )
+                        , ( "data", send.data |> Json.Encode.string )
+                        ]
+                }
 
             TimePosixRequest _ ->
                 { tag = "TimePosixRequest", value = Json.Encode.null }
@@ -790,6 +862,31 @@ interfaceSingleToStructuredId interfaceSingle =
             HttpRequestSend request ->
                 { tag = "HttpRequestSend"
                 , value = request.url |> StructuredId.ofString
+                }
+
+            HttpRequestListen listen ->
+                { tag = "HttpRequestListen"
+                , value = listen.portNumber |> StructuredId.ofInt
+                }
+
+            HttpResponseSend send ->
+                { tag = "HttpResponseSend"
+                , value =
+                    Json.Encode.object
+                        [ ( "port", send.portNumber |> StructuredId.ofInt )
+                        , ( "statusCode", send.statusCode |> StructuredId.ofInt )
+                        , ( "headers"
+                          , send.headers
+                                |> StructuredId.ofList
+                                    (\header ->
+                                        Json.Encode.object
+                                            [ ( "name", header.name |> StructuredId.ofString )
+                                            , ( "value", header.value |> StructuredId.ofString )
+                                            ]
+                                    )
+                          )
+                        , ( "data", send.data |> StructuredId.ofString )
+                        ]
                 }
 
             TimePosixRequest _ ->
@@ -968,6 +1065,14 @@ interfaceSingleFutureJsonDecoder interface =
                 ]
                 |> Just
 
+        HttpRequestListen listen ->
+            httpServerEventJsonDecoder
+                |> Json.Decode.map listen.on
+                |> Just
+
+        HttpResponseSend _ ->
+            Nothing
+
         TimePosixRequest toFuture ->
             Time.LocalExtra.posixJsonDecoder |> Json.Decode.map toFuture |> Just
 
@@ -1091,6 +1196,40 @@ interfaceSingleFutureJsonDecoder interface =
             Json.Decode.string
                 |> Json.Decode.map on
                 |> Just
+
+
+httpServerEventJsonDecoder : Json.Decode.Decoder HttpServerEvent
+httpServerEventJsonDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.LocalExtra.variant "HttpServerOpened"
+            (Json.Decode.null HttpServerOpened)
+        , Json.Decode.LocalExtra.variant "HttpRequestReceived"
+            (Json.Decode.map3
+                (\method headers data ->
+                    HttpRequestReceived { method = method, headers = headers, data = data }
+                )
+                (Json.Decode.field "method" Json.Decode.string)
+                (Json.Decode.field "headers"
+                    (Json.Decode.list
+                        (Json.Decode.map2 (\name value -> { name = name, value = value })
+                            (Json.Decode.field "name" Json.Decode.string)
+                            (Json.Decode.field "value" Json.Decode.string)
+                        )
+                    )
+                )
+                (Json.Decode.field "data" Json.Decode.string)
+            )
+        , Json.Decode.LocalExtra.variant "HttpResponseSent"
+            (Json.Decode.null HttpResponseSent)
+        , Json.Decode.LocalExtra.variant "HttpServerFailed"
+            (Json.Decode.map2
+                (\code message ->
+                    HttpServerFailed { code = code, message = message }
+                )
+                (Json.Decode.field "code" Json.Decode.string)
+                (Json.Decode.field "message" Json.Decode.string)
+            )
+        ]
 
 
 fileKindJsonDecoder : Json.Decode.Decoder FileKind
@@ -1676,6 +1815,91 @@ randomUnsignedInt32sRequest count =
         |> interfaceFromSingle
 
 
+{-| An [`Interface`](Web#Interface) for detecting when data has been sent from the server at a given address
+or the connection has changed, see [`Web.SocketEvent`](Web#SocketEvent).
+
+You also have the ability to send data to the server whenever necessary.
+
+    Node.httpRequestListenAndMaybeRespond
+        { portNumber = 1248
+        , response =
+            case state.pendingRequest of
+                Nothing ->
+                    Nothing
+
+                Just pendingRequest ->
+                    case pendingRequest.data |> String.fromInt of
+                        Nothing ->
+                            Just
+                                { statusCode = 404
+                                , headers = []
+                                , data = ""
+                                }
+
+                        Just requestNumber ->
+                            Just
+                                { statusCode = 200
+                                , headers = []
+                                , data = requestNumber * 2 |> String.fromInt
+                                }
+        }
+        |> Node.interfaceFutureMap
+            (\socketEvent ->
+                case socketEvent of
+                    Node.HttpRequestReceived pendingRequest ->
+                        { state | pendingRequest = Just pendingRequest }
+
+                    Node.HttpResponseSent ->
+                        { state | pendingRequest = Nothing }
+
+                    Node.HttpServerOpened ->
+                        state
+
+                    Node.HttpServerClosed ->
+                        state
+            )
+
+"Removing" [`Node.httpRequestListenAndMaybeRespond`](#httpRequestListenAndMaybeRespond)
+from your interface will close the server at that port.
+
+It's common to send encoded data with [`Json.Encode.encode 0`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Encode#encode)
+(usually with the header `{ name = "Content-Type", value = "application/json" }`).
+
+-}
+httpRequestListenAndMaybeRespond :
+    { portNumber : Int
+    , response :
+        Maybe
+            { statusCode : Int
+            , headers : List { name : String, value : String }
+            , data : String
+            }
+    }
+    -> Interface HttpServerEvent
+httpRequestListenAndMaybeRespond info =
+    let
+        listenInterface : Interface HttpServerEvent
+        listenInterface =
+            HttpRequestListen { portNumber = info.portNumber, on = identity }
+                |> interfaceFromSingle
+    in
+    case info.response of
+        Nothing ->
+            listenInterface
+
+        Just response ->
+            [ listenInterface
+            , HttpResponseSend
+                { portNumber = info.portNumber
+                , statusCode = response.statusCode
+                , headers = response.headers
+                , data = response.data
+                }
+                |> interfaceFromSingle
+            ]
+                |> interfaceBatch
+
+
 {-| Put a given JSON value in the body of your request. This will automatically add the `Content-Type: application/json` header.
 -}
 httpBodyJson : Json.Encode.Value -> HttpBody
@@ -1763,10 +1987,6 @@ httpExpectBytes =
     HttpExpectBytes identity
 
 
-
--- Expect
-
-
 {-| Expect the response body to be a `String`.
 -}
 httpExpectString : HttpExpect (Result HttpError String)
@@ -1816,10 +2036,6 @@ httpAddHeaders headers request =
             (headers |> List.map (\( name, value ) -> { name = name, value = value }))
                 ++ request.headers
     }
-
-
-
--- request
 
 
 {-| Create a `POST` [`HttpRequest`](Node#HttpRequest).
