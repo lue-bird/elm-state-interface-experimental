@@ -79,9 +79,6 @@ runningInterface running =
 
                             Node.HttpServerFailed error ->
                                 HttpServerFailed error
-
-                            Node.HttpServerClosed ->
-                                Running running
                     )
             , Node.standardOutWrite "Open http://localhost:4850\n"
             , Node.fileChangeListen "index.html"
