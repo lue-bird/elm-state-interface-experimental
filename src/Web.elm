@@ -644,7 +644,7 @@ type InterfaceSingle future
     | NavigationLoad String
     | NavigationReload ()
     | NavigationUrlRequest (AppUrl -> future)
-    | FileDownloadUnsignedInt8s { mimeType : String, name : String, content : {- TODO rename -UnsignedInt8s here instead -} List Int }
+    | FileDownload { mimeType : String, name : String, contentUnsignedInt8s : List Int }
     | ClipboardReplaceBy String
     | ClipboardRequest (String -> future)
     | AudioSourceLoad { url : String, on : Result AudioSourceLoadError AudioSource -> future }
@@ -1064,8 +1064,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         NavigationReload () ->
             navigationReload
 
-        FileDownloadUnsignedInt8s download ->
-            FileDownloadUnsignedInt8s download
+        FileDownload download ->
+            FileDownload download
 
         ClipboardReplaceBy clipboard ->
             ClipboardReplaceBy clipboard
@@ -1355,7 +1355,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         NavigationUrlRequest _ ->
             []
 
-        FileDownloadUnsignedInt8s _ ->
+        FileDownload _ ->
             []
 
         ClipboardReplaceBy _ ->
@@ -2016,14 +2016,14 @@ interfaceSingleToJson interfaceSingle =
             NavigationReload () ->
                 { tag = "NavigationReload", value = Json.Encode.null }
 
-            FileDownloadUnsignedInt8s config ->
-                { tag = "FileDownloadUnsignedInt8s"
+            FileDownload config ->
+                { tag = "FileDownload"
                 , value =
                     Json.Encode.object
                         [ ( "name", config.name |> Json.Encode.string )
                         , ( "mimeType", config.mimeType |> Json.Encode.string )
-                        , ( "content"
-                          , config.content |> Json.Encode.list Json.Encode.int
+                        , ( "contentUnsignedInt8s"
+                          , config.contentUnsignedInt8s |> Json.Encode.list Json.Encode.int
                           )
                         ]
                 }
@@ -2478,8 +2478,8 @@ interfaceSingleToStructuredId interfaceSingle =
             NavigationReload () ->
                 { tag = "NavigationReload", value = StructuredId.ofUnit }
 
-            FileDownloadUnsignedInt8s config ->
-                { tag = "FileDownloadUnsignedInt8s"
+            FileDownload config ->
+                { tag = "FileDownload"
                 , value =
                     StructuredId.ofParts
                         [ config.name |> StructuredId.ofString
@@ -2863,7 +2863,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Json.Decode.map toFuture
                 |> Just
 
-        FileDownloadUnsignedInt8s _ ->
+        FileDownload _ ->
             Nothing
 
         ClipboardReplaceBy _ ->
@@ -4373,10 +4373,10 @@ Replacement for [`File.Download.bytes`](https://dark.elm.dmy.fr/packages/elm/fil
 -}
 fileDownloadBytes : { name : String, mimeType : String, content : Bytes } -> Interface future_
 fileDownloadBytes fileDownloadConfig =
-    FileDownloadUnsignedInt8s
+    FileDownload
         { name = fileDownloadConfig.name
         , mimeType = fileDownloadConfig.mimeType
-        , content = fileDownloadConfig.content |> Bytes.LocalExtra.toUnsignedInt8List
+        , contentUnsignedInt8s = fileDownloadConfig.content |> Bytes.LocalExtra.toUnsignedInt8List
         }
         |> interfaceFromSingle
 

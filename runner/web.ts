@@ -91,7 +91,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             case "NavigationUrlRequest": return (_config: null) => {
                 sendToElm(window.location.href)
             }
-            case "FileDownloadUnsignedInt8s": return (config: { mimeType: string, name: string, content: number[] }) => {
+            case "FileDownload": return (config: { mimeType: string, name: string, contentUnsignedInt8s: number[] }) => {
                 fileDownloadBytes(config)
             }
             case "ClipboardReplaceBy": return (config: string) => {
@@ -764,10 +764,10 @@ function noOnOrFormAction(key: string) {
 }
 
 
-function fileDownloadBytes(config: { mimeType: string, name: string, content: number[] }) {
+function fileDownloadBytes(config: { mimeType: string, name: string, contentUnsignedInt8s: number[] }) {
     const temporaryAnchorDomElement: HTMLAnchorElement = window.document.createElement("a")
     const blob = new Blob(
-        [new Uint8Array(config.content)],
+        [new Uint8Array(config.contentUnsignedInt8s)],
         { type: config.mimeType }
     )
     const objectUrl = URL.createObjectURL(blob)
