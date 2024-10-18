@@ -3567,7 +3567,6 @@ httpErrorJsonDecoder =
 
 windowVisibilityJsonDecoder : Json.Decode.Decoder WindowVisibility
 windowVisibilityJsonDecoder =
-    -- TODO casing
     Json.Decode.oneOf
         [ Json.Decode.map (\() -> WindowShown) (Json.Decode.LocalExtra.onlyString "visible")
         , Json.Decode.map (\() -> WindowHidden) (Json.Decode.LocalExtra.onlyString "hidden")
