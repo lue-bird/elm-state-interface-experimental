@@ -4287,7 +4287,7 @@ notificationShow content =
 
 
 {-| An [`Interface`](Web#Interface) for sending an HTTP request
-to a given url, decoding the result as specified by [`HttpExpect`](#HttpExpect)
+to a given url
 
     exampleHttpPost : Web.Interface (Result Web.HttpError Bytes)
     exampleHttpPost =
@@ -4330,24 +4330,6 @@ to a given url, decoding the result as specified by [`HttpExpect`](#HttpExpect)
                         Err _ ->
                             Err "HTTP response error"
                 )
-
-Another example with a request bytes body
-
-    {- to be used with Content-Type application/zip -}
-    exampleZipBodyBytes : Bytes
-    exampleZipBodyBytes =
-        Zip.fromEntries
-            [ Bytes.Encode.string "Hello, World!"
-                |> Bytes.Encode.encode
-                |> Zip.Entry.store
-                    { path = "hello.txt"
-                    , lastModified = ( Time.utc, Time.millisToPosix 0 )
-                    , comment = Nothing
-                    }
-            ]
-            |> Zip.toBytes
-
-  - 🧩 [`Zip` and `Zip.Entry` are from `agu-z/elm-zip`](https://dark.elm.dmy.fr/packages/agu-z/elm-zip/latest/)
 
 Usually, if you have a request body,
 the headers include `Content-Type` with a [MIME type](https://en.wikipedia.org/wiki/Media_type)

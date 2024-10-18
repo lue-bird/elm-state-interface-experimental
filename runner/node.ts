@@ -422,41 +422,32 @@ function watchPath(
 
 
 
+
 interface HttpRequest {
     url: string
     method: string
     headers: { name: string, value: string }[]
-    expect: Expect
-    body: HttpRequestBody
+    bodyUnsignedInt8s: Uint8Array
 }
-type Expect = | "String" | "Bytes" | "Whatever"
-type HttpRequestBody =
-    | { tag: "Uint8Array", value: Uint8Array }
-    | { tag: "String", value: string }
-    | { tag: "Empty", value: null }
-
 type HttpResponse =
-    | { tag: "Success", value: ResponseSuccess }
-    | { tag: "Error", value: any }
-interface ResponseSuccess {
-    body: Uint8Array | string | null
-    url: string
-    headers: { [header: string]: string }
-    statusCode: number
-    statusText: string
-}
-
-function httpRequestBodyForFetch(body: HttpRequestBody) {
-    switch (body.tag) {
-        case "Empty": return null
-        case "String": return body.value
-        case "Uint8Array": return new Blob([body.value])
+    | {
+        tag: "Success",
+        value: {
+            statusCode: number,
+            statusText: string,
+            headers: { name: string, value: string }[],
+            bodyUnsignedInt8s: number[]
+        }
     }
-}
+    | { tag: "Error", value: any }
+
 function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<HttpResponse> {
     return fetch(request.url, {
         method: request.method,
-        body: httpRequestBodyForFetch(request.body),
+        body:
+            request.bodyUnsignedInt8s === null ?
+                null
+                : new Blob([new Uint8Array(request.bodyUnsignedInt8s)]),
         headers: new Headers(request.headers.map(header => {
             // removing the type makes ts think that  tuple: string[]
             const tuple: [string, string] = [header.name, header.value]
@@ -464,45 +455,26 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
         })),
         signal: abortSignal
     })
-        .then((response: Response) => {
-            const headers = Object.fromEntries(response.headers.entries())
-            switch (request.expect) {
-                case "String": return response.text()
-                    .then((x) => ({
-                        tag: "Success" as const,
-                        value: {
-                            url: response.url,
-                            headers: headers,
-                            statusCode: response.status,
-                            statusText: response.statusText,
-                            body: x as (string | null | Uint8Array) // without this as ts complains
-                        }
-                    }))
-                case "Bytes": return response.blob()
-                    .then(blob => blob.arrayBuffer())
-                    .then((x) => ({
-                        tag: "Success" as const,
-                        value: {
-                            url: response.url,
-                            headers: headers,
-                            statusCode: response.status,
-                            statusText: response.statusText,
-                            body: new Uint8Array(x)
-                        }
-                    }))
-                case "Whatever": return {
+        .then((response) =>
+            response
+                .blob()
+                .then((bodyBlob) => bodyBlob.arrayBuffer())
+                // use intermediate ArrayBuffer bc chromium does not support .bytes() yet
+                // https://developer.mozilla.org/en-US/docs/Web/API/Blob/bytes
+                .then((bodyArrayBuffer) => ({
                     tag: "Success" as const,
                     value: {
-                        url: response.url,
-                        headers: headers,
                         statusCode: response.status,
                         statusText: response.statusText,
-                        body: null
+                        headers:
+                            Array.from(response.headers.entries())
+                                .map(([name, value]) => ({ name: name, value: value })),
+                        bodyUnsignedInt8s:
+                            Array.from(new Uint8Array(bodyArrayBuffer))
                     }
-                }
-            }
-        })
-        .catch(error => { return { tag: "Error", value: error } })
+                }))
+        )
+        .catch((error) => ({ tag: "Error" as const, value: error }))
 }
 
 // helpers

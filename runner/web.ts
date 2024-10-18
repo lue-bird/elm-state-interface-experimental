@@ -784,6 +784,7 @@ function fileDownloadBytes(config: { mimeType: string, name: string, content: nu
     URL.revokeObjectURL(objectUrl)
 }
 
+
 interface HttpRequest {
     url: string
     method: string
@@ -791,14 +792,16 @@ interface HttpRequest {
     bodyUnsignedInt8s: Uint8Array
 }
 type HttpResponse =
-    | { tag: "Success", value: ResponseSuccess }
+    | {
+        tag: "Success",
+        value: {
+            statusCode: number,
+            statusText: string,
+            headers: { name: string, value: string }[],
+            bodyUnsignedInt8s: number[]
+        }
+    }
     | { tag: "Error", value: any }
-interface ResponseSuccess {
-    statusCode: number,
-    statusText: string,
-    headers: { name: string, value: string }[],
-    bodyUnsignedInt8s: number[]
-}
 
 function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<HttpResponse> {
     return fetch(request.url, {
@@ -806,7 +809,7 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
         body:
             request.bodyUnsignedInt8s === null ?
                 null
-                : new Blob([request.bodyUnsignedInt8s]),
+                : new Blob([new Uint8Array(request.bodyUnsignedInt8s)]),
         headers: new Headers(request.headers.map(header => {
             // removing the type makes ts think that  tuple: string[]
             const tuple: [string, string] = [header.name, header.value]
