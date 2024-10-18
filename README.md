@@ -7,6 +7,7 @@
 >   - move all `Web.X.y` module members to `Web.xY`
 >   - add module `Node`, split js package into `/web` and `/node` entrypoints
 >   - simplify web socket API
+>   - simplify web http request send API
 >   - internal: replace `Dict` values to sorted assoc-list, `FastDict.Dict` or in the case of `Web.Interface`, a custom FastDict clone
 
 ### define an app in a simple, safe and declarative way

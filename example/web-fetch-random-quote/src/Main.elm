@@ -1,5 +1,8 @@
 port module Main exposing (State(..), main)
 
+import Bytes exposing (Bytes)
+import Bytes.Decode
+import Bytes.Encode
 import Color
 import Json.Decode
 import Json.Encode
@@ -17,29 +20,23 @@ main =
 
 initialState : State
 initialState =
-    State { movies = Nothing }
+    State { quotes = Nothing }
 
 
 interface : State -> Web.Interface State
 interface (State state) =
-    [ case state.movies of
+    [ case state.quotes of
         Just _ ->
             Web.interfaceNone
 
         Nothing ->
-            Web.httpGet
-                { url = "https://api.quotable.io/quotes/random"
-                , expect =
-                    Web.httpExpectJson
-                        (Json.Decode.index 0
-                            (Json.Decode.map2 (\content author -> { content = content, author = author })
-                                (Json.Decode.field "content" Json.Decode.string)
-                                (Json.Decode.field "author" Json.Decode.string)
-                            )
-                        )
+            Web.httpRequestSend
+                { url = "https://dummyjson.com/quotes/random"
+                , method = "GET"
+                , headers = []
+                , body = Nothing
                 }
-                |> Web.httpRequest
-                |> Web.interfaceFutureMap MoviesReceived
+                |> Web.interfaceFutureMap QuotesReceived
     , Web.domElement "div"
         [ Web.domStyle "background-color" (Color.rgb 0 0 0 |> Color.toCssString)
         , Web.domStyle "color" (Color.rgb 1 1 1 |> Color.toCssString)
@@ -62,28 +59,18 @@ interface (State state) =
                 [ Web.domElement "div"
                     [ Web.domStyle "font-size" "1.2em"
                     ]
-                    [ case state.movies of
+                    [ case state.quotes of
                         Nothing ->
                             Web.domText "waiting for response"
 
-                        Just (Err Web.HttpBadUrl) ->
-                            Web.domText "Malformed URL"
+                        Just (Err error) ->
+                            Web.domText error
 
-                        Just (Err Web.HttpNetworkError) ->
-                            Web.domText "Network error"
-
-                        Just (Err (Web.HttpBadStatus _)) ->
-                            Web.domText "Bad response status"
-
-                        Just (Ok (Err decodeError)) ->
-                            Web.domText
-                                (decodeError.jsonError |> Json.Decode.errorToString)
-
-                        Just (Ok (Ok movies)) ->
+                        Just (Ok quotes) ->
                             Web.domElement "div"
                                 []
-                                [ Web.domElement "blockquote" [ Web.domStyle "textAlign" "center" ] [ Web.domText movies.content ]
-                                , Web.domElement "i" [ Web.domStyle "textAlign" "center" ] [ Web.domText ("by " ++ movies.author) ]
+                                [ Web.domElement "blockquote" [ Web.domStyle "textAlign" "center" ] [ Web.domText quotes.content ]
+                                , Web.domElement "i" [ Web.domStyle "textAlign" "center" ] [ Web.domText ("by " ++ quotes.author) ]
                                 ]
                     ]
                 , Web.domElement "br" [] []
@@ -102,11 +89,43 @@ interface (State state) =
             (\event ->
                 case event of
                     MoreClicked ->
-                        State { state | movies = Nothing }
+                        State { state | quotes = Nothing }
 
-                    MoviesReceived moviesResponse ->
-                        State { state | movies = moviesResponse |> Just }
+                    QuotesReceived responseBytesOrError ->
+                        let
+                            result =
+                                case responseBytesOrError of
+                                    Err Web.HttpBadUrl ->
+                                        Err "Malformed URL"
+
+                                    Err (Web.HttpNetworkError message) ->
+                                        Err message
+
+                                    Err (Web.HttpBadStatus _) ->
+                                        Err "Bad response status"
+
+                                    Ok responseBytes ->
+                                        case responseBytes |> Bytes.Decode.decode (Bytes.Decode.string (responseBytes |> Bytes.width)) of
+                                            Nothing ->
+                                                Err "failed to decode HTTP body bytes as UTF-8"
+
+                                            Just responseString ->
+                                                case responseString |> Json.Decode.decodeString randomQuoteJsonDecoder of
+                                                    Err jsonError ->
+                                                        Err (jsonError |> Json.Decode.errorToString)
+
+                                                    Ok quote ->
+                                                        Ok quote
+                        in
+                        State { state | quotes = Just result }
             )
+
+
+randomQuoteJsonDecoder : Json.Decode.Decoder { content : String, author : String }
+randomQuoteJsonDecoder =
+    Json.Decode.map2 (\content author -> { content = content, author = author })
+        (Json.Decode.field "quote" Json.Decode.string)
+        (Json.Decode.field "author" Json.Decode.string)
 
 
 buttonUi : List (Web.DomModifier ()) -> List (Web.DomNode ()) -> Web.DomNode ()
@@ -137,25 +156,10 @@ port fromJs : (Json.Encode.Value -> event) -> Sub event
 
 type State
     = State
-        { movies :
-            Maybe
-                (Result
-                    Web.HttpError
-                    (Result
-                        { actualBody : String, jsonError : Json.Decode.Error }
-                        { content : String, author : String }
-                    )
-                )
+        { quotes : Maybe (Result String { content : String, author : String })
         }
 
 
 type DiceUiEvent
     = MoreClicked
-    | MoviesReceived
-        (Result
-            Web.HttpError
-            (Result
-                { actualBody : String, jsonError : Json.Decode.Error }
-                { content : String, author : String }
-            )
-        )
+    | QuotesReceived (Result Web.HttpError Bytes)

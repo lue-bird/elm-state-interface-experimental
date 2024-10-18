@@ -15,11 +15,7 @@ module Web exposing
     , pushUrl, replaceUrl
     , navigateForward, navigateBack, navigationListen
     , navigateTo, reload
-    , HttpRequest, HttpBody(..), HttpExpect(..), HttpError(..), HttpMetadata
-    , httpRequestSend
-    , httpGet, httpPost, httpAddHeaders
-    , httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
-    , httpBodyJson, httpBodyBytes
+    , httpRequestSend, HttpError(..)
     , randomUnsignedInt32sRequest
     , consoleLog, consoleWarn, consoleError
     , localStorageRequest, localStorageSet, localStorageRemove
@@ -96,12 +92,7 @@ Primitives used for SVG and HTML
 
 ## HTTP
 
-@docs HttpRequest, HttpBody, HttpExpect, HttpError, HttpMetadata
-
-@docs httpRequestSend
-@docs httpGet, httpPost, httpAddHeaders
-@docs httpExpectString, httpExpectJson, httpExpectBytes, httpExpectWhatever
-@docs httpBodyJson, httpBodyBytes
+@docs httpRequestSend, HttpError
 
 
 ## random
@@ -653,7 +644,7 @@ type InterfaceSingle future
     | NavigationLoad String
     | NavigationReload ()
     | NavigationUrlRequest (AppUrl -> future)
-    | FileDownloadUnsignedInt8s { mimeType : String, name : String, content : List Int }
+    | FileDownloadUnsignedInt8s { mimeType : String, name : String, content : {- TODO rename -UnsignedInt8s here instead -} List Int }
     | ClipboardReplaceBy String
     | ClipboardRequest (String -> future)
     | AudioSourceLoad { url : String, on : Result AudioSourceLoadError AudioSource -> future }
@@ -666,7 +657,13 @@ type InterfaceSingle future
         }
     | NotificationAskForPermission ()
     | NotificationShow { id : String, message : String, details : String, on : NotificationClicked -> future }
-    | HttpRequestSend (HttpRequest future)
+    | HttpRequestSend
+        { url : String
+        , method : String
+        , headers : List { name : String, value : String }
+        , bodyUnsignedInt8s : Maybe (List Int)
+        , on : Result HttpError Bytes -> future
+        }
     | TimePosixRequest (Time.Posix -> future)
     | TimezoneOffsetRequest (Int -> future)
     | TimeOnce { pointInTime : Time.Posix, on : Time.Posix -> future }
@@ -755,55 +752,6 @@ type alias GeoLocation =
 type WindowVisibility
     = WindowShown
     | WindowHidden
-
-
-{-| An HTTP request for use in an [`Interface`](#Interface).
-
-Use [`Web.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
-Use [`Web.timeOnceAt`](Web#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
-
--}
-type alias HttpRequest future =
-    RecordWithoutConstructorFunction
-        { url : String
-        , method : String
-        , headers : List { name : String, value : String }
-        , body : HttpBody
-        , expect : HttpExpect future
-        }
-
-
-{-| Describe what you expect to be returned in an http response body.
--}
-type HttpExpect future
-    = HttpExpectString (Result HttpError String -> future)
-    | HttpExpectBytes (Result HttpError Bytes -> future)
-    | HttpExpectWhatever (Result HttpError () -> future)
-
-
-{-| Data send in your http request.
-
-  - `HttpBodyEmpty`: Create an empty body for your request.
-    This is useful for `GET` requests and `POST` requests where you are not sending any data.
-
-  - `HttpBodyString`: Put a `String` in the body of your request. Defining `Web.httpJsonBody` looks like this:
-
-        import Json.Encode
-
-        httpJsonBody : Json.Encode.Value -> Web.HttpBody
-        httpJsonBody value =
-            Web.HttpBodyString "application/json" (Json.Encode.encode 0 value)
-
-    The first argument is a [MIME type](https://en.wikipedia.org/wiki/Media_type) of the body.
-
-  - `HttpBodyUnsignedInt8s` is pretty much the same as `HttpBodyString` but for [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/),
-    see [`Web.httpBodyBytes`](Web#httpBodyBytes)
-
--}
-type HttpBody
-    = HttpBodyEmpty
-    | HttpBodyString { mimeType : String, content : String }
-    | HttpBodyUnsignedInt8s { mimeType : String, content : List Int }
 
 
 {-| Plain text or a [`DomElementHeader`](#DomElementHeader) for use in an [`Interface`](#Interface).
@@ -1158,8 +1106,14 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             }
                 |> NotificationShow
 
-        HttpRequestSend request ->
-            request |> httpRequestFutureMap futureChange |> HttpRequestSend
+        HttpRequestSend send ->
+            { url = send.url
+            , method = send.method
+            , headers = send.headers
+            , bodyUnsignedInt8s = send.bodyUnsignedInt8s
+            , on = \responseBytes -> send.on responseBytes |> futureChange
+            }
+                |> HttpRequestSend
 
         LocalStorageRequest request ->
             { key = request.key, on = \event -> event |> request.on |> futureChange }
@@ -1263,25 +1217,6 @@ domNodeFutureMap futureChange domElementToMap =
 
         DomElementHeader domElementHeader ->
             domElementHeader |> domElementHeaderFutureMap futureChange |> DomElementHeader
-
-
-httpRequestFutureMap : (future -> mappedFuture) -> (HttpRequest future -> HttpRequest mappedFuture)
-httpRequestFutureMap futureChange request =
-    { url = request.url
-    , method = request.method
-    , headers = request.headers
-    , body = request.body
-    , expect =
-        case request.expect of
-            HttpExpectWhatever expectWhatever ->
-                (\unit -> expectWhatever unit |> futureChange) |> HttpExpectWhatever
-
-            HttpExpectString expectString ->
-                (\string -> expectString string |> futureChange) |> HttpExpectString
-
-            HttpExpectBytes expectBytes ->
-                (\bytes -> expectBytes bytes |> futureChange) |> HttpExpectBytes
-    }
 
 
 domElementHeaderFutureMap : (future -> mappedFuture) -> (DomElementHeader future -> DomElementHeader mappedFuture)
@@ -2151,8 +2086,29 @@ interfaceSingleToJson interfaceSingle =
                         ]
                 }
 
-            HttpRequestSend httpRequestInfo ->
-                { tag = "HttpRequestSend", value = httpRequestInfo |> httpRequestInfoToJson }
+            HttpRequestSend send ->
+                { tag = "HttpRequestSend"
+                , value =
+                    Json.Encode.object
+                        [ ( "url", send.url |> Json.Encode.string )
+                        , ( "method", send.method |> Json.Encode.string )
+                        , ( "headers"
+                          , send.headers
+                                |> Json.Encode.list
+                                    (\header ->
+                                        Json.Encode.object
+                                            [ ( "name", header.name |> Json.Encode.string )
+                                            , ( "value", header.value |> Json.Encode.string )
+                                            ]
+                                    )
+                          )
+                        , ( "bodyUnsignedInt8s"
+                          , send.bodyUnsignedInt8s
+                                |> Json.Encode.LocalExtra.nullable
+                                    (Json.Encode.list Json.Encode.int)
+                          )
+                        ]
+                }
 
             TimePosixRequest _ ->
                 { tag = "TimePosixRequest", value = Json.Encode.null }
@@ -2237,74 +2193,6 @@ interfaceSingleToJson interfaceSingle =
 
             GamepadsChangeListen _ ->
                 { tag = "GamepadsChangeListen", value = Json.Encode.null }
-        )
-
-
-httpRequestInfoToJson : HttpRequest future_ -> Json.Encode.Value
-httpRequestInfoToJson httpRequestId =
-    Json.Encode.object
-        [ ( "url", httpRequestId.url |> Json.Encode.string )
-        , ( "method", httpRequestId.method |> Json.Encode.string )
-        , ( "headers"
-          , httpRequestId.headers
-                |> addContentTypeForBody httpRequestId.body
-                |> Json.Encode.list
-                    (\header ->
-                        Json.Encode.object
-                            [ ( "name", header.name |> Json.Encode.string )
-                            , ( "value", header.value |> Json.Encode.string )
-                            ]
-                    )
-          )
-        , ( "expect", httpRequestId.expect |> httpExpectInfoToJson )
-        , ( "body", httpRequestId.body |> httpBodyToJson )
-        ]
-
-
-addContentTypeForBody : HttpBody -> (List { name : String, value : String } -> List { name : String, value : String })
-addContentTypeForBody body headers =
-    case body of
-        HttpBodyEmpty ->
-            headers
-
-        HttpBodyString stringBodyInfo ->
-            { name = "Content-Type", value = stringBodyInfo.mimeType } :: headers
-
-        HttpBodyUnsignedInt8s bytesBodyInfo ->
-            { name = "Content-Type", value = bytesBodyInfo.mimeType } :: headers
-
-
-httpBodyToJson : HttpBody -> Json.Encode.Value
-httpBodyToJson body =
-    Json.Encode.LocalExtra.variant
-        (case body of
-            HttpBodyString stringBodyInfo ->
-                { tag = "String"
-                , value = stringBodyInfo.content |> Json.Encode.string
-                }
-
-            HttpBodyUnsignedInt8s bytesBodyInfo ->
-                { tag = "Uint8Array"
-                , value = bytesBodyInfo.content |> Json.Encode.list Json.Encode.int
-                }
-
-            HttpBodyEmpty ->
-                { tag = "Empty", value = Json.Encode.null }
-        )
-
-
-httpExpectInfoToJson : HttpExpect future_ -> Json.Encode.Value
-httpExpectInfoToJson httpExpectId =
-    Json.Encode.string
-        (case httpExpectId of
-            HttpExpectString _ ->
-                "String"
-
-            HttpExpectBytes _ ->
-                "Bytes"
-
-            HttpExpectWhatever _ ->
-                "Whatever"
         )
 
 
@@ -2655,9 +2543,9 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value = show.id |> StructuredId.ofString
                 }
 
-            HttpRequestSend request ->
+            HttpRequestSend send ->
                 { tag = "HttpRequestSend"
-                , value = request.url |> StructuredId.ofString
+                , value = send.url |> StructuredId.ofString
                 }
 
             TimePosixRequest _ ->
@@ -3052,10 +2940,11 @@ interfaceSingleFutureJsonDecoder interface =
 
         HttpRequestSend request ->
             Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Success" (httpSuccessResponseJsonDecoder request.expect)
+                [ Json.Decode.LocalExtra.variant "Success" httpSuccessResponseJsonDecoder
                 , Json.Decode.LocalExtra.variant "Error" httpErrorJsonDecoder
-                    |> Json.Decode.map (httpExpectOnError request.expect)
+                    |> Json.Decode.map Err
                 ]
+                |> Json.Decode.map request.on
                 |> Just
 
         TimePosixRequest toFuture ->
@@ -3613,89 +3502,49 @@ fastDictInsertSameValueFor keyList value dict =
             dict
 
 
-httpExpectOnError : HttpExpect future -> (HttpError -> future)
-httpExpectOnError httpExpect e =
-    case httpExpect of
-        HttpExpectString toFuture ->
-            e |> Err |> toFuture
+httpSuccessResponseJsonDecoder : Json.Decode.Decoder (Result HttpError Bytes)
+httpSuccessResponseJsonDecoder =
+    httpResponseJsonDecoder
+        |> Json.Decode.map
+            (\response ->
+                if response.statusCode >= 200 && response.statusCode < 300 then
+                    Ok response.body
 
-        HttpExpectBytes toFuture ->
-            e |> Err |> toFuture
-
-        HttpExpectWhatever toFuture ->
-            e |> Err |> toFuture
-
-
-httpSuccessResponseJsonDecoder : HttpExpect future -> Json.Decode.Decoder future
-httpSuccessResponseJsonDecoder expect =
-    httpMetadataJsonDecoder
-        |> Json.Decode.andThen
-            (\meta ->
-                let
-                    isOk : Bool
-                    isOk =
-                        meta.statusCode >= 200 && meta.statusCode < 300
-
-                    badStatusJsonDecoder : Json.Decode.Decoder (Result HttpError value_)
-                    badStatusJsonDecoder =
-                        Json.Decode.map (\body -> Err (HttpBadStatus { metadata = meta, body = body })) Json.Decode.value
-                in
-                Json.Decode.field "body"
-                    (case expect of
-                        HttpExpectString toFuture ->
-                            Json.Decode.map toFuture
-                                (if isOk then
-                                    Json.Decode.map Ok Json.Decode.string
-
-                                 else
-                                    badStatusJsonDecoder
-                                )
-
-                        HttpExpectBytes toFuture ->
-                            Json.Decode.map toFuture
-                                (if isOk then
-                                    Json.Decode.map Ok
-                                        (Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
-                                            (Json.Decode.list Json.Decode.int)
-                                        )
-
-                                 else
-                                    badStatusJsonDecoder
-                                )
-
-                        HttpExpectWhatever toFuture ->
-                            Json.Decode.map toFuture
-                                (if isOk then
-                                    Json.Decode.succeed (Ok ())
-
-                                 else
-                                    badStatusJsonDecoder
-                                )
-                    )
+                else
+                    Err (HttpBadStatus response)
             )
 
 
-httpMetadataJsonDecoder : Json.Decode.Decoder HttpMetadata
-httpMetadataJsonDecoder =
+httpResponseJsonDecoder :
+    Json.Decode.Decoder
+        { statusCode : Int
+        , statusText : String
+        , headers : List { name : String, value : String }
+        , body : Bytes
+        }
+httpResponseJsonDecoder =
     Json.Decode.map4
-        (\url statusCode statusText headers ->
-            { url = url
-            , statusCode = statusCode
+        (\statusCode statusText headers body ->
+            { statusCode = statusCode
             , statusText = statusText
             , headers = headers
+            , body = body
             }
         )
-        (Json.Decode.field "url" Json.Decode.string)
         (Json.Decode.field "statusCode" Json.Decode.int)
         (Json.Decode.field "statusText" Json.Decode.string)
         (Json.Decode.field "headers"
-            (Json.Decode.map
-                (\headerTuples ->
-                    headerTuples
-                        |> List.LocalExtra.mapAnyOrder
-                            (\( key, value ) -> { key = key, value = value })
+            (Json.Decode.list
+                (Json.Decode.map2
+                    (\name value -> { name = name, value = value })
+                    (Json.Decode.field "name" Json.Decode.string)
+                    (Json.Decode.field "value" Json.Decode.string)
                 )
-                (Json.Decode.keyValuePairs Json.Decode.string)
+            )
+        )
+        (Json.Decode.field "bodyUnsignedInt8s"
+            (Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
+                (Json.Decode.list Json.Decode.int)
             )
         )
 
@@ -3707,12 +3556,18 @@ httpErrorJsonDecoder =
             (Json.Decode.field "cause"
                 (Json.Decode.field "code" (Json.Decode.LocalExtra.onlyString "BAD_URL"))
             )
-        , Json.Decode.succeed HttpNetworkError
+        , Json.Decode.map HttpNetworkError
+            (Json.Decode.oneOf
+                [ Json.Decode.field "message" Json.Decode.string
+                , Json.Decode.succeed ""
+                ]
+            )
         ]
 
 
 windowVisibilityJsonDecoder : Json.Decode.Decoder WindowVisibility
 windowVisibilityJsonDecoder =
+    -- TODO casing
     Json.Decode.oneOf
         [ Json.Decode.map (\() -> WindowShown) (Json.Decode.LocalExtra.onlyString "visible")
         , Json.Decode.map (\() -> WindowHidden) (Json.Decode.LocalExtra.onlyString "hidden")
@@ -3992,39 +3847,24 @@ internalFastDictFoldrInner func acc t =
 
 {-| A Request can fail in a couple ways:
 
-  - `BadUrl` means you did not provide a valid URL
-  - `NetworkError` means the user turned off their wifi, went in a cave, etc.
+  - `BadUrl`: you did not provide a valid URL
+  - `NetworkError`: the user turned off their wifi, went in a cave, etc.
     or the server CORS is misconfigured.
     Note: A 404 for example does not constitute a network error
-  - `BadStatus` means you got a response back, but the status code indicates failure. Contains:
-      - The response `Metadata`.
-      - The raw response body as a `Json.Decode.Value`.
+  - `BadStatus`: you got a response back, but the status code indicates failure. Contains:
+      - the statusCode like 404 and statusText describing what the statusCode means a little
+      - headers like Content-Length and Expires
+      - the body as [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/)
 
 -}
 type HttpError
     = HttpBadUrl
-    | HttpNetworkError
-    | HttpBadStatus { metadata : HttpMetadata, body : Json.Decode.Value }
-
-
-{-| Extra information about the response:
-
-  - url of the server that actually responded (so you can detect redirects)
-  - statusCode like 200 or 404
-  - statusText describing what the statusCode means a little
-  - headers like Content-Length and Expires
-
-Note: It is possible for a response to have the same header multiple times.
-In that case, all the values end up in a single entry in the headers.
-The values are separated by commas, following the rules outlined [here](https://stackoverflow.com/questions/4371328/are-duplicate-http-response-headers-acceptable).
-
--}
-type alias HttpMetadata =
-    RecordWithoutConstructorFunction
-        { url : String
-        , statusCode : Int
+    | HttpNetworkError String
+    | HttpBadStatus
+        { statusCode : Int
         , statusText : String
-        , headers : List { key : String, value : String }
+        , headers : List { name : String, value : String }
+        , body : Bytes
         }
 
 
@@ -4446,179 +4286,100 @@ notificationShow content =
         |> interfaceFromSingle
 
 
-{-| Put a given JSON value in the body of your request. This will automatically add the `Content-Type: application/json` header.
--}
-httpBodyJson : Json.Encode.Value -> HttpBody
-httpBodyJson content =
-    HttpBodyString { mimeType = "application/json", content = Json.Encode.encode 0 content }
+{-| An [`Interface`](Web#Interface) for sending an HTTP request
+to a given url, decoding the result as specified by [`HttpExpect`](#HttpExpect)
 
-
-{-| Put given [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/) in the body of your request.
-The string argument should be a [MIME type](https://en.wikipedia.org/wiki/Media_type) to be used in the `Content-Type` header
-
-    import Bytes exposing (Bytes)
-    import Bytes.Encode
-    import Time
-    import Web
-    import Zip
-    import Zip.Entry
-
-    exampleZipBody : Web.HttpBody
-    exampleZipBody =
-        Web.httpBodyBytes "application/zip"
-            (Zip.fromEntries
-                [ Bytes.Encode.string "Hello, World!"
+    exampleHttpPost : Web.Interface (Result Web.HttpError Bytes)
+    exampleHttpPost =
+        Web.httpRequestSend
+            { url = ...
+            , method = "POST"
+            , headers = [ { name = "Content-Type", value = "application/json" } ]
+            , body =
+                96
+                    |> Json.Encode.int
+                    |> Json.Encode.encode 0
                     |> Bytes.Encode.encode
-                    |> Zip.Entry.store
-                        { path = "hello.txt"
-                        , lastModified = ( Time.utc, Time.millisToPosix 0 )
-                        , comment = Nothing
-                        }
-                ]
-                |> Zip.toBytes
-            )
+                    |> Just
+            }
+
+    exampleHttpGet : Web.HttpRequest
+    exampleHttpGet =
+        Web.httpRequestSend
+            { url = ...
+            , method = "GET"
+            , headers = [ { name = "X-Custom-Header", value = "ProcessThisImmediately" } ]
+            , body = Nothing -- empty bytes with HEAD or GET can lead to an HttpError
+            }
+            |> Web.interfaceFutureMap
+                (\responseOrError ->
+                    case responseOrError of
+                        Ok bytes ->
+                            case bytes |> Bytes.Decode.decode (Bytes.Decode.string (bytes |> Bytes.width)) of
+                                Just jsonString ->
+                                    case jsonString |> Json.Decode.decodeString ... of
+                                        Err jsonError ->
+                                            Err (jsonError |> Json.Decode.errorToString)
+
+                                        Ok parsed ->
+                                            Ok parsed
+
+                                Nothing ->
+                                    Err "failed to decode bytes to a string"
+
+                        Err _ ->
+                            Err "HTTP response error"
+                )
+
+Another example with a request bytes body
+
+    {- to be used with Content-Type application/zip -}
+    exampleZipBodyBytes : Bytes
+    exampleZipBodyBytes =
+        Zip.fromEntries
+            [ Bytes.Encode.string "Hello, World!"
+                |> Bytes.Encode.encode
+                |> Zip.Entry.store
+                    { path = "hello.txt"
+                    , lastModified = ( Time.utc, Time.millisToPosix 0 )
+                    , comment = Nothing
+                    }
+            ]
+            |> Zip.toBytes
 
   - 🧩 [`Zip` and `Zip.Entry` are from `agu-z/elm-zip`](https://dark.elm.dmy.fr/packages/agu-z/elm-zip/latest/)
 
--}
-httpBodyBytes : String -> (Bytes -> HttpBody)
-httpBodyBytes mimeType content =
-    HttpBodyUnsignedInt8s { mimeType = mimeType, content = content |> Bytes.LocalExtra.toUnsignedInt8List }
+Usually, if you have a request body,
+the headers include `Content-Type` with a [MIME type](https://en.wikipedia.org/wiki/Media_type)
 
+The response will either contain [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/).
+or an [`HttpError`](Web#HttpError)
 
-{-| Expect the response body to be `JSON`, decode it using the given decoder.
-The result will either be
+If you for some reason need a timeout,
+add a [`Web.timeOnceAt`](Web#timeOnceAt) and remove the [`Web.httpRequestSend`](#httpRequestSend)
+once it has passed.
 
-  - `Err` with an [`HttpError`](Web#HttpError) if it didn't succeed
-  - `Ok` if there was a result with either
-      - `Ok` with the decoded value
-      - `Err` with a [`Json.Decode.Error`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Decode#Error)
-        and the actual text response
+Uses the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
 
 -}
-httpExpectJson :
-    Json.Decode.Decoder future
-    ->
-        HttpExpect
-            (Result
-                HttpError
-                (Result { actualBody : String, jsonError : Json.Decode.Error } future)
-            )
-httpExpectJson stateDecoder =
-    HttpExpectString
-        (\result ->
-            case result of
-                Ok jsonString ->
-                    case jsonString |> Json.Decode.decodeString stateDecoder of
-                        Err jsonError ->
-                            Ok (Err { actualBody = jsonString, jsonError = jsonError })
-
-                        Ok json ->
-                            Ok (Ok json)
-
-                Err httpError ->
-                    Err httpError
-        )
-
-
-{-| Expect the response body to be [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/).
-The result will either be
-
-  - `Err` with an [`HttpError`](Web#HttpError) if it didn't succeed
-  - `Ok` with the `Bytes`
-
--}
-httpExpectBytes : HttpExpect (Result HttpError Bytes)
-httpExpectBytes =
-    HttpExpectBytes identity
-
-
-{-| Expect the response body to be a `String`.
--}
-httpExpectString : HttpExpect (Result HttpError String)
-httpExpectString =
-    HttpExpectString identity
-
-
-
--- Expect
-
-
-{-| Discard the response body.
--}
-httpExpectWhatever : HttpExpect (Result HttpError ())
-httpExpectWhatever =
-    HttpExpectWhatever identity
-
-
-{-| Create a `GET` [`HttpRequest`](Web#HttpRequest).
-
-Use [`Web.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
-Use [`Web.timeOnceAt`](Web#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
-
--}
-httpGet :
+httpRequestSend :
     { url : String
-    , expect : HttpExpect future
+    , method : String
+    , headers : List { name : String, value : String }
+    , body : Maybe Bytes
     }
-    -> HttpRequest future
-httpGet options =
-    { url = options.url
-    , method = "GET"
-    , headers = []
-    , body = HttpBodyEmpty
-    , expect = options.expect
-    }
-
-
-{-| Add custom headers to the [`Web.HttpRequest`](Web#HttpRequest).
-
-    request
-        |> Web.httpAddHeaders
-            [ ( "X-Custom-Header", "ProcessThisImmediately" )
-            ]
-
--}
-httpAddHeaders : List ( String, String ) -> (HttpRequest future -> HttpRequest future)
-httpAddHeaders headers request =
-    { request
-        | headers =
-            (headers |> List.map (\( name, value ) -> { name = name, value = value }))
-                ++ request.headers
-    }
-
-
-{-| Create a `POST` [`HttpRequest`](Web#HttpRequest).
-
-Use [`Web.httpAddHeaders`](Web#httpAddHeaders) to set custom headers as needed.
-Use [`Web.timeOnceAt`](Web#timeOnceAt) to add a timeout of how long you are willing to wait before giving up.
-
--}
-httpPost :
-    { url : String
-    , body : HttpBody
-    , expect : HttpExpect future
-    }
-    -> HttpRequest future
-httpPost options =
-    { url = options.url
-    , method = "POST"
-    , headers = []
-    , body = options.body
-    , expect = options.expect
-    }
-
-
-
--- request
-
-
-{-| An [`Interface`](Web#Interface) for handling an [`HttpRequest`](Web#HttpRequest)
-using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)
--}
-httpRequestSend : HttpRequest future -> Interface future
+    -> Interface (Result HttpError Bytes)
 httpRequestSend request =
-    request |> HttpRequestSend |> interfaceFromSingle
+    { url = request.url
+    , method = request.method
+    , headers = request.headers
+    , bodyUnsignedInt8s =
+        request.body
+            |> Maybe.map Bytes.LocalExtra.toUnsignedInt8List
+    , on = identity
+    }
+        |> HttpRequestSend
+        |> interfaceFromSingle
 
 
 {-| An [`Interface`](Web#Interface) for downloading a given file
