@@ -1,5 +1,6 @@
 port module Main exposing (State(..), main)
 
+import Bytes.Encode
 import Duration
 import Json.Encode
 import Node
@@ -45,15 +46,15 @@ interface (State state) =
                 ( Ok (), Ok () ) ->
                     [ Node.fileUtf8Write
                         { path = benchmarkDirectoryName ++ "/elm.json"
-                        , content = initElmJsonSource
+                        , content = initElmJsonSource |> Bytes.Encode.string |> Bytes.Encode.encode
                         }
                     , Node.fileUtf8Write
                         { path = benchmarkDirectoryName ++ "/src/WebMain.elm"
-                        , content = initWebMainElmSource
+                        , content = initWebMainElmSource |> Bytes.Encode.string |> Bytes.Encode.encode
                         }
                     , Node.fileUtf8Write
                         { path = benchmarkDirectoryName ++ "/src/Benchmarks.elm"
-                        , content = initBenchmarksElmSource
+                        , content = initBenchmarksElmSource |> Bytes.Encode.string |> Bytes.Encode.encode
                         }
                     , Node.standardOutWrite
                         ("""

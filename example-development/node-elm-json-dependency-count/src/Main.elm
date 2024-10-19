@@ -1,7 +1,10 @@
 port module Main exposing (State(..), main)
 
 import Ansi.Color
+import Ansi.Cursor
 import Ansi.Font
+import Bytes
+import Bytes.Decode
 import Elm.Package
 import Elm.Project
 import Json.Decode
@@ -13,7 +16,7 @@ type State
     = WaitingForWorkingDirectory
     | Running
         { workingDirectory : String
-        , elmJson : Maybe (Result Json.Decode.Error Elm.Project.Project)
+        , elmJson : Maybe (Result String Elm.Project.Project)
         }
 
 
@@ -40,16 +43,28 @@ interface state =
                 Nothing ->
                     Node.fileUtf8Request (running.workingDirectory ++ "/elm.json")
                         |> Node.interfaceFutureMap
-                            (\elmJsonRaw ->
+                            (\elmJsonBytes ->
                                 Running
                                     { workingDirectory = running.workingDirectory
                                     , elmJson =
-                                        Just (elmJsonRaw |> Json.Decode.decodeString Elm.Project.decoder)
+                                        Just
+                                            (case elmJsonBytes |> Bytes.Decode.decode (Bytes.Decode.string (Bytes.width elmJsonBytes)) of
+                                                Nothing ->
+                                                    Err "bytes could not be decoded into UTF-8 String"
+
+                                                Just elmJsonString ->
+                                                    case elmJsonString |> Json.Decode.decodeString Elm.Project.decoder of
+                                                        Ok elmJson ->
+                                                            Ok elmJson
+
+                                                        Err jsonDecodeError ->
+                                                            Err (jsonDecodeError |> Json.Decode.errorToString)
+                                            )
                                     }
                             )
 
                 Just (Ok elmJson) ->
-                    Node.consoleLog
+                    Node.standardOutWrite
                         ("elm.json parsed successfully.\nThe "
                             ++ (case elmJson of
                                     Elm.Project.Application application ->
@@ -58,18 +73,20 @@ interface state =
                                     Elm.Project.Package package ->
                                         "package "
                                             ++ (package.name |> Elm.Package.toString)
-                                            ++ " – "
+                                            ++ " - "
                                             ++ package.summary
                                             ++ "\nhas "
                                             ++ (package.deps |> List.length |> String.fromInt |> Ansi.Font.bold |> Ansi.Color.fontColor Ansi.Color.magenta)
                                             ++ " direct dependencies"
                                )
+                            ++ "\n"
                         )
 
                 Just (Err elmJsonDecodeError) ->
-                    Node.consoleError
+                    Node.standardErrWrite
                         ("elm.json failed to parse due to "
-                            ++ (elmJsonDecodeError |> Json.Decode.errorToString)
+                            ++ elmJsonDecodeError
+                            ++ "\n"
                         )
 
 

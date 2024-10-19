@@ -136,7 +136,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                             headers:
                                 Object.entries(request.headers)
                                     .map(([name, value]) => ({ name: name, value: value })),
-                            data: Buffer.concat(dataChunks).toString()
+                            data: Array.from(Buffer.concat(dataChunks))
                         }
                     })
                     function sendResponse(response: HttpServerResponse) {
@@ -148,7 +148,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                                 return tuple
                             }))
                         )
-                        responseBuilder.write(Buffer.from(response.data))
+                        responseBuilder.write(response.data)
                         responseBuilder.end()
                         sendToElm({ tag: "HttpResponseSent", value: null })
                     }
@@ -174,12 +174,12 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 port: number,
                 statusCode: number,
                 headers: { name: string, value: string }[],
-                data: string
+                dataUnsignedInt8s: number[]
             }) => {
                 const response: HttpServerResponse = {
                     statusCode: config.statusCode,
                     headers: config.headers,
-                    data: config.data
+                    data: Buffer.from(config.dataUnsignedInt8s)
                 }
                 const httpRequestAwaitingResponse = httpRequestsAwaitingResponse.get(config.port)
                 if (httpRequestAwaitingResponse === undefined) {
@@ -255,16 +255,16 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         warn("failed to unlink file " + err)
                     })
             }
-            case "FileUtf8Write": return (write: { content: string, path: string }) => {
+            case "FileUtf8Write": return (write: { contentUnsignedInt8s: number[], path: string }) => {
                 fileUtf8Write(write, abortSignal)
             }
             case "FileUtf8Request": return (path: string) => {
                 fs.promises.readFile(
                     path,
-                    { encoding: "utf-8", signal: abortSignal }
+                    { signal: abortSignal }
                 )
                     .then((content) => {
-                        sendToElm(content)
+                        sendToElm(Array.from(content))
                     })
                     .catch((err) => {
                         warn("failed to read file " + err)
@@ -321,7 +321,7 @@ const httpResponsesAwaitingRequest: Map<number /* port */, HttpServerResponse> =
 type HttpServerResponse = {
     statusCode: number,
     headers: { name: string, value: string }[],
-    data: string
+    data: Buffer
 }
 
 
@@ -333,11 +333,11 @@ function queueAbortable(abortSignal: AbortSignal, action: () => void) {
 }
 
 
-function fileUtf8Write(write: { path: string, content: string }, abortSignal: AbortSignal | undefined) {
+function fileUtf8Write(write: { path: string, contentUnsignedInt8s: number[] }, abortSignal: AbortSignal | undefined) {
     fs.promises.writeFile(
         write.path,
-        write.content,
-        { encoding: "utf-8", signal: abortSignal }
+        Uint8Array.from(write.contentUnsignedInt8s),
+        { signal: abortSignal }
     )
         .then(() => { })
         .catch((err) => warn("failed to write to file " + err))

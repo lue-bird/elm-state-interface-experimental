@@ -228,7 +228,7 @@ type InterfaceSingle future
         { portNumber : Int
         , statusCode : Int
         , headers : List { name : String, value : String }
-        , data : String
+        , dataUnsignedInt8s : List Int
         }
     | TimePosixRequest (Time.Posix -> future)
     | TimezoneOffsetRequest (Int -> future)
@@ -242,8 +242,8 @@ type InterfaceSingle future
         , on : Result { code : String, message : String } () -> future
         }
     | FileRemove String
-    | FileUtf8Write { content : String, path : String }
-    | FileUtf8Request { path : String, on : String -> future }
+    | FileUtf8Write { contentUnsignedInt8s : List Int, path : String }
+    | FileUtf8Request { path : String, on : Bytes -> future }
     | FileChangeListen { path : String, on : FileChange -> future }
     | FileInfoRequest
         { path : String
@@ -261,7 +261,7 @@ type HttpServerEvent
     | HttpRequestReceived
         { method : String
         , headers : List { name : String, value : String }
-        , data : String
+        , data : Bytes
         }
     | HttpResponseSent
     | HttpServerFailed { code : String, message : String }
@@ -547,7 +547,7 @@ interfaceSingleToJson interfaceSingle =
                                             ]
                                     )
                           )
-                        , ( "data", send.data |> Json.Encode.string )
+                        , ( "dataUnsignedInt8s", send.dataUnsignedInt8s |> Json.Encode.list Json.Encode.int )
                         ]
                 }
 
@@ -591,7 +591,7 @@ interfaceSingleToJson interfaceSingle =
                 , value =
                     Json.Encode.object
                         [ ( "path", write.path |> Json.Encode.string )
-                        , ( "content", write.content |> Json.Encode.string )
+                        , ( "contentUnsignedInt8s", write.contentUnsignedInt8s |> Json.Encode.list Json.Encode.int )
                         ]
                 }
 
@@ -674,7 +674,7 @@ interfaceSingleToStructuredId interfaceSingle =
                                             ]
                                     )
                           )
-                        , ( "data", send.data |> StructuredId.ofString )
+                        , ( "dataUnsignedInt8s", send.dataUnsignedInt8s |> Json.Encode.list Json.Encode.int )
                         ]
                 }
 
@@ -720,7 +720,7 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value =
                     StructuredId.ofParts
                         [ write.path |> StructuredId.ofString
-                        , write.content |> StructuredId.ofString
+                        , write.contentUnsignedInt8s |> StructuredId.ofList StructuredId.ofInt
                         ]
                 }
 
@@ -914,7 +914,8 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         FileUtf8Request request ->
-            Json.Decode.string
+            Json.Decode.list Json.Decode.int
+                |> Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
                 |> Json.Decode.map request.on
                 |> Just
 
@@ -1007,7 +1008,11 @@ httpServerEventJsonDecoder =
                         )
                     )
                 )
-                (Json.Decode.field "data" Json.Decode.string)
+                (Json.Decode.field "data"
+                    (Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
+                        (Json.Decode.list Json.Decode.int)
+                    )
+                )
             )
         , Json.Decode.LocalExtra.variant "HttpResponseSent"
             (Json.Decode.null HttpResponseSent)
@@ -1532,24 +1537,27 @@ fileRemove path =
 
 
 {-| An [`Interface`](Node#Interface) for creating or overwriting a file
-at a given path with given string content.
+at a given path with given [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/Bytes#Bytes) content.
 
 Uses [`fs.writeFile`](https://nodejs.org/api/fs.html#fswritefilefile-data-options-callback)
 
 -}
-fileUtf8Write : { content : String, path : String } -> Interface future_
+fileUtf8Write : { path : String, content : Bytes } -> Interface future_
 fileUtf8Write write =
-    FileUtf8Write write
+    FileUtf8Write
+        { path = write.path
+        , contentUnsignedInt8s = write.content |> Bytes.LocalExtra.toUnsignedInt8List
+        }
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Node#Interface) for reading the string content of the file
-at a given path.
+{-| An [`Interface`](Node#Interface) for reading the [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/latest/Bytes#Bytes) content
+of the file at a given path.
 
 Uses [`fs.readFile`](https://nodejs.org/api/fs.html#fsreadfilepath-options-callback)
 
 -}
-fileUtf8Request : String -> Interface String
+fileUtf8Request : String -> Interface Bytes
 fileUtf8Request path =
     FileUtf8Request { path = path, on = identity }
         |> interfaceFromSingle
@@ -1632,19 +1640,22 @@ You also have the ability to send data to the server whenever necessary.
                     Nothing
 
                 Just pendingRequest ->
-                    case pendingRequest.data |> String.fromInt of
+                    case pendingRequest.data |> Bytes.Decode.decode Bytes.Decode.signedInt32 Bytes.BE of
                         Nothing ->
                             Just
                                 { statusCode = 404
                                 , headers = []
-                                , data = ""
+                                , data = Bytes.Encode.sequence [] |> Bytes.Encode.encode
                                 }
 
                         Just requestNumber ->
                             Just
                                 { statusCode = 200
                                 , headers = []
-                                , data = requestNumber * 2 |> String.fromInt
+                                , data =
+                                    (requestNumber * 2)
+                                        |> Bytes.Encode.signedInt32 Bytes.BE
+                                        |> Bytes.Encode.encode
                                 }
         }
         |> Node.interfaceFutureMap
@@ -1676,7 +1687,7 @@ httpRequestListenAndMaybeRespond :
         Maybe
             { statusCode : Int
             , headers : List { name : String, value : String }
-            , data : String
+            , data : Bytes
             }
     }
     -> Interface HttpServerEvent
@@ -1697,7 +1708,7 @@ httpRequestListenAndMaybeRespond info =
                 { portNumber = info.portNumber
                 , statusCode = response.statusCode
                 , headers = response.headers
-                , data = response.data
+                , dataUnsignedInt8s = response.data |> Bytes.LocalExtra.toUnsignedInt8List
                 }
                 |> interfaceFromSingle
             ]
@@ -1843,6 +1854,8 @@ standardInRawListen =
 If you want to clear the screen, apply color or font effects,
 employ [ansi codes](https://dark.elm.dmy.fr/packages/wolfadex/elm-ansi/latest/) instead
 (either use a library or go click on the declarations and copy source)
+
+If you find that the last line gets eaten, append a `\n`
 
 Uses [`process.stdout.write`](https://nodejs.org/api/stream.html#writablewritechunk-encoding-callback)
 

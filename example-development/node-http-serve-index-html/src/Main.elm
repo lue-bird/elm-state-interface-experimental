@@ -1,5 +1,6 @@
 port module Main exposing (State(..), main)
 
+import Bytes.Encode
 import Duration
 import Json.Encode
 import Node
@@ -62,7 +63,7 @@ runningInterface running =
                     Just
                         { statusCode = 200
                         , headers = [ { name = "Content-Type", value = "text/html; charset=utf-8" } ]
-                        , data = indexHtml.source
+                        , data = indexHtml.source |> Bytes.Encode.string |> Bytes.Encode.encode
                         }
                 }
                 |> Node.interfaceFutureMap
