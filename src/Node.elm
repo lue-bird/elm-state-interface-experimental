@@ -19,6 +19,10 @@ module Node exposing
 {-| A state-interface program that can run in [node.js](https://nodejs.org/en)
 which is commonly used to create command line tools, scripts and servers.
 
+I recommend starting with [the minimal setup](https://github.com/lue-bird/elm-state-interface-node-hello),
+browsing [the examples](https://github.com/lue-bird/elm-state-interface-experimental/tree/main/example)
+and picking parts you want to experiment with.
+
 @docs program, Program
 
 You can also [embed](#embed) a state-interface program as part of an existing app that uses The Elm Architecture.
