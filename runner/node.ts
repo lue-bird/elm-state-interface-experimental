@@ -251,18 +251,15 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "FileRemove": return (path: string) => {
                 fs.promises.unlink(path)
                     .then(() => { })
-                    .catch((err) => {
-                        console.warn("failed to unlink file", err)
+                    .catch((error) => {
+                        console.warn("failed to unlink file", error)
                     })
             }
             case "FileWrite": return (write: { contentUnsignedInt8s: number[], path: string }) => {
                 fileWrite(write, abortSignal)
             }
             case "FileRequest": return (path: string) => {
-                fs.promises.readFile(
-                    path,
-                    { signal: abortSignal }
-                )
+                fs.promises.readFile(path, { signal: abortSignal })
                     .then((contentBuffer) => {
                         sendToElm({ tag: "Ok", value: Array.from(contentBuffer) })
                     })
@@ -291,10 +288,10 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "DirectorySubNamesRequest": return (path: string) => {
                 fs.promises.readdir(path)
                     .then((subNames) => {
-                        sendToElm(subNames) // name should always have only 1 element
+                        sendToElm({ tag: "Ok", value: subNames })
                     })
-                    .catch((err) => {
-                        console.warn("failed to read directory sub names", err)
+                    .catch((error) => {
+                        sendToElm({ tag: "Err", value: error })
                     })
             }
             default: return (_config: any) => {
@@ -342,7 +339,9 @@ function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, abor
         { signal: abortSignal }
     )
         .then(() => { })
-        .catch((err) => console.warn("failed to write to file", err))
+        .catch((error) => {
+            console.warn("failed to write to file", error)
+        })
 }
 
 function watchPath(

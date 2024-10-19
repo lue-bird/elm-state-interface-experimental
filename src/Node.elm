@@ -258,7 +258,10 @@ type InterfaceSingle future
             Maybe { byteCount : Int, lastContentChangeTime : Time.Posix, kind : FileKind }
             -> future
         }
-    | DirectorySubNamesRequest { path : String, on : List String -> future }
+    | DirectorySubNamesRequest
+        { path : String
+        , on : Result { code : String, message : String } (List String) -> future
+        }
 
 
 {-| How the connection has changed or what request has been sent.
@@ -975,7 +978,25 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         DirectorySubNamesRequest request ->
-            Json.Decode.list Json.Decode.string
+            Json.Decode.oneOf
+                [ Json.Decode.LocalExtra.variant "Ok"
+                    (Json.Decode.map Ok
+                        (Json.Decode.list Json.Decode.string)
+                    )
+                , Json.Decode.LocalExtra.variant "Err"
+                    (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+                        (Json.Decode.oneOf
+                            [ Json.Decode.field "code" Json.Decode.string
+                            , Json.Decode.succeed ""
+                            ]
+                        )
+                        (Json.Decode.oneOf
+                            [ Json.Decode.field "message" Json.Decode.string
+                            , Json.Decode.succeed ""
+                            ]
+                        )
+                    )
+                ]
                 |> Json.Decode.map request.on
                 |> Just
 
@@ -1632,13 +1653,15 @@ contained on the surface in the directory at the given path.
         Node.fileInfoRequest path
             |> Node.interfaceFutureRequest
                 (\subNames ->
-                    subNames |> List.map (\subName -> path ++ "/" ++ subName)
+                    subNames
+                        |> Result.withDefault []
+                        |> List.map (\subName -> path ++ "/" ++ subName)
                 )
 
 Uses [`fs.readdir`](https://nodejs.org/api/fs.html#fsreaddirpath-options-callback)
 
 -}
-directorySubNamesRequest : String -> Interface (List String)
+directorySubNamesRequest : String -> Interface (Result { code : String, message : String } (List String))
 directorySubNamesRequest path =
     DirectorySubNamesRequest { path = path, on = identity }
         |> interfaceFromSingle
