@@ -263,11 +263,13 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     path,
                     { signal: abortSignal }
                 )
-                    .then((content) => {
-                        sendToElm(Array.from(content))
+                    .then((contentBuffer) => {
+                        sendToElm({ tag: "Ok", value: Array.from(contentBuffer) })
                     })
-                    .catch((err) => {
-                        console.warn("failed to read file", err)
+                    .catch((error) => {
+                        if (!abortSignal.aborted) {
+                            sendToElm({ tag: "Err", value: error })
+                        }
                     })
             }
             case "FileInfoRequest": return (path: string) => {

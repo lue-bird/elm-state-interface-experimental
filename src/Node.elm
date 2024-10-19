@@ -247,7 +247,10 @@ type InterfaceSingle future
         }
     | FileRemove String
     | FileUtf8Write { contentUnsignedInt8s : List Int, path : String }
-    | FileUtf8Request { path : String, on : Bytes -> future }
+    | FileUtf8Request
+        { path : String
+        , on : Result { code : String, message : String } Bytes -> future
+        }
     | FileChangeListen { path : String, on : FileChange -> future }
     | FileInfoRequest
         { path : String
@@ -900,11 +903,15 @@ interfaceSingleFutureJsonDecoder interface =
                     (Json.Decode.null (Ok ()))
                 , Json.Decode.LocalExtra.variant "Err"
                     (Json.Decode.map2 (\code message -> Err { code = code, message = message })
-                        (Json.Decode.field "code"
-                            (Json.Decode.oneOf [ Json.Decode.string, Json.Decode.succeed "" ])
+                        (Json.Decode.oneOf
+                            [ Json.Decode.field "code" Json.Decode.string
+                            , Json.Decode.succeed ""
+                            ]
                         )
-                        (Json.Decode.field "message"
-                            (Json.Decode.oneOf [ Json.Decode.string, Json.Decode.succeed "" ])
+                        (Json.Decode.oneOf
+                            [ Json.Decode.field "message" Json.Decode.string
+                            , Json.Decode.succeed ""
+                            ]
                         )
                     )
                 ]
@@ -918,8 +925,27 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         FileUtf8Request request ->
-            Json.Decode.list Json.Decode.int
-                |> Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
+            Json.Decode.oneOf
+                [ Json.Decode.LocalExtra.variant "Ok"
+                    (Json.Decode.map Ok
+                        (Json.Decode.list Json.Decode.int
+                            |> Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
+                        )
+                    )
+                , Json.Decode.LocalExtra.variant "Err"
+                    (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+                        (Json.Decode.oneOf
+                            [ Json.Decode.field "code" Json.Decode.string
+                            , Json.Decode.succeed ""
+                            ]
+                        )
+                        (Json.Decode.oneOf
+                            [ Json.Decode.field "message" Json.Decode.string
+                            , Json.Decode.succeed ""
+                            ]
+                        )
+                    )
+                ]
                 |> Json.Decode.map request.on
                 |> Just
 
@@ -1561,7 +1587,7 @@ of the file at a given path.
 Uses [`fs.readFile`](https://nodejs.org/api/fs.html#fsreadfilepath-options-callback)
 
 -}
-fileUtf8Request : String -> Interface Bytes
+fileUtf8Request : String -> Interface (Result { code : String, message : String } Bytes)
 fileUtf8Request path =
     FileUtf8Request { path = path, on = identity }
         |> interfaceFromSingle
