@@ -1,7 +1,13 @@
 {
-    "type": "module",
-    "main": "src/index.js",
-    "dependencies": {
-        "@lue-bird/elm-state-interface-experimental": "^2.0.2"
-    }
+  "type": "module",
+  "name": "tetris",
+  "devDependencies": {
+    "elm-esm": "^1.1.4",
+    "@lue-bird/elm-state-interface-experimental": "^2.0.2"
+  },
+  "bin": "./src/index.js",
+  "scripts": {
+    "build": "elm-esm make src/Main.elm --output=src/elmMain.js --optimize",
+    "start": "elm-esm make src/Main.elm --output=src/elmMain.js && node src/index.js"
+  }
 }

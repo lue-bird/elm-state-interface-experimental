@@ -20,11 +20,6 @@ function copyExampleDevelopmentToExample(sub) {
     const exampleElmJsonPath = path.resolve(import.meta.dirname, "..", "example", sub, "elm.json")
     const indexHtmlPath = path.resolve(import.meta.dirname, sub, "index.html")
     const viteConfigPath = path.resolve(import.meta.dirname, sub, "vite.config.js")
-    const target =
-        fs.existsSync(indexHtmlPath) && fs.existsSync(viteConfigPath) ?
-            "web"
-            :
-            "node"
 
     fs.cpSync(
         path.resolve(import.meta.dirname, sub, "src"),
@@ -56,7 +51,20 @@ function copyExampleDevelopmentToExample(sub) {
     moveFromDirectToIndirect(exampleElmJson, "elm/bytes")
     fs.writeFileSync(exampleElmJsonPath, JSON.stringify(exampleElmJson, null, 4))
 
-    if (target === "web") {
+
+    fs.writeFileSync(
+        path.resolve(import.meta.dirname, "..", "example", sub, "package.json"),
+        fs.readFileSync(
+            path.resolve(import.meta.dirname, "..", "example-development", sub, "package.json"),
+            { encoding: "utf-8" }
+        ).replace("../..", "^2.0.2")
+    )
+    fs.cpSync(
+        path.resolve(import.meta.dirname, "..", "example-development", sub, "src", "index.js"),
+        path.resolve(import.meta.dirname, "..", "example", sub, "src", "index.js")
+    )
+
+    if (fs.existsSync(indexHtmlPath) && fs.existsSync(viteConfigPath)) {
         fs.cpSync(
             viteConfigPath,
             path.resolve(import.meta.dirname, "..", "example", sub, "vite.config.js")
@@ -64,46 +72,6 @@ function copyExampleDevelopmentToExample(sub) {
         fs.cpSync(
             indexHtmlPath,
             path.resolve(import.meta.dirname, "..", "example", sub, "index.html")
-        )
-        fs.writeFileSync(
-            path.resolve(import.meta.dirname, "..", "example", sub, "package.json"),
-            `{
-    "type": "module",
-    "main": "src/index.js",
-    "dependencies": {
-        "@lue-bird/elm-state-interface-experimental": "^2.0.2",
-        "vite": "^5.1.2",
-        "vite-plugin-elm-watch": "^1.3.2"
-    }
-}`
-        )
-        fs.writeFileSync(
-            path.resolve(import.meta.dirname, "..", "example", sub, "src", "index.js"),
-            `import * as Web from "@lue-bird/elm-state-interface-experimental/web"
-import Main from "./Main.elm"
-
-const elmApp = Main.init()
-Web.programStart({ ports: elmApp.ports, domElement: document.getElementById("app") })
-`
-        )
-    } else if (target === "node") {
-        fs.writeFileSync(
-            path.resolve(import.meta.dirname, "..", "example", sub, "package.json"),
-            `{
-    "type": "module",
-    "main": "src/index.js",
-    "dependencies": {
-        "@lue-bird/elm-state-interface-experimental": "^2.0.2"
-    }
-}`
-        )
-        fs.writeFileSync(
-            path.resolve(import.meta.dirname, "..", "example", sub, "src", "index.js"),
-            `import * as Node from "@lue-bird/elm-state-interface-experimental/node"
-
-const elmApp = Node.compileElm(import.meta.dirname, "Main.elm").init()
-Node.programStart({ ports: elmApp.ports })
-`
         )
     }
 }

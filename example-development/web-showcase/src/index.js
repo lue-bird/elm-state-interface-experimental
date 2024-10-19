@@ -1,4 +1,4 @@
-import * as Web from "../../../runner-compiled/web.js"
+import * as Web from "@lue-bird/elm-state-interface-experimental/web"
 import Main from "./Main.elm"
 
 const elmApp = Main.init()

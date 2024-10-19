@@ -1,6 +1,5 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import * as child_process from "node:child_process"
 import * as http from "node:http"
 
 export interface ElmPorts {
@@ -10,48 +9,6 @@ export interface ElmPorts {
     }
     fromJs: { send: (toElm: any) => void }
 }
-
-/** Small helper for creating a runnable elm program. Requires the `elm` binary to be available.
- * Feel free to use a custom loader that e.g. allows debug or uses an alternative compiler.
- * 
- * @param elmProjectDirectoryPath The path to the elm application. Use `import.meta.dirname`
- * @param mainElmModuleNamePath usually Main.elm or src/Main.elm depending on where your index.js is
- * @returns An elm worker program you can start whenever you want which then provides its ports
- */
-export function compileElm(elmProjectDirectoryPath: string, mainElmModuleNamePath: string): { init: () => { ports: ElmPorts } } {
-    if (elmProjectDirectoryPath === undefined) {
-        console.error("To access import.meta.dirname you need at least Node.js 20.11 / 21.2: https://stackoverflow.com/a/50052194")
-        throw new Error()
-    }
-    const elmJsPath = path.join(elmProjectDirectoryPath, "elm-stuff", "temporary-elm.js")
-
-    child_process.execSync(
-        // if you want to use Debug.log etc while prototyping or debugging, remove the --optimize flag
-        // if you need extra performance switch to https://github.com/mdgriffith/elm-optimize-level-2
-        `elm make ${mainElmModuleNamePath} --output "${elmJsPath}" --optimize`,
-        { cwd: elmProjectDirectoryPath }
-    )
-    eval(
-        fs.readFileSync(elmJsPath, { encoding: "utf8" })
-            .replace("(this)", "(globalThis)")
-    )
-    fs.unlinkSync(elmJsPath)
-    return elmResultExtractInit((globalThis as any).Elm)
-}
-function elmResultExtractInit(elmResult: any): { init: () => { ports: ElmPorts } } {
-    if (elmResult.init !== undefined) {
-        return elmResult
-    } else {
-        const elmResultInner = Object.entries(elmResult)[0]
-        if (elmResultInner === undefined) {
-            throw new Error("I was unable to extract an init function from the compiled elm. Did you edit the code?")
-        } else {
-            return elmResultExtractInit(elmResultInner[1])
-        }
-    }
-}
-
-
 
 export function programStart(appConfig: { ports: ElmPorts }) {
     process.addListener("exit", (_event) => {
