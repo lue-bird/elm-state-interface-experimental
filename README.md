@@ -363,7 +363,7 @@ interface =
                         |> Web.domFutureMap (\_ -> MinusClicked)
                     ]
                     |> Web.domRender
-                , Web.pushUrl
+                , Web.urlPush
                     { path = []
                     , queryParameters = Dict.singleton "counter" [ counter |> String.fromInt ]
                     , fragment = Nothing

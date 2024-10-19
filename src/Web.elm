@@ -10,7 +10,7 @@ module Web exposing
     , domListenTo, domListenToPreventingDefaultAction
     , domScrollToShow, DomElementVisibilityAlignment(..), domScrollPositionRequest, domScrollToPosition
     , urlRequest
-    , pushUrl, replaceUrl
+    , urlPush, urlReplace
     , navigateForward, navigateBack, navigationListen
     , navigateTo, reload
     , httpRequestSend, HttpError(..)
@@ -80,7 +80,7 @@ Primitives used for SVG and HTML
 `history` interaction
 
 @docs urlRequest
-@docs pushUrl, replaceUrl
+@docs urlPush, urlReplace
 @docs navigateForward, navigateBack, navigationListen
 @docs navigateTo, reload
 
@@ -4678,11 +4678,11 @@ without triggering a page load or adding a new entry to the browser history.
 This can be useful if you have search box and you want the ?search=hats in the URL to match without adding a history entry for every single key stroke.
 Imagine how annoying it would be to click back thirty times and still be on the same page!
 
-Replacement for [`Browser.Navigation.replaceUrl`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#replaceUrl)
+Replacement for [`Browser.Navigation.urlReplace`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#urlReplace)
 
 -}
-replaceUrl : AppUrl -> Interface future_
-replaceUrl appUrl =
+urlReplace : AppUrl -> Interface future_
+urlReplace appUrl =
     NavigationReplaceUrl appUrl
         |> interfaceFromSingle
 
@@ -4691,11 +4691,11 @@ replaceUrl appUrl =
 and adding a new entry to the browser history
 without triggering a page load.
 
-Replacement for [`Browser.Navigation.pushUrl`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#pushUrl)
+Replacement for [`Browser.Navigation.urlPush`](https://dark.elm.dmy.fr/packages/elm/browser/latest/Browser-Navigation#urlPush)
 
 -}
-pushUrl : AppUrl -> Interface future_
-pushUrl appUrl =
+urlPush : AppUrl -> Interface future_
+urlPush appUrl =
     NavigationPushUrl appUrl
         |> interfaceFromSingle
 
@@ -4761,13 +4761,13 @@ reload =
         |> interfaceFromSingle
 
 
-{-| If you used [`pushUrl`](#pushUrl) to update the URL with new history entries,
+{-| If you used [`urlPush`](#urlPush) to update the URL with new history entries,
 when the user clicks ← or → buttons (or you call [`navigateForward`](#navigateForward) or [`navigateBack`](#navigateBack) yourself),
 the URL will change but your UI will not.
 
 [`navigationListen`](#navigationListen) is an [`Interface`](Web#Interface) for detecting those URL changes and making ui changes as needed.
 
-When the app itself initiates a url change with [`pushUrl`](#pushUrl) or [`replaceUrl`](#replaceUrl), no such event is triggered.
+When the app itself initiates a url change with [`urlPush`](#urlPush) or [`urlReplace`](#urlReplace), no such event is triggered.
 
 Note: This event is called ["popstate"](https://developer.mozilla.org/en-US/docs/Web/API/Window/popstate_event) in js
 

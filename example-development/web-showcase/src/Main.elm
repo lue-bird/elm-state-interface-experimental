@@ -47,7 +47,7 @@ programConfig =
 
                 Initialized initialized ->
                     [ initialized |> initializedInterface
-                    , Web.pushUrl (initialized |> stateToAppUrl)
+                    , Web.urlPush (initialized |> stateToAppUrl)
                     , Web.navigationListen
                         |> Web.interfaceFutureMap
                             (\newUrl ->
