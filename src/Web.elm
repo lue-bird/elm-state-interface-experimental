@@ -3,14 +3,12 @@ module Web exposing
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
-    , DomElementHeader, DomElementVisibilityAlignment(..), DefaultActionHandling(..)
-    , DomNode(..), domText
-    , DomElement, domElement, svgElement, domElementNamespaced
+    , domText, domElement, svgElement, domElementNamespaced, DomNode(..)
     , domFutureMap, domRender
     , DomModifier, domModifierFutureMap, domModifierBatch, domModifierNone
     , domAttribute, domAttributeNamespaced, domStyle, domBoolProperty, domStringProperty
     , domListenTo, domListenToPreventingDefaultAction
-    , domScrollToShow, domScrollPositionRequest, domScrollToPosition
+    , domScrollToShow, DomElementVisibilityAlignment(..), domScrollPositionRequest, domScrollToPosition
     , urlRequest
     , pushUrl, replaceUrl
     , navigateForward, navigateBack, navigationListen
@@ -37,7 +35,7 @@ module Web exposing
     , documentListenTo, windowListenTo
     , titleReplaceBy, authorSet, keywordsSet, descriptionSet
     , ProgramConfig, programInit, programUpdate, programSubscriptions
-    , DomModifierSingle(..)
+    , DomElement, DomModifierSingle(..), DomElementHeader, DefaultActionHandling(..)
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..)
     , SortedKeyValueList(..)
     , InternalFastDict(..), InternalFastDictInner(..), InternalFastDictNColor(..)
@@ -69,15 +67,12 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 Primitives used for SVG and HTML
 (filling the same role as [`elm/virtual-dom`](https://dark.elm.dmy.fr/packages/elm/virtual-dom/latest/))
 
-@docs DomElementHeader, DomElementVisibilityAlignment, DefaultActionHandling
-
-@docs DomNode, domText
-@docs DomElement, domElement, svgElement, domElementNamespaced
+@docs domText, domElement, svgElement, domElementNamespaced, DomNode
 @docs domFutureMap, domRender
 @docs DomModifier, domModifierFutureMap, domModifierBatch, domModifierNone
 @docs domAttribute, domAttributeNamespaced, domStyle, domBoolProperty, domStringProperty
 @docs domListenTo, domListenToPreventingDefaultAction
-@docs domScrollToShow, domScrollPositionRequest, domScrollToPosition
+@docs domScrollToShow, DomElementVisibilityAlignment, domScrollPositionRequest, domScrollToPosition
 
 
 ## navigation
@@ -90,7 +85,7 @@ Primitives used for SVG and HTML
 @docs navigateTo, reload
 
 
-## HTTP
+## HTTP client
 
 @docs httpRequestSend, HttpError
 
@@ -292,7 +287,7 @@ press some buttons. On some devices, only certain buttons will wake up the gamep
 @docs Gamepad, GamepadButton, gamepadsRequest, gamepadsChangeListen
 
 
-## Notification
+## notification
 
 Give important notices to the user as push notifications.
 Consider this a convenience feature, not something users have to rely upon.
@@ -402,7 +397,7 @@ Under the hood, [`Web.program`](Web#program) is then defined as just
 
 Exposed so can for example simulate it more easily in tests, add a debugger etc.
 
-@docs DomModifierSingle
+@docs DomElement, DomModifierSingle, DomElementHeader, DefaultActionHandling
 
 @docs ProgramState, ProgramEvent, InterfaceSingle, DomTextOrElementHeader
 
@@ -616,7 +611,7 @@ type alias ProgramConfig state =
 
 
 {-| Incoming and outgoing effects.
-To create one, use the helpers in [time](#time), [DOM](#dom), [HTTP](#http) etc.
+To create one, use the helpers in [time](#time), [DOM](#dom), [HTTP](#http-client) etc.
 
 To combine multiple, use [`Web.interfaceBatch`](#interfaceBatch) and [`Web.interfaceNone`](#interfaceNone).
 To change the value that comes back in the future, use [`Web.interfaceFutureMap`](Web#interfaceFutureMap)
@@ -627,7 +622,7 @@ type alias Interface future =
 
 
 {-| A "non-batched" [`Interface`](#Interface).
-To create one, use the helpers in [time](#time), [DOM](#dom), [HTTP](#http) etc.
+To create one, use the helpers in [time](#time), [DOM](#dom), [HTTP](#http-client) etc.
 -}
 type InterfaceSingle future
     = DocumentTitleReplaceBy String
@@ -3972,7 +3967,7 @@ type DomEdit
     And it always starts with a given `initialState`
 
   - The [`Interface`](#Interface) is the face to the outside world
-    and can be created using the helpers in [time](#time), [DOM](#dom), [HTTP](#http) etc.
+    and can be created using the helpers in [time](#time), [DOM](#dom), [HTTP](#http-client) etc.
     The given `interface` function constructs these interfaces based on the current state
 
   - Connections to and from js
@@ -4130,7 +4125,7 @@ timePeriodicallyListen intervalDuration =
         |> interfaceFromSingle
 
 
-{-| Create an SVG element [`Web.DomNode`](Web#DomNode).
+{-| Create an SVG [DOM node](#DomNode).
 with a given tag, [`DomModifier`](Web#DomModifier)s and sub-nodes
 -}
 svgElement : String -> List (DomModifier future) -> List (DomNode future) -> DomNode future
@@ -4845,7 +4840,7 @@ geoLocationChangeListen =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Web#Interface) for displaying a given [`Web.DomNode`](Web#DomNode)
+{-| An [`Interface`](Web#Interface) for displaying a given [DOM node](Web#DomNode)
 -}
 domRender : DomNode future -> Interface future
 domRender domNode =
@@ -4981,7 +4976,7 @@ internalFastDictFromReverseSortedListBy entryToKeyValue entries =
         )
 
 
-{-| Wire events from this [`Web.DomNode`](Web#DomNode) to a specific event, for example
+{-| Wire events from this [DOM node](Web#DomNode) to a specific event, for example
 
     buttonUi "start"
         |> Web.domFutureMap (\Clicked -> StartButtonClicked)
@@ -5018,7 +5013,7 @@ elementFutureMap futureChange domElementToMap =
     }
 
 
-{-| Plain text [`DomNode`](#DomNode)
+{-| Plain text [DOM node](#DomNode)
 -}
 domText : String -> DomNode future_
 domText =
@@ -5260,7 +5255,7 @@ For example to get `<p>flying</p>`
         []
         [ Web.domText "flying" ]
 
-To create SVG elements, use [`Web.svgElement`](Web#svgElement)
+To create an SVG element, use [`Web.svgElement`](Web#svgElement)
 
 -}
 domElement : String -> List (DomModifier future) -> List (DomNode future) -> DomNode future
