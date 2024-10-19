@@ -35,11 +35,10 @@ module Web exposing
     , documentListenTo, windowListenTo
     , titleReplaceBy, authorSet, keywordsSet, descriptionSet
     , ProgramConfig, programInit, programUpdate, programSubscriptions
-    , DomElement, DomModifierSingle(..), DomElementHeader, DefaultActionHandling(..)
-    , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..)
+    , DomElement, DefaultActionHandling(..), DomModifierSingle(..)
+    , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..), DomElementHeader
     , SortedKeyValueList(..)
     , InternalFastDict(..), InternalFastDictInner(..), InternalFastDictNColor(..)
-    , interfaceSingleEdits, InterfaceSingleEdit(..), AudioEdit(..), DomEdit(..)
     )
 
 {-| A state-interface program that can run in the browser
@@ -397,15 +396,13 @@ Under the hood, [`Web.program`](Web#program) is then defined as just
 
 Exposed so can for example simulate it more easily in tests, add a debugger etc.
 
-@docs DomElement, DomModifierSingle, DomElementHeader, DefaultActionHandling
+@docs DomElement, DefaultActionHandling, DomModifierSingle
 
-@docs ProgramState, ProgramEvent, InterfaceSingle, DomTextOrElementHeader
+@docs ProgramState, ProgramEvent, InterfaceSingle, DomTextOrElementHeader, DomElementHeader
 
 @docs SortedKeyValueList
 
 @docs InternalFastDict, InternalFastDictInner, InternalFastDictNColor
-
-@docs interfaceSingleEdits, InterfaceSingleEdit, AudioEdit, DomEdit
 
 If you need more things like json encoders/decoders, [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new)
 
@@ -468,7 +465,7 @@ import Url.LocalExtra
        }
        ```
 
-    - inside `Web.interfaceSingleEdits`, add a case `[YourName] -> []`.
+    - inside `Web.interfaceSingleEditsMap`, add a case `[YourName] -> []`.
       If your running interface can be changed, read the section below
 
 
@@ -478,7 +475,7 @@ import Url.LocalExtra
    If you also want to enable editing a running interface:
 
     - to `Web.InterfaceSingleEdit`, add a variant `| Edit[YourName] ..your diff info..`
-    - inside `Web.interfaceSingleEdits`, set the case
+    - inside `Web.interfaceSingleEditsMap`, set the case
       ```elm
       [YourName] old ->
           case case interfaces.updated of
@@ -1259,482 +1256,6 @@ type ProgramEvent appState
     | JsEventEnabledConstructionOfNewAppState appState
 
 
-interfaceSingleEditsMap :
-    (InterfaceSingleEdit -> fromSingeEdit)
-    ->
-        ({ old : InterfaceSingle future, updated : InterfaceSingle future }
-         -> List fromSingeEdit
-        )
-interfaceSingleEditsMap fromSingeEdit interfaces =
-    case interfaces.old of
-        DomNodeRender domElementPreviouslyRendered ->
-            case interfaces.updated of
-                DomNodeRender domElementToRender ->
-                    { old = domElementPreviouslyRendered.node, updated = domElementToRender.node }
-                        |> domTextOrElementHeaderDiffMap
-                            (\diff ->
-                                { reversePath = domElementPreviouslyRendered.reversePath
-                                , replacement = diff
-                                }
-                                    |> EditDom
-                                    |> fromSingeEdit
-                            )
-
-                _ ->
-                    []
-
-        AudioPlay previouslyPlayed ->
-            case interfaces.updated of
-                AudioPlay toPlay ->
-                    { old = previouslyPlayed, updated = toPlay }
-                        |> audioDiffMap
-                            (\diff ->
-                                { url = toPlay.url, startTime = toPlay.startTime, replacement = diff }
-                                    |> EditAudio
-                                    |> fromSingeEdit
-                            )
-
-                _ ->
-                    []
-
-        NotificationShow _ ->
-            case interfaces.updated of
-                NotificationShow toShow ->
-                    [ { id = toShow.id, message = toShow.message, details = toShow.details }
-                        |> EditNotification
-                        |> fromSingeEdit
-                    ]
-
-                _ ->
-                    []
-
-        DocumentTitleReplaceBy _ ->
-            []
-
-        DocumentAuthorSet _ ->
-            []
-
-        DocumentKeywordsSet _ ->
-            []
-
-        DocumentDescriptionSet _ ->
-            []
-
-        DocumentEventListen _ ->
-            []
-
-        ConsoleLog _ ->
-            []
-
-        ConsoleWarn _ ->
-            []
-
-        ConsoleError _ ->
-            []
-
-        NavigationReplaceUrl _ ->
-            []
-
-        NavigationPushUrl _ ->
-            []
-
-        NavigationGo _ ->
-            []
-
-        NavigationLoad _ ->
-            []
-
-        NavigationReload () ->
-            []
-
-        NavigationUrlRequest _ ->
-            []
-
-        FileDownload _ ->
-            []
-
-        ClipboardReplaceBy _ ->
-            []
-
-        ClipboardRequest _ ->
-            []
-
-        AudioSourceLoad _ ->
-            []
-
-        NotificationAskForPermission () ->
-            []
-
-        HttpRequestSend _ ->
-            []
-
-        TimePosixRequest _ ->
-            []
-
-        TimezoneOffsetRequest _ ->
-            []
-
-        TimeOnce _ ->
-            []
-
-        TimePeriodicallyListen _ ->
-            []
-
-        TimezoneNameRequest _ ->
-            []
-
-        RandomUnsignedInt32sRequest _ ->
-            []
-
-        WindowSizeRequest _ ->
-            []
-
-        WindowPreferredLanguagesRequest _ ->
-            []
-
-        WindowEventListen _ ->
-            []
-
-        WindowVisibilityChangeListen _ ->
-            []
-
-        WindowAnimationFrameListen _ ->
-            []
-
-        WindowPreferredLanguagesChangeListen _ ->
-            []
-
-        SocketListen _ ->
-            []
-
-        SocketDataSend _ ->
-            []
-
-        LocalStorageSet _ ->
-            []
-
-        LocalStorageRequest _ ->
-            []
-
-        LocalStorageRemoveOnADifferentTabListen _ ->
-            []
-
-        LocalStorageSetOnADifferentTabListen _ ->
-            []
-
-        GeoLocationRequest _ ->
-            []
-
-        GeoLocationChangeListen _ ->
-            []
-
-        GamepadsRequest _ ->
-            []
-
-        GamepadsChangeListen _ ->
-            []
-
-
-domTextOrElementHeaderDiffMap :
-    (DomEdit -> fromDomEdit)
-    ->
-        ({ old : DomTextOrElementHeader state, updated : DomTextOrElementHeader state }
-         -> List fromDomEdit
-        )
-domTextOrElementHeaderDiffMap fromDomEdit nodes =
-    case nodes.old of
-        DomHeaderText oldText ->
-            case nodes.updated of
-                DomElementHeader updatedElement ->
-                    [ updatedElement
-                        |> domElementHeaderFutureMap (\_ -> ())
-                        |> DomElementHeader
-                        |> ReplacementDomNode
-                        |> fromDomEdit
-                    ]
-
-                DomHeaderText updatedText ->
-                    if oldText == updatedText ++ "" then
-                        []
-
-                    else
-                        [ updatedText
-                            |> DomHeaderText
-                            |> ReplacementDomNode
-                            |> fromDomEdit
-                        ]
-
-        DomElementHeader oldElement ->
-            case nodes.updated of
-                DomHeaderText updatedText ->
-                    [ updatedText
-                        |> DomHeaderText
-                        |> ReplacementDomNode
-                        |> fromDomEdit
-                    ]
-
-                DomElementHeader updatedElement ->
-                    { old = oldElement, updated = updatedElement }
-                        |> domElementHeaderDiffMap fromDomEdit
-
-
-domElementHeaderDiffMap :
-    (DomEdit -> fromDomEdit)
-    ->
-        ({ old : DomElementHeader future, updated : DomElementHeader future }
-         -> List fromDomEdit
-        )
-domElementHeaderDiffMap fromDomEdit elements =
-    if elements.old.tag /= elements.updated.tag then
-        [ elements.updated
-            |> domElementHeaderFutureMap (\_ -> ())
-            |> DomElementHeader
-            |> ReplacementDomNode
-            |> fromDomEdit
-        ]
-
-    else
-        { old = elements.old.styles, updated = elements.updated.styles }
-            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
-                { remove = identity, edit = Basics.identity }
-            |> List.LocalExtra.fromMaybe
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.attributes, updated = elements.updated.attributes }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                        (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
-                )
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
-                        (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
-                        { remove = \k -> { namespace = k.namespace, key = k.key }
-                        , edit = \entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value }
-                        }
-                )
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.stringProperties, updated = elements.updated.stringProperties }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                        (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
-                )
-            |> List.LocalExtra.consJust
-                ({ old = elements.old.boolProperties, updated = elements.updated.boolProperties }
-                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                        (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
-                )
-            |> List.LocalExtra.consJust
-                (if elements.old.scrollToPosition == elements.updated.scrollToPosition then
-                    Nothing
-
-                 else
-                    ReplacementDomElementScrollToPosition elements.updated.scrollToPosition
-                        |> fromDomEdit
-                        |> Just
-                )
-            |> List.LocalExtra.consJust
-                (if elements.old.scrollToShow == elements.updated.scrollToShow then
-                    Nothing
-
-                 else
-                    ReplacementDomElementScrollToShow elements.updated.scrollToShow
-                        |> fromDomEdit
-                        |> Just
-                )
-            |> List.LocalExtra.consJust
-                (case elements.old.scrollPositionRequest of
-                    Just _ ->
-                        Nothing
-
-                    Nothing ->
-                        case elements.updated.scrollPositionRequest of
-                            Nothing ->
-                                Nothing
-
-                            Just _ ->
-                                replacementDomElementScrollPositionRequest
-                                    |> fromDomEdit
-                                    |> Just
-                )
-            |> List.LocalExtra.consJust
-                (let
-                    updatedElementEventListensId : List { key : String, value : DefaultActionHandling }
-                    updatedElementEventListensId =
-                        elements.updated.eventListens
-                            |> sortedKeyValueListToList
-                            |> List.LocalExtra.mapAnyOrder
-                                (\entry ->
-                                    { key = entry.key, value = entry.value.defaultActionHandling }
-                                )
-                 in
-                 if
-                    (elements.old.eventListens
-                        |> sortedKeyValueListToList
-                        |> List.LocalExtra.mapAnyOrder
-                            (\entry ->
-                                { key = entry.key, value = entry.value.defaultActionHandling }
-                            )
-                    )
-                        == updatedElementEventListensId
-                 then
-                    Nothing
-
-                 else
-                    ReplacementDomElementEventListens updatedElementEventListensId
-                        |> fromDomEdit
-                        |> Just
-                )
-
-
-replacementDomElementScrollPositionRequest : DomEdit
-replacementDomElementScrollPositionRequest =
-    ReplacementDomElementScrollPositionRequest ()
-
-
-sortedKeyValueListEditAndRemoveDiffMapBy :
-    (key -> comparable_)
-    -> ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
-    -> { remove : key -> removeSingle, edit : { key : key, value : value } -> editSingle }
-    ->
-        ({ old : SortedKeyValueList key value
-         , updated : SortedKeyValueList key value
-         }
-         -> Maybe fromRemoveAndEdit
-        )
-sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDiffSingle dicts =
-    let
-        diff : { remove : List removeSingle, edit : List editSingle }
-        diff =
-            sortedKeyValueListMergeBy keyToComparable
-                (\removed soFar ->
-                    { edit = soFar.edit
-                    , remove = asDiffSingle.remove removed.key :: soFar.remove
-                    }
-                )
-                (\old updated soFar ->
-                    if old == updated.value then
-                        soFar
-
-                    else
-                        { remove = soFar.remove
-                        , edit = asDiffSingle.edit updated :: soFar.edit
-                        }
-                )
-                (\updated soFar ->
-                    { remove = soFar.remove
-                    , edit = asDiffSingle.edit updated :: soFar.edit
-                    }
-                )
-                (dicts.old |> sortedKeyValueListToList)
-                (dicts.updated |> sortedKeyValueListToList)
-                { remove = [], edit = [] }
-    in
-    case diff.remove of
-        [] ->
-            case diff.edit of
-                [] ->
-                    Nothing
-
-                (_ :: _) as editsFilled ->
-                    { remove = [], edit = editsFilled } |> fromEditAndRemove |> Just
-
-        (_ :: _) as removeFilled ->
-            { remove = removeFilled, edit = diff.edit } |> fromEditAndRemove |> Just
-
-
-{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
-The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
--}
-sortedKeyValueListMergeBy :
-    (key -> comparable_)
-    -> ({ key : key, value : a } -> folded -> folded)
-    -> (a -> { key : key, value : b } -> folded -> folded)
-    -> ({ key : key, value : b } -> folded -> folded)
-    -> List { key : key, value : a }
-    -> List { key : key, value : b }
-    -> folded
-    -> folded
-sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
-    case aSortedKeyValueList of
-        [] ->
-            bSortedKeyValueList |> List.foldl onlyB initialFolded
-
-        aLowest :: aWithoutLowest ->
-            case bSortedKeyValueList of
-                [] ->
-                    aWithoutLowest
-                        |> List.foldl onlyA
-                            (onlyA aLowest initialFolded)
-
-                bLowest :: bWithoutLowest ->
-                    case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
-                        EQ ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bWithoutLowest
-                                (bothAB aLowest.value bLowest initialFolded)
-
-                        LT ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aWithoutLowest
-                                bSortedKeyValueList
-                                (onlyA aLowest initialFolded)
-
-                        GT ->
-                            sortedKeyValueListMergeBy keyToComparable
-                                onlyA
-                                bothAB
-                                onlyB
-                                aSortedKeyValueList
-                                bWithoutLowest
-                                (onlyB bLowest initialFolded)
-
-
-audioDiffMap :
-    (AudioEdit -> fromAudioEdit)
-    -> ({ old : Audio, updated : Audio } -> List fromAudioEdit)
-audioDiffMap fromAudioEdit audios =
-    (if audios.old.volume == audios.updated.volume then
-        []
-
-     else
-        [ ReplacementAudioVolume audios.updated.volume |> fromAudioEdit ]
-    )
-        |> List.LocalExtra.consJust
-            (if audios.old.speed == audios.updated.speed then
-                Nothing
-
-             else
-                ReplacementAudioSpeed audios.updated.speed |> fromAudioEdit |> Just
-            )
-        |> List.LocalExtra.consJust
-            (if audios.old.stereoPan == audios.updated.stereoPan then
-                Nothing
-
-             else
-                ReplacementAudioStereoPan audios.updated.stereoPan |> fromAudioEdit |> Just
-            )
-        |> List.LocalExtra.consJust
-            (if audios.old.processingLastToFirst == audios.updated.processingLastToFirst then
-                Nothing
-
-             else
-                audios.updated.processingLastToFirst
-                    |> List.reverse
-                    |> ReplacementAudioProcessing
-                    |> fromAudioEdit
-                    |> Just
-            )
-
-
 namespacedKeyToComparable : { namespace : String, key : String } -> String
 namespacedKeyToComparable namespacedKey =
     namespacedKey.key ++ String.cons ' ' namespacedKey.namespace
@@ -1750,15 +1271,6 @@ type SortedKeyValueList key value
 sortedKeyValueListToList : SortedKeyValueList key value -> List { key : key, value : value }
 sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
     sortedKeyValueList
-
-
-{-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
--}
-interfaceSingleEdits :
-    { old : InterfaceSingle future, updated : InterfaceSingle future }
-    -> List InterfaceSingleEdit
-interfaceSingleEdits interfaces =
-    interfaces |> interfaceSingleEditsMap Basics.identity
 
 
 toJsToJson : { id : String, diff : InterfaceSingleDiff future_ } -> Json.Encode.Value
@@ -3769,6 +3281,482 @@ interfacesDiffMap idAndDiffCombine interfaces =
         interfaces.old
         interfaces.updated
         []
+
+
+interfaceSingleEditsMap :
+    (InterfaceSingleEdit -> fromSingeEdit)
+    ->
+        ({ old : InterfaceSingle future, updated : InterfaceSingle future }
+         -> List fromSingeEdit
+        )
+interfaceSingleEditsMap fromSingeEdit interfaces =
+    case interfaces.old of
+        DomNodeRender domElementPreviouslyRendered ->
+            case interfaces.updated of
+                DomNodeRender domElementToRender ->
+                    { old = domElementPreviouslyRendered.node, updated = domElementToRender.node }
+                        |> domTextOrElementHeaderDiffMap
+                            (\diff ->
+                                { reversePath = domElementPreviouslyRendered.reversePath
+                                , replacement = diff
+                                }
+                                    |> EditDom
+                                    |> fromSingeEdit
+                            )
+
+                _ ->
+                    []
+
+        AudioPlay previouslyPlayed ->
+            case interfaces.updated of
+                AudioPlay toPlay ->
+                    { old = previouslyPlayed, updated = toPlay }
+                        |> audioDiffMap
+                            (\diff ->
+                                { url = toPlay.url, startTime = toPlay.startTime, replacement = diff }
+                                    |> EditAudio
+                                    |> fromSingeEdit
+                            )
+
+                _ ->
+                    []
+
+        NotificationShow _ ->
+            case interfaces.updated of
+                NotificationShow toShow ->
+                    [ { id = toShow.id, message = toShow.message, details = toShow.details }
+                        |> EditNotification
+                        |> fromSingeEdit
+                    ]
+
+                _ ->
+                    []
+
+        DocumentTitleReplaceBy _ ->
+            []
+
+        DocumentAuthorSet _ ->
+            []
+
+        DocumentKeywordsSet _ ->
+            []
+
+        DocumentDescriptionSet _ ->
+            []
+
+        DocumentEventListen _ ->
+            []
+
+        ConsoleLog _ ->
+            []
+
+        ConsoleWarn _ ->
+            []
+
+        ConsoleError _ ->
+            []
+
+        NavigationReplaceUrl _ ->
+            []
+
+        NavigationPushUrl _ ->
+            []
+
+        NavigationGo _ ->
+            []
+
+        NavigationLoad _ ->
+            []
+
+        NavigationReload () ->
+            []
+
+        NavigationUrlRequest _ ->
+            []
+
+        FileDownload _ ->
+            []
+
+        ClipboardReplaceBy _ ->
+            []
+
+        ClipboardRequest _ ->
+            []
+
+        AudioSourceLoad _ ->
+            []
+
+        NotificationAskForPermission () ->
+            []
+
+        HttpRequestSend _ ->
+            []
+
+        TimePosixRequest _ ->
+            []
+
+        TimezoneOffsetRequest _ ->
+            []
+
+        TimeOnce _ ->
+            []
+
+        TimePeriodicallyListen _ ->
+            []
+
+        TimezoneNameRequest _ ->
+            []
+
+        RandomUnsignedInt32sRequest _ ->
+            []
+
+        WindowSizeRequest _ ->
+            []
+
+        WindowPreferredLanguagesRequest _ ->
+            []
+
+        WindowEventListen _ ->
+            []
+
+        WindowVisibilityChangeListen _ ->
+            []
+
+        WindowAnimationFrameListen _ ->
+            []
+
+        WindowPreferredLanguagesChangeListen _ ->
+            []
+
+        SocketListen _ ->
+            []
+
+        SocketDataSend _ ->
+            []
+
+        LocalStorageSet _ ->
+            []
+
+        LocalStorageRequest _ ->
+            []
+
+        LocalStorageRemoveOnADifferentTabListen _ ->
+            []
+
+        LocalStorageSetOnADifferentTabListen _ ->
+            []
+
+        GeoLocationRequest _ ->
+            []
+
+        GeoLocationChangeListen _ ->
+            []
+
+        GamepadsRequest _ ->
+            []
+
+        GamepadsChangeListen _ ->
+            []
+
+
+domTextOrElementHeaderDiffMap :
+    (DomEdit -> fromDomEdit)
+    ->
+        ({ old : DomTextOrElementHeader state, updated : DomTextOrElementHeader state }
+         -> List fromDomEdit
+        )
+domTextOrElementHeaderDiffMap fromDomEdit nodes =
+    case nodes.old of
+        DomHeaderText oldText ->
+            case nodes.updated of
+                DomElementHeader updatedElement ->
+                    [ updatedElement
+                        |> domElementHeaderFutureMap (\_ -> ())
+                        |> DomElementHeader
+                        |> ReplacementDomNode
+                        |> fromDomEdit
+                    ]
+
+                DomHeaderText updatedText ->
+                    if oldText == updatedText ++ "" then
+                        []
+
+                    else
+                        [ updatedText
+                            |> DomHeaderText
+                            |> ReplacementDomNode
+                            |> fromDomEdit
+                        ]
+
+        DomElementHeader oldElement ->
+            case nodes.updated of
+                DomHeaderText updatedText ->
+                    [ updatedText
+                        |> DomHeaderText
+                        |> ReplacementDomNode
+                        |> fromDomEdit
+                    ]
+
+                DomElementHeader updatedElement ->
+                    { old = oldElement, updated = updatedElement }
+                        |> domElementHeaderDiffMap fromDomEdit
+
+
+domElementHeaderDiffMap :
+    (DomEdit -> fromDomEdit)
+    ->
+        ({ old : DomElementHeader future, updated : DomElementHeader future }
+         -> List fromDomEdit
+        )
+domElementHeaderDiffMap fromDomEdit elements =
+    if elements.old.tag /= elements.updated.tag then
+        [ elements.updated
+            |> domElementHeaderFutureMap (\_ -> ())
+            |> DomElementHeader
+            |> ReplacementDomNode
+            |> fromDomEdit
+        ]
+
+    else
+        { old = elements.old.styles, updated = elements.updated.styles }
+            |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
+                { remove = identity, edit = Basics.identity }
+            |> List.LocalExtra.fromMaybe
+            |> List.LocalExtra.consJust
+                ({ old = elements.old.attributes, updated = elements.updated.attributes }
+                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                        (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
+                        { remove = identity, edit = Basics.identity }
+                )
+            |> List.LocalExtra.consJust
+                ({ old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
+                    |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
+                        (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
+                        { remove = \k -> { namespace = k.namespace, key = k.key }
+                        , edit = \entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value }
+                        }
+                )
+            |> List.LocalExtra.consJust
+                ({ old = elements.old.stringProperties, updated = elements.updated.stringProperties }
+                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                        (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
+                        { remove = identity, edit = Basics.identity }
+                )
+            |> List.LocalExtra.consJust
+                ({ old = elements.old.boolProperties, updated = elements.updated.boolProperties }
+                    |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
+                        (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
+                        { remove = identity, edit = Basics.identity }
+                )
+            |> List.LocalExtra.consJust
+                (if elements.old.scrollToPosition == elements.updated.scrollToPosition then
+                    Nothing
+
+                 else
+                    ReplacementDomElementScrollToPosition elements.updated.scrollToPosition
+                        |> fromDomEdit
+                        |> Just
+                )
+            |> List.LocalExtra.consJust
+                (if elements.old.scrollToShow == elements.updated.scrollToShow then
+                    Nothing
+
+                 else
+                    ReplacementDomElementScrollToShow elements.updated.scrollToShow
+                        |> fromDomEdit
+                        |> Just
+                )
+            |> List.LocalExtra.consJust
+                (case elements.old.scrollPositionRequest of
+                    Just _ ->
+                        Nothing
+
+                    Nothing ->
+                        case elements.updated.scrollPositionRequest of
+                            Nothing ->
+                                Nothing
+
+                            Just _ ->
+                                replacementDomElementScrollPositionRequest
+                                    |> fromDomEdit
+                                    |> Just
+                )
+            |> List.LocalExtra.consJust
+                (let
+                    updatedElementEventListensId : List { key : String, value : DefaultActionHandling }
+                    updatedElementEventListensId =
+                        elements.updated.eventListens
+                            |> sortedKeyValueListToList
+                            |> List.LocalExtra.mapAnyOrder
+                                (\entry ->
+                                    { key = entry.key, value = entry.value.defaultActionHandling }
+                                )
+                 in
+                 if
+                    (elements.old.eventListens
+                        |> sortedKeyValueListToList
+                        |> List.LocalExtra.mapAnyOrder
+                            (\entry ->
+                                { key = entry.key, value = entry.value.defaultActionHandling }
+                            )
+                    )
+                        == updatedElementEventListensId
+                 then
+                    Nothing
+
+                 else
+                    ReplacementDomElementEventListens updatedElementEventListensId
+                        |> fromDomEdit
+                        |> Just
+                )
+
+
+replacementDomElementScrollPositionRequest : DomEdit
+replacementDomElementScrollPositionRequest =
+    ReplacementDomElementScrollPositionRequest ()
+
+
+sortedKeyValueListEditAndRemoveDiffMapBy :
+    (key -> comparable_)
+    -> ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
+    -> { remove : key -> removeSingle, edit : { key : key, value : value } -> editSingle }
+    ->
+        ({ old : SortedKeyValueList key value
+         , updated : SortedKeyValueList key value
+         }
+         -> Maybe fromRemoveAndEdit
+        )
+sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDiffSingle dicts =
+    let
+        diff : { remove : List removeSingle, edit : List editSingle }
+        diff =
+            sortedKeyValueListMergeBy keyToComparable
+                (\removed soFar ->
+                    { edit = soFar.edit
+                    , remove = asDiffSingle.remove removed.key :: soFar.remove
+                    }
+                )
+                (\old updated soFar ->
+                    if old == updated.value then
+                        soFar
+
+                    else
+                        { remove = soFar.remove
+                        , edit = asDiffSingle.edit updated :: soFar.edit
+                        }
+                )
+                (\updated soFar ->
+                    { remove = soFar.remove
+                    , edit = asDiffSingle.edit updated :: soFar.edit
+                    }
+                )
+                (dicts.old |> sortedKeyValueListToList)
+                (dicts.updated |> sortedKeyValueListToList)
+                { remove = [], edit = [] }
+    in
+    case diff.remove of
+        [] ->
+            case diff.edit of
+                [] ->
+                    Nothing
+
+                (_ :: _) as editsFilled ->
+                    { remove = [], edit = editsFilled } |> fromEditAndRemove |> Just
+
+        (_ :: _) as removeFilled ->
+            { remove = removeFilled, edit = diff.edit } |> fromEditAndRemove |> Just
+
+
+{-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
+The idea and API is the same as [`Dict.merge`](https://dark.elm.dmy.fr/packages/elm/core/latest/Dict#merge)
+-}
+sortedKeyValueListMergeBy :
+    (key -> comparable_)
+    -> ({ key : key, value : a } -> folded -> folded)
+    -> (a -> { key : key, value : b } -> folded -> folded)
+    -> ({ key : key, value : b } -> folded -> folded)
+    -> List { key : key, value : a }
+    -> List { key : key, value : b }
+    -> folded
+    -> folded
+sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList bSortedKeyValueList initialFolded =
+    case aSortedKeyValueList of
+        [] ->
+            bSortedKeyValueList |> List.foldl onlyB initialFolded
+
+        aLowest :: aWithoutLowest ->
+            case bSortedKeyValueList of
+                [] ->
+                    aWithoutLowest
+                        |> List.foldl onlyA
+                            (onlyA aLowest initialFolded)
+
+                bLowest :: bWithoutLowest ->
+                    case compare (aLowest.key |> keyToComparable) (bLowest.key |> keyToComparable) of
+                        EQ ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bWithoutLowest
+                                (bothAB aLowest.value bLowest initialFolded)
+
+                        LT ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aWithoutLowest
+                                bSortedKeyValueList
+                                (onlyA aLowest initialFolded)
+
+                        GT ->
+                            sortedKeyValueListMergeBy keyToComparable
+                                onlyA
+                                bothAB
+                                onlyB
+                                aSortedKeyValueList
+                                bWithoutLowest
+                                (onlyB bLowest initialFolded)
+
+
+audioDiffMap :
+    (AudioEdit -> fromAudioEdit)
+    -> ({ old : Audio, updated : Audio } -> List fromAudioEdit)
+audioDiffMap fromAudioEdit audios =
+    (if audios.old.volume == audios.updated.volume then
+        []
+
+     else
+        [ ReplacementAudioVolume audios.updated.volume |> fromAudioEdit ]
+    )
+        |> List.LocalExtra.consJust
+            (if audios.old.speed == audios.updated.speed then
+                Nothing
+
+             else
+                ReplacementAudioSpeed audios.updated.speed |> fromAudioEdit |> Just
+            )
+        |> List.LocalExtra.consJust
+            (if audios.old.stereoPan == audios.updated.stereoPan then
+                Nothing
+
+             else
+                ReplacementAudioStereoPan audios.updated.stereoPan |> fromAudioEdit |> Just
+            )
+        |> List.LocalExtra.consJust
+            (if audios.old.processingLastToFirst == audios.updated.processingLastToFirst then
+                Nothing
+
+             else
+                audios.updated.processingLastToFirst
+                    |> List.reverse
+                    |> ReplacementAudioProcessing
+                    |> fromAudioEdit
+                    |> Just
+            )
 
 
 {-| The most general way of combining two dictionaries. You provide three
