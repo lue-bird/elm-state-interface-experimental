@@ -14,7 +14,6 @@ module Node exposing
     , randomUnsignedInt32sRequest
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..)
-    , interfaceSingleEdits, InterfaceSingleEdit(..)
     )
 
 {-| A state-interface program that can run in [node.js](https://nodejs.org/en)
@@ -95,8 +94,6 @@ Exposed so can for example simulate it more easily in tests, add a debugger etc.
 
 @docs ProgramState, ProgramEvent, InterfaceSingle
 
-@docs interfaceSingleEdits, InterfaceSingleEdit
-
 If you need more things like json encoders/decoders, [open an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new)
 
 -}
@@ -149,7 +146,7 @@ import Time.LocalExtra
        }
        ```
 
-    - inside `Node.interfaceSingleEdits`, add a case `[YourName] -> []`.
+    - inside `Node.interfaceSingleEditsMap`, add a case `[YourName] -> []`.
       If your running interface can be changed, read the section below
 
 
@@ -159,7 +156,7 @@ import Time.LocalExtra
    If you also want to enable editing a running interface:
 
     - to `Node.InterfaceSingleEdit`, add a variant `| Edit[YourName] ..your diff info..`
-    - inside `Node.interfaceSingleEdits`, set the case
+    - inside `Node.interfaceSingleEditsMap`, set the case
       ```elm
       [YourName] old ->
           case case interfaces.updated of
@@ -467,102 +464,6 @@ interfaceSingleFutureMap futureChange interfaceSingle =
 type ProgramEvent appState
     = JsEventFailedToDecode Json.Decode.Error
     | JsEventEnabledConstructionOfNewAppState appState
-
-
-interfaceSingleEditsMap :
-    (InterfaceSingleEdit -> fromSingeEdit)
-    ->
-        ({ old : InterfaceSingle future, updated : InterfaceSingle future }
-         -> List fromSingeEdit
-        )
-interfaceSingleEditsMap fromSingeEdit interfaces =
-    case interfaces.old of
-        HttpRequestSend _ ->
-            []
-
-        HttpRequestListen _ ->
-            []
-
-        HttpResponseSend _ ->
-            []
-
-        TimePosixRequest _ ->
-            []
-
-        TimezoneOffsetRequest _ ->
-            []
-
-        TimeOnce _ ->
-            []
-
-        TimePeriodicallyListen _ ->
-            []
-
-        TimezoneNameRequest _ ->
-            []
-
-        RandomUnsignedInt32sRequest _ ->
-            []
-
-        Exit _ ->
-            []
-
-        DirectoryMake _ ->
-            []
-
-        FileRemove _ ->
-            []
-
-        FileUtf8Write _ ->
-            []
-
-        FileChangeListen _ ->
-            []
-
-        FileUtf8Request _ ->
-            []
-
-        FileInfoRequest _ ->
-            []
-
-        DirectorySubNamesRequest _ ->
-            []
-
-        WorkingDirectoryPathRequest _ ->
-            []
-
-        LaunchArgumentsRequest _ ->
-            []
-
-        TerminalSizeRequest _ ->
-            []
-
-        TerminalSizeChangeListen _ ->
-            []
-
-        ProcessTitleSet _ ->
-            []
-
-        StandardOutWrite _ ->
-            []
-
-        StandardErrWrite _ ->
-            []
-
-        StandardInListen _ ->
-            []
-
-        StandardInRawListen _ ->
-            []
-
-
-{-| What [`InterfaceSingleEdit`](#InterfaceSingleEdit)s are needed to sync up
--}
-interfaceSingleEdits :
-    { old : InterfaceSingle future, updated : InterfaceSingle future }
-    -> List InterfaceSingleEdit
-interfaceSingleEdits interfaces =
-    interfaces |> interfaceSingleEditsMap Basics.identity
 
 
 toJsToJson : { id : String, diff : InterfaceSingleDiff future_ } -> Json.Encode.Value
@@ -1273,6 +1174,93 @@ interfacesDiffMap idAndDiffCombine interfaces =
         interfaces.old
         interfaces.updated
         []
+
+
+interfaceSingleEditsMap :
+    (InterfaceSingleEdit -> fromSingeEdit)
+    ->
+        ({ old : InterfaceSingle future, updated : InterfaceSingle future }
+         -> List fromSingeEdit
+        )
+interfaceSingleEditsMap fromSingeEdit interfaces =
+    case interfaces.old of
+        HttpRequestSend _ ->
+            []
+
+        HttpRequestListen _ ->
+            []
+
+        HttpResponseSend _ ->
+            []
+
+        TimePosixRequest _ ->
+            []
+
+        TimezoneOffsetRequest _ ->
+            []
+
+        TimeOnce _ ->
+            []
+
+        TimePeriodicallyListen _ ->
+            []
+
+        TimezoneNameRequest _ ->
+            []
+
+        RandomUnsignedInt32sRequest _ ->
+            []
+
+        Exit _ ->
+            []
+
+        DirectoryMake _ ->
+            []
+
+        FileRemove _ ->
+            []
+
+        FileUtf8Write _ ->
+            []
+
+        FileChangeListen _ ->
+            []
+
+        FileUtf8Request _ ->
+            []
+
+        FileInfoRequest _ ->
+            []
+
+        DirectorySubNamesRequest _ ->
+            []
+
+        WorkingDirectoryPathRequest _ ->
+            []
+
+        LaunchArgumentsRequest _ ->
+            []
+
+        TerminalSizeRequest _ ->
+            []
+
+        TerminalSizeChangeListen _ ->
+            []
+
+        ProcessTitleSet _ ->
+            []
+
+        StandardOutWrite _ ->
+            []
+
+        StandardErrWrite _ ->
+            []
+
+        StandardInListen _ ->
+            []
+
+        StandardInRawListen _ ->
+            []
 
 
 remove : InterfaceSingleDiff irrelevantFuture_
