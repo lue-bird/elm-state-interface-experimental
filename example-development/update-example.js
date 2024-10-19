@@ -17,6 +17,10 @@ fs.readdir(
 function copyExampleDevelopmentToExample(sub) {
     const packageElmJson = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "elm.json")))
     const packageSrcPath = path.resolve(import.meta.dirname, "..", "src")
+
+    const packagePackageJson = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, "..", "package.json"), { encoding: "utf-8" }))
+    const packagePackageJsonVersion = packagePackageJson.version
+
     const exampleElmJsonPath = path.resolve(import.meta.dirname, "..", "example", sub, "elm.json")
     const indexHtmlPath = path.resolve(import.meta.dirname, sub, "index.html")
     const viteConfigPath = path.resolve(import.meta.dirname, sub, "vite.config.js")
@@ -52,12 +56,14 @@ function copyExampleDevelopmentToExample(sub) {
     fs.writeFileSync(exampleElmJsonPath, JSON.stringify(exampleElmJson, null, 4))
 
 
+
+    const packageJsonSource = fs.readFileSync(
+        path.resolve(import.meta.dirname, "..", "example-development", sub, "package.json"),
+        { encoding: "utf-8" }
+    )
     fs.writeFileSync(
         path.resolve(import.meta.dirname, "..", "example", sub, "package.json"),
-        fs.readFileSync(
-            path.resolve(import.meta.dirname, "..", "example-development", sub, "package.json"),
-            { encoding: "utf-8" }
-        ).replace("../..", "^2.0.2")
+        packageJsonSource.replace("../..", "^" + packagePackageJsonVersion)
     )
     fs.cpSync(
         path.resolve(import.meta.dirname, "..", "example-development", sub, "src", "index.js"),

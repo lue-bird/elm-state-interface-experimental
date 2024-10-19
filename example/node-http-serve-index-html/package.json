@@ -3,7 +3,7 @@
   "name": "http-serve-index-html",
   "devDependencies": {
     "elm-esm": "^1.1.4",
-    "@lue-bird/elm-state-interface-experimental": "^2.0.2"
+    "@lue-bird/elm-state-interface-experimental": "^2.0.3"
   },
   "bin": "./src/index.js",
   "scripts": {
