@@ -14,10 +14,14 @@ import Node
 
 type State
     = WaitingForWorkingDirectory
-    | Running
-        { workingDirectory : String
-        , elmJson : Maybe (Result String Elm.Project.Project)
-        }
+    | Running RunningState
+    | ElmJsonFileReadFailed String
+
+
+type alias RunningState =
+    { workingDirectory : String
+    , elmJson : Maybe Elm.Project.Project
+    }
 
 
 initialState : State
@@ -39,55 +43,83 @@ interface state =
                     )
 
         Running running ->
-            case running.elmJson of
-                Nothing ->
-                    Node.fileRequest (running.workingDirectory ++ "/elm.json")
-                        |> Node.interfaceFutureMap
-                            (\elmJsonBytes ->
-                                Running
-                                    { workingDirectory = running.workingDirectory
-                                    , elmJson =
-                                        Just
-                                            (case elmJsonBytes |> Bytes.Decode.decode (Bytes.Decode.string (Bytes.width elmJsonBytes)) of
-                                                Nothing ->
-                                                    Err "bytes could not be decoded into UTF-8 String"
+            runningInterface running
 
-                                                Just elmJsonString ->
-                                                    case elmJsonString |> Json.Decode.decodeString Elm.Project.decoder of
-                                                        Ok elmJson ->
-                                                            Ok elmJson
+        ElmJsonFileReadFailed elmJsonDecodeError ->
+            [ Node.standardErrWrite
+                (elmJsonDecodeError ++ "\n")
+            , Node.exit 1
+            ]
+                |> Node.interfaceBatch
 
-                                                        Err jsonDecodeError ->
-                                                            Err (jsonDecodeError |> Json.Decode.errorToString)
-                                            )
-                                    }
-                            )
 
-                Just (Ok elmJson) ->
-                    Node.standardOutWrite
-                        ("elm.json parsed successfully.\nThe "
-                            ++ (case elmJson of
-                                    Elm.Project.Application application ->
-                                        "application has " ++ (application.depsDirect |> List.length |> String.fromInt |> Ansi.Font.bold |> Ansi.Color.fontColor Ansi.Color.magenta) ++ " direct dependencies"
+runningInterface : RunningState -> Node.Interface State
+runningInterface running =
+    case running.elmJson of
+        Nothing ->
+            Node.fileRequest (running.workingDirectory ++ "/elm.json")
+                |> Node.interfaceFutureMap
+                    (\elmJsonBytesOrError ->
+                        case elmJsonBytesOrError of
+                            Err fileReadError ->
+                                ElmJsonFileReadFailed
+                                    ("elm.json couldn't be read because "
+                                        ++ fileReadError.message
+                                        ++ " (code "
+                                        ++ fileReadError.code
+                                        ++ ")"
+                                    )
 
-                                    Elm.Project.Package package ->
-                                        "package "
-                                            ++ (package.name |> Elm.Package.toString)
-                                            ++ " - "
-                                            ++ package.summary
-                                            ++ "\nhas "
-                                            ++ (package.deps |> List.length |> String.fromInt |> Ansi.Font.bold |> Ansi.Color.fontColor Ansi.Color.magenta)
-                                            ++ " direct dependencies"
-                               )
-                            ++ "\n"
-                        )
+                            Ok elmJsonBytes ->
+                                case elmJsonBytes |> Bytes.Decode.decode (Bytes.Decode.string (Bytes.width elmJsonBytes)) of
+                                    Nothing ->
+                                        ElmJsonFileReadFailed "elm.json bytes could not be decoded into UTF-8 String"
 
-                Just (Err elmJsonDecodeError) ->
-                    Node.standardErrWrite
-                        ("elm.json failed to parse due to "
-                            ++ elmJsonDecodeError
-                            ++ "\n"
-                        )
+                                    Just elmJsonString ->
+                                        case elmJsonString |> Json.Decode.decodeString Elm.Project.decoder of
+                                            Err jsonDecodeError ->
+                                                ElmJsonFileReadFailed
+                                                    ("elm.json failed to parse due to "
+                                                        ++ (jsonDecodeError |> Json.Decode.errorToString)
+                                                    )
+
+                                            Ok elmJson ->
+                                                Running
+                                                    { workingDirectory = running.workingDirectory
+                                                    , elmJson = Just elmJson
+                                                    }
+                    )
+
+        Just elmJson ->
+            Node.standardOutWrite
+                ("elm.json parsed successfully.\nThe "
+                    ++ (case elmJson of
+                            Elm.Project.Application application ->
+                                "application has "
+                                    ++ (application.depsDirect
+                                            |> List.length
+                                            |> String.fromInt
+                                            |> Ansi.Font.bold
+                                            |> Ansi.Color.fontColor Ansi.Color.magenta
+                                       )
+                                    ++ " direct dependencies"
+
+                            Elm.Project.Package package ->
+                                "package "
+                                    ++ (package.name |> Elm.Package.toString)
+                                    ++ " - "
+                                    ++ package.summary
+                                    ++ "\nhas "
+                                    ++ (package.deps
+                                            |> List.length
+                                            |> String.fromInt
+                                            |> Ansi.Font.bold
+                                            |> Ansi.Color.fontColor Ansi.Color.magenta
+                                       )
+                                    ++ " direct dependencies"
+                       )
+                    ++ "\n"
+                )
 
 
 main : Node.Program State

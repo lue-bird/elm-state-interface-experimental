@@ -1,5 +1,7 @@
 port module Main exposing (State(..), main)
 
+import Bytes exposing (Bytes)
+import Bytes.Decode
 import Bytes.Encode
 import Duration
 import Json.Encode
@@ -18,11 +20,12 @@ main =
 
 type State
     = Running RunningState
+    | InitialIndexHtmlFileReadFailed { code : String, message : String }
     | HttpServerFailed { code : String, message : String }
 
 
 type alias RunningState =
-    { indexHtml : Maybe { source : String, isOutOfDate : Bool }
+    { indexHtml : Maybe { source : Bytes, isOutOfDate : Bool }
     }
 
 
@@ -38,6 +41,19 @@ interface state =
     case state of
         Running running ->
             runningInterface running
+
+        InitialIndexHtmlFileReadFailed error ->
+            [ Node.standardOutWrite
+                ("HTTP server can't start as index.html couldn't be read because "
+                    ++ error.message
+                    ++ " (code "
+                    ++ error.code
+                    ++ ")"
+                    ++ "\n"
+                )
+            , Node.exit 1
+            ]
+                |> Node.interfaceBatch
 
         HttpServerFailed error ->
             [ Node.standardOutWrite
@@ -63,7 +79,7 @@ runningInterface running =
                     Just
                         { statusCode = 200
                         , headers = [ { name = "Content-Type", value = "text/html; charset=utf-8" } ]
-                        , data = indexHtml.source |> Bytes.Encode.string |> Bytes.Encode.encode
+                        , data = indexHtml.source
                         }
                 }
                 |> Node.interfaceFutureMap
@@ -102,11 +118,20 @@ runningInterface running =
             , if indexHtml.isOutOfDate then
                 Node.fileRequest "index.html"
                     |> Node.interfaceFutureMap
-                        (\indexHtmlSource ->
-                            Running
-                                { indexHtml =
-                                    Just { source = indexHtmlSource, isOutOfDate = False }
-                                }
+                        (\newIndexHtmlSourceOrError ->
+                            case newIndexHtmlSourceOrError of
+                                Ok newIndexHtmlSourceBytes ->
+                                    Running
+                                        { indexHtml =
+                                            Just { source = newIndexHtmlSourceBytes, isOutOfDate = False }
+                                        }
+
+                                Err _ ->
+                                    -- keep serving the old html until a new one gets created
+                                    Running
+                                        { indexHtml =
+                                            Just { source = indexHtml.source, isOutOfDate = False }
+                                        }
                         )
 
               else
@@ -117,11 +142,16 @@ runningInterface running =
         Nothing ->
             Node.fileRequest "index.html"
                 |> Node.interfaceFutureMap
-                    (\indexHtmlSource ->
-                        Running
-                            { indexHtml =
-                                Just { source = indexHtmlSource, isOutOfDate = False }
-                            }
+                    (\newIndexHtmlSourceOrError ->
+                        case newIndexHtmlSourceOrError of
+                            Ok newIndexHtmlSourceBytes ->
+                                Running
+                                    { indexHtml =
+                                        Just { source = newIndexHtmlSourceBytes, isOutOfDate = False }
+                                    }
+
+                            Err indexHtmlFileReadError ->
+                                InitialIndexHtmlFileReadFailed indexHtmlFileReadError
                     )
 
 
