@@ -44,15 +44,15 @@ interface (State state) =
         ( Result benchmarkDirectoryResult, Result srcDirectoryResult ) ->
             case ( benchmarkDirectoryResult, srcDirectoryResult ) of
                 ( Ok (), Ok () ) ->
-                    [ Node.fileUtf8Write
+                    [ Node.fileWrite
                         { path = benchmarkDirectoryName ++ "/elm.json"
                         , content = initElmJsonSource |> Bytes.Encode.string |> Bytes.Encode.encode
                         }
-                    , Node.fileUtf8Write
+                    , Node.fileWrite
                         { path = benchmarkDirectoryName ++ "/src/WebMain.elm"
                         , content = initWebMainElmSource |> Bytes.Encode.string |> Bytes.Encode.encode
                         }
-                    , Node.fileUtf8Write
+                    , Node.fileWrite
                         { path = benchmarkDirectoryName ++ "/src/Benchmarks.elm"
                         , content = initBenchmarksElmSource |> Bytes.Encode.string |> Bytes.Encode.encode
                         }

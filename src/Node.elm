@@ -7,7 +7,7 @@ module Node exposing
     , standardOutWrite, standardErrWrite, standardInListen, standardInRawListen
     , terminalSizeRequest, terminalSizeChangeListen
     , FileKind(..), fileInfoRequest, directorySubNamesRequest
-    , directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
+    , directoryMake, fileWrite, fileRequest, fileRemove
     , fileChangeListen, FileChange(..)
     , httpRequestSend, HttpError(..)
     , httpRequestListenAndMaybeRespond, HttpServerEvent(..)
@@ -51,7 +51,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 ## file system
 
 @docs FileKind, fileInfoRequest, directorySubNamesRequest
-@docs directoryMake, fileUtf8Write, fileUtf8Request, fileRemove
+@docs directoryMake, fileWrite, fileRequest, fileRemove
 @docs fileChangeListen, FileChange
 
 
@@ -246,8 +246,8 @@ type InterfaceSingle future
         , on : Result { code : String, message : String } () -> future
         }
     | FileRemove String
-    | FileUtf8Write { contentUnsignedInt8s : List Int, path : String }
-    | FileUtf8Request
+    | FileWrite { contentUnsignedInt8s : List Int, path : String }
+    | FileRequest
         { path : String
         , on : Result { code : String, message : String } Bytes -> future
         }
@@ -411,11 +411,11 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         FileRemove path ->
             FileRemove path
 
-        FileUtf8Write write ->
-            FileUtf8Write write
+        FileWrite write ->
+            FileWrite write
 
-        FileUtf8Request request ->
-            FileUtf8Request
+        FileRequest request ->
+            FileRequest
                 { path = request.path
                 , on = \content -> request.on content |> futureChange
                 }
@@ -593,8 +593,8 @@ interfaceSingleToJson interfaceSingle =
             FileRemove path ->
                 { tag = "FileRemove", value = path |> Json.Encode.string }
 
-            FileUtf8Write write ->
-                { tag = "FileUtf8Write"
+            FileWrite write ->
+                { tag = "FileWrite"
                 , value =
                     Json.Encode.object
                         [ ( "path", write.path |> Json.Encode.string )
@@ -602,8 +602,8 @@ interfaceSingleToJson interfaceSingle =
                         ]
                 }
 
-            FileUtf8Request request ->
-                { tag = "FileUtf8Request"
+            FileRequest request ->
+                { tag = "FileRequest"
                 , value = request.path |> Json.Encode.string
                 }
 
@@ -722,8 +722,8 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value = path |> StructuredId.ofString
                 }
 
-            FileUtf8Write write ->
-                { tag = "FileUtf8Write"
+            FileWrite write ->
+                { tag = "FileWrite"
                 , value =
                     StructuredId.ofParts
                         [ write.path |> StructuredId.ofString
@@ -731,8 +731,8 @@ interfaceSingleToStructuredId interfaceSingle =
                         ]
                 }
 
-            FileUtf8Request request ->
-                { tag = "FileUtf8Request"
+            FileRequest request ->
+                { tag = "FileRequest"
                 , value = request.path |> StructuredId.ofString
                 }
 
@@ -921,10 +921,10 @@ interfaceSingleFutureJsonDecoder interface =
         FileRemove _ ->
             Nothing
 
-        FileUtf8Write _ ->
+        FileWrite _ ->
             Nothing
 
-        FileUtf8Request request ->
+        FileRequest request ->
             Json.Decode.oneOf
                 [ Json.Decode.LocalExtra.variant "Ok"
                     (Json.Decode.map Ok
@@ -1255,13 +1255,13 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         FileRemove _ ->
             []
 
-        FileUtf8Write _ ->
+        FileWrite _ ->
             []
 
         FileChangeListen _ ->
             []
 
-        FileUtf8Request _ ->
+        FileRequest _ ->
             []
 
         FileInfoRequest _ ->
@@ -1572,9 +1572,9 @@ at a given path with given [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/
 Uses [`fs.writeFile`](https://nodejs.org/api/fs.html#fswritefilefile-data-options-callback)
 
 -}
-fileUtf8Write : { path : String, content : Bytes } -> Interface future_
-fileUtf8Write write =
-    FileUtf8Write
+fileWrite : { path : String, content : Bytes } -> Interface future_
+fileWrite write =
+    FileWrite
         { path = write.path
         , contentUnsignedInt8s = write.content |> Bytes.LocalExtra.toUnsignedInt8List
         }
@@ -1587,9 +1587,9 @@ of the file at a given path.
 Uses [`fs.readFile`](https://nodejs.org/api/fs.html#fsreadfilepath-options-callback)
 
 -}
-fileUtf8Request : String -> Interface (Result { code : String, message : String } Bytes)
-fileUtf8Request path =
-    FileUtf8Request { path = path, on = identity }
+fileRequest : String -> Interface (Result { code : String, message : String } Bytes)
+fileRequest path =
+    FileRequest { path = path, on = identity }
         |> interfaceFromSingle
 
 

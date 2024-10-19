@@ -255,10 +255,10 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         console.warn("failed to unlink file", err)
                     })
             }
-            case "FileUtf8Write": return (write: { contentUnsignedInt8s: number[], path: string }) => {
-                fileUtf8Write(write, abortSignal)
+            case "FileWrite": return (write: { contentUnsignedInt8s: number[], path: string }) => {
+                fileWrite(write, abortSignal)
             }
-            case "FileUtf8Request": return (path: string) => {
+            case "FileRequest": return (path: string) => {
                 fs.promises.readFile(
                     path,
                     { signal: abortSignal }
@@ -335,7 +335,7 @@ function queueAbortable(abortSignal: AbortSignal, action: () => void) {
 }
 
 
-function fileUtf8Write(write: { path: string, contentUnsignedInt8s: number[] }, abortSignal: AbortSignal | undefined) {
+function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, abortSignal: AbortSignal | undefined) {
     fs.promises.writeFile(
         write.path,
         Uint8Array.from(write.contentUnsignedInt8s),

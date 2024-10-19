@@ -100,7 +100,7 @@ runningInterface running =
                                     }
                     )
             , if indexHtml.isOutOfDate then
-                Node.fileUtf8Request "index.html"
+                Node.fileRequest "index.html"
                     |> Node.interfaceFutureMap
                         (\indexHtmlSource ->
                             Running
@@ -115,7 +115,7 @@ runningInterface running =
                 |> Node.interfaceBatch
 
         Nothing ->
-            Node.fileUtf8Request "index.html"
+            Node.fileRequest "index.html"
                 |> Node.interfaceFutureMap
                     (\indexHtmlSource ->
                         Running

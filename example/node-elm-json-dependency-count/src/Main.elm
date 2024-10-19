@@ -41,7 +41,7 @@ interface state =
         Running running ->
             case running.elmJson of
                 Nothing ->
-                    Node.fileUtf8Request (running.workingDirectory ++ "/elm.json")
+                    Node.fileRequest (running.workingDirectory ++ "/elm.json")
                         |> Node.interfaceFutureMap
                             (\elmJsonBytes ->
                                 Running
