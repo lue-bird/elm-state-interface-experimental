@@ -45,7 +45,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     abortController.abort()
                     abortControllers.delete(id)
                 } else {
-                    warn("bug: trying to remove an interface that was already aborted")
+                    notifyOfBug("trying to remove an interface that was already aborted")
                 }
             }
         }
@@ -252,7 +252,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 fs.promises.unlink(path)
                     .then(() => { })
                     .catch((err) => {
-                        warn("failed to unlink file " + err)
+                        console.warn("failed to unlink file", err)
                     })
             }
             case "FileUtf8Write": return (write: { contentUnsignedInt8s: number[], path: string }) => {
@@ -267,7 +267,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         sendToElm(Array.from(content))
                     })
                     .catch((err) => {
-                        warn("failed to read file " + err)
+                        console.warn("failed to read file", err)
                     })
             }
             case "FileInfoRequest": return (path: string) => {
@@ -292,7 +292,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         sendToElm(subNames) // name should always have only 1 element
                     })
                     .catch((err) => {
-                        warn("failed to read directory sub names " + err)
+                        console.warn("failed to read directory sub names", err)
                     })
             }
             default: return (_config: any) => {
@@ -340,7 +340,7 @@ function fileUtf8Write(write: { path: string, contentUnsignedInt8s: number[] }, 
         { signal: abortSignal }
     )
         .then(() => { })
-        .catch((err) => warn("failed to write to file " + err))
+        .catch((err) => console.warn("failed to write to file", err))
 }
 
 function watchPath(
@@ -434,13 +434,10 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
         .catch((error) => ({ tag: "Error" as const, value: error }))
 }
 
-// helpers
 
-function warn(warning: string) {
-    console.warn(warning + " (lue-bird/elm-state-interface-experimental)")
-}
+
 function notifyOfUnknownMessageKind(messageTag: string) {
-    notifyOfBug("Unknown message kind " + messageTag + " from elm. The associated js implementation is missing")
+    notifyOfBug("unknown message kind " + messageTag + " from elm. The associated js implementation is missing")
 }
 function notifyOfBug(bugDescription: string) {
     console.error("bug: " + bugDescription + ". Please open an issue on github.com/lue-bird/elm-state-interface-experimental")
