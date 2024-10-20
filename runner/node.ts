@@ -285,8 +285,8 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "FileChangeListen": return (path: string) => {
                 watchPath(path, abortSignal, event => sendToElm(event))
             }
-            case "DirectorySubNamesRequest": return (path: string) => {
-                fs.promises.readdir(path)
+            case "DirectorySubPathsRequest": return (path: string) => {
+                fs.promises.readdir(path, { recursive: true })
                     .then((subNames) => {
                         sendToElm({ tag: "Ok", value: subNames })
                     })

@@ -6,7 +6,7 @@ module Node exposing
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
     , standardOutWrite, standardErrWrite, standardInListen, standardInRawListen
     , terminalSizeRequest, terminalSizeChangeListen
-    , FileKind(..), fileInfoRequest, directorySubNamesRequest
+    , FileKind(..), fileInfoRequest, directorySubPathsRequest
     , directoryMake, fileWrite, fileRequest, fileRemove
     , fileChangeListen, FileChange(..)
     , httpRequestSend, HttpError(..)
@@ -50,7 +50,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 ## file system
 
-@docs FileKind, fileInfoRequest, directorySubNamesRequest
+@docs FileKind, fileInfoRequest, directorySubPathsRequest
 @docs directoryMake, fileWrite, fileRequest, fileRemove
 @docs fileChangeListen, FileChange
 
@@ -258,7 +258,7 @@ type InterfaceSingle future
             Maybe { byteCount : Int, lastContentChangeTime : Time.Posix, kind : FileKind }
             -> future
         }
-    | DirectorySubNamesRequest
+    | DirectorySubPathsRequest
         { path : String
         , on : Result { code : String, message : String } (List String) -> future
         }
@@ -435,8 +435,8 @@ interfaceSingleFutureMap futureChange interfaceSingle =
                 , on = \info -> request.on info |> futureChange
                 }
 
-        DirectorySubNamesRequest request ->
-            DirectorySubNamesRequest
+        DirectorySubPathsRequest request ->
+            DirectorySubPathsRequest
                 { path = request.path
                 , on = \subNames -> request.on subNames |> futureChange
                 }
@@ -620,8 +620,8 @@ interfaceSingleToJson interfaceSingle =
                 , value = request.path |> Json.Encode.string
                 }
 
-            DirectorySubNamesRequest request ->
-                { tag = "DirectorySubNamesRequest"
+            DirectorySubPathsRequest request ->
+                { tag = "DirectorySubPathsRequest"
                 , value = request.path |> Json.Encode.string
                 }
 
@@ -749,8 +749,8 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value = request.path |> StructuredId.ofString
                 }
 
-            DirectorySubNamesRequest request ->
-                { tag = "DirectorySubNamesRequest"
+            DirectorySubPathsRequest request ->
+                { tag = "DirectorySubPathsRequest"
                 , value = request.path |> StructuredId.ofString
                 }
 
@@ -977,7 +977,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Json.Decode.map request.on
                 |> Just
 
-        DirectorySubNamesRequest request ->
+        DirectorySubPathsRequest request ->
             Json.Decode.oneOf
                 [ Json.Decode.LocalExtra.variant "Ok"
                     (Json.Decode.map Ok
@@ -1288,7 +1288,7 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
         FileInfoRequest _ ->
             []
 
-        DirectorySubNamesRequest _ ->
+        DirectorySubPathsRequest _ ->
             []
 
         WorkingDirectoryPathRequest _ ->
@@ -1645,25 +1645,25 @@ fileInfoRequest path =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Node#Interface) for getting names of the files
-contained on the surface in the directory at the given path.
+{-| An [`Interface`](Node#Interface) for getting the tails of the paths of the files
+contained in the directory at the given path (or any contained directory).
 
-    directorySubPathsRequest : String -> Node.Interface (List String)
-    directorySubPathsRequest path =
-        Node.fileInfoRequest path
+    directoryFullSubPathsRequest : String -> Node.Interface (List String)
+    directoryFullSubPathsRequest directoryPath =
+        Node.directorySubPathsRequest directoryPath
             |> Node.interfaceFutureRequest
-                (\subNames ->
-                    subNames
+                (\subNamesOrError ->
+                    subNamesOrError
                         |> Result.withDefault []
                         |> List.map (\subName -> path ++ "/" ++ subName)
                 )
 
-Uses [`fs.readdir`](https://nodejs.org/api/fs.html#fsreaddirpath-options-callback)
+Uses [`fs.readdir({ recursive: true })`](https://nodejs.org/api/fs.html#fsreaddirpath-options-callback)
 
 -}
-directorySubNamesRequest : String -> Interface (Result { code : String, message : String } (List String))
-directorySubNamesRequest path =
-    DirectorySubNamesRequest { path = path, on = identity }
+directorySubPathsRequest : String -> Interface (Result { code : String, message : String } (List String))
+directorySubPathsRequest path =
+    DirectorySubPathsRequest { path = path, on = identity }
         |> interfaceFromSingle
 
 
