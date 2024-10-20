@@ -272,26 +272,34 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "FileInfoRequest": return (path: string) => {
                 fs.promises.stat(path)
                     .then((stats) => {
-                        sendToElm({
-                            byteCount: stats.size,
-                            kind: stats.isDirectory() ? "Directory" : "File",
-                            lastContentChangePosixMilliseconds: stats.mtimeMs
-                        })
+                        if (!abortSignal.aborted) {
+                            sendToElm({
+                                byteCount: stats.size,
+                                kind: stats.isDirectory() ? "Directory" : "File",
+                                lastContentChangePosixMilliseconds: stats.mtimeMs
+                            })
+                        }
                     })
                     .catch((_enoend) => {
-                        sendToElm(null)
+                        if (!abortSignal.aborted) {
+                            sendToElm(null)
+                        }
                     })
             }
             case "FileChangeListen": return (path: string) => {
-                watchPath(path, abortSignal, event => sendToElm(event))
+                watchPath(path, abortSignal, event => { sendToElm(event) })
             }
             case "DirectorySubPathsRequest": return (path: string) => {
                 fs.promises.readdir(path, { recursive: true })
                     .then((subNames) => {
-                        sendToElm({ tag: "Ok", value: subNames })
+                        if (!abortSignal.aborted) {
+                            sendToElm({ tag: "Ok", value: subNames })
+                        }
                     })
                     .catch((error) => {
-                        sendToElm({ tag: "Err", value: error })
+                        if (!abortSignal.aborted) {
+                            sendToElm({ tag: "Err", value: error })
+                        }
                     })
             }
             default: return (_config: any) => {
