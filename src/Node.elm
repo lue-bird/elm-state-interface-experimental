@@ -1645,8 +1645,8 @@ fileInfoRequest path =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Node#Interface) for getting the tails of the paths of the files
-contained in the directory at the given path (or any contained directory).
+{-| An [`Interface`](Node#Interface) for getting relative paths of the files
+contained in the directory at the given path (and any contained directory).
 
     directoryFullSubPathsRequest : String -> Node.Interface (List String)
     directoryFullSubPathsRequest directoryPath =
