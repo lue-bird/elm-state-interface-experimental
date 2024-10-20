@@ -3,7 +3,7 @@
   "name": "elm-benchmark-init",
   "devDependencies": {
     "elm-esm": "^1.1.4",
-    "@lue-bird/elm-state-interface-experimental": "^2.0.3"
+    "@lue-bird/elm-state-interface-experimental": "^3.0.0"
   },
   "bin": "./src/index.js",
   "scripts": {

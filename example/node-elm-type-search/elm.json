@@ -20,7 +20,7 @@
             "lydell/elm-app-url": "1.0.4",
             "stil4m/elm-syntax": "7.3.6",
             "wolfadex/elm-ansi": "3.0.0",
-            "lue-bird/elm-state-interface-experimental": "5.0.0"
+            "lue-bird/elm-state-interface-experimental": "6.0.0"
         },
         "indirect": {
             "NoRedInk/elm-random-general": "1.0.0",
