@@ -3975,8 +3975,13 @@ program :
     }
     -> Program state
 program appConfig =
+    let
+        initialStateCmdTuplePreComputed : ( ProgramState state, Cmd (ProgramEvent state) )
+        initialStateCmdTuplePreComputed =
+            programInit appConfig
+    in
     Platform.worker
-        { init = \() -> programInit appConfig
+        { init = \() -> initialStateCmdTuplePreComputed
         , update = \event state -> programUpdate appConfig event state
         , subscriptions = \state -> programSubscriptions appConfig state
         }
