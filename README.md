@@ -620,7 +620,7 @@ Adding stuff _will_ force a major version bump.
   - [andrewMacmurray for `elm-concurrent-task`](https://dark.elm.dmy.fr/packages/andrewMacmurray/elm-concurrent-task/latest/) which I used as the base for many of the js implementations
   - [elm-radio hosts for the episode about concurrent-task](https://elm-radio.com/episode/elm-concurrent-task) which motivated me to make a package out of it
   - [a-teammate (Malte H)](https://github.com/a-teammate) for lots of valuable feedback 💚
-  - [Robin Heggelund Hansen for `gren-lang/node`](https://packages.gren-lang.org/package/gren-lang/node/version/latest/overview) which I used as a kind of js implementation reference, and for showing me how to make node exist at the right time
+  - [Robin Heggelund Hansen for `gren-lang/node`](https://packages.gren-lang.org/package/gren-lang/node/version/latest/overview) which I used as a kind of js implementation reference, and for showing me how to make node exit at the right time
   - [Justin Blake for `gren-tui`](https://packages.gren-lang.org/package/blaix/gren-tui/version/latest/overview)
   - [MartinSStewart for `elm-audio`](https://dark.elm.dmy.fr/packages/MartinSStewart/elm-audio/latest/) which inspired the audio API
   - [noordstar for `elm-gamepad`](https://dark.elm.dmy.fr/packages/noordstar/elm-gamepad/latest) which inspired the gamepads API
