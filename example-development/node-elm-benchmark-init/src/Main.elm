@@ -40,7 +40,7 @@ benchmarkDirectoryName =
 
 interface : State -> Node.Interface State
 interface (State state) =
-    case ( state.benchmarkDirectory, state.srcDirectory ) of
+    [ case ( state.benchmarkDirectory, state.srcDirectory ) of
         ( Result benchmarkDirectoryResult, Result srcDirectoryResult ) ->
             case ( benchmarkDirectoryResult, srcDirectoryResult ) of
                 ( Ok (), Ok () ) ->
@@ -106,35 +106,36 @@ Run with  cd """
                     ]
                         |> Node.interfaceBatch
 
-        ( benchmarkDirectory, srcDirectory ) ->
-            [ case benchmarkDirectory of
-                Result _ ->
-                    Node.interfaceNone
+        _ ->
+            Node.interfaceNone
+    , case state.benchmarkDirectory of
+        Result _ ->
+            Node.interfaceNone
 
-                NotStarted ->
-                    Node.directoryMake benchmarkDirectoryName
-                        |> Node.interfaceFutureMap
-                            (\result ->
-                                State
-                                    { benchmarkDirectory = Result result
-                                    , srcDirectory = state.srcDirectory
-                                    }
-                            )
-            , case srcDirectory of
-                Result _ ->
-                    Node.interfaceNone
+        NotStarted ->
+            Node.directoryMake benchmarkDirectoryName
+                |> Node.interfaceFutureMap
+                    (\result ->
+                        State
+                            { benchmarkDirectory = Result result
+                            , srcDirectory = state.srcDirectory
+                            }
+                    )
+    , case state.srcDirectory of
+        Result _ ->
+            Node.interfaceNone
 
-                NotStarted ->
-                    Node.directoryMake (benchmarkDirectoryName ++ "/src")
-                        |> Node.interfaceFutureMap
-                            (\result ->
-                                State
-                                    { benchmarkDirectory = state.benchmarkDirectory
-                                    , srcDirectory = Result result
-                                    }
-                            )
-            ]
-                |> Node.interfaceBatch
+        NotStarted ->
+            Node.directoryMake (benchmarkDirectoryName ++ "/src")
+                |> Node.interfaceFutureMap
+                    (\result ->
+                        State
+                            { benchmarkDirectory = state.benchmarkDirectory
+                            , srcDirectory = Result result
+                            }
+                    )
+    ]
+        |> Node.interfaceBatch
 
 
 initElmJsonSource : String
