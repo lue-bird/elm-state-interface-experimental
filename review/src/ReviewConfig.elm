@@ -95,19 +95,6 @@ config =
                 )
         )
 
-    -- ## sort
-    , NoUnsortedCases.rule
-        (NoUnsortedCases.defaults
-            |> -- i would want to sort by complexity last (number of arguments (+ their respective complexity))
-               -- but such an ordering is not supported by the rule
-               NoUnsortedCases.sortOnlyMatchingTypes (\_ _ -> False)
-            |> NoUnsortedCases.doNotSortLiterals
-        )
-    , NoUnsortedTopLevelDeclarations.rule
-        (NoUnsortedTopLevelDeclarations.sortTopLevelDeclarations
-            |> NoUnsortedTopLevelDeclarations.glueHelpersAfter
-        )
-
     -- ## limit
     , NoUnused.CustomTypeConstructors.rule []
     , NoUnused.CustomTypeConstructorArgs.rule
