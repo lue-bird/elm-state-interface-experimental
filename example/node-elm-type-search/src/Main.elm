@@ -1,19 +1,15 @@
-port module Main exposing (State(..), main)
+port module Main exposing (main)
 
 {-| Fuzzy-find declared values/functions from within your project by rough type
 -}
 
 import Ansi.Color
-import Ansi.Cursor
-import Ansi.Font
 import Bytes
 import Bytes.Decode
-import Elm.Package
 import Elm.Parser
 import Elm.Project
 import Elm.Syntax.Declaration
 import Elm.Syntax.File
-import Elm.Syntax.ModuleName
 import Elm.Syntax.Node
 import Elm.Syntax.Range
 import Elm.Syntax.TypeAnnotation

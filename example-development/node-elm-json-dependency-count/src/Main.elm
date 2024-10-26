@@ -1,7 +1,6 @@
-port module Main exposing (State(..), main)
+port module Main exposing (main)
 
 import Ansi.Color
-import Ansi.Cursor
 import Ansi.Font
 import Bytes
 import Bytes.Decode

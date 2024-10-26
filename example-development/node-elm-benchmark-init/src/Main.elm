@@ -1,10 +1,8 @@
-port module Main exposing (State(..), main)
+port module Main exposing (main)
 
 import Bytes.Encode
-import Duration
 import Json.Encode
 import Node
-import Time
 
 
 main : Node.Program State

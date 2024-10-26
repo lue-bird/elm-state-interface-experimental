@@ -1,9 +1,7 @@
-port module Main exposing (State(..), main)
+port module Main exposing (main)
 
-import Duration
 import Json.Encode
 import Node
-import Time
 
 
 main : Node.Program State
@@ -83,11 +81,6 @@ interface state =
                             |> Node.interfaceBatch
 
                     lastGuess :: guessesBeforeLast ->
-                        let
-                            guessCount : Int
-                            guessCount =
-                                (guessesBeforeLast |> List.length) + 1
-                        in
                         if lastGuess == playing.secretNumber then
                             Node.standardOutWrite
                                 ("🎊 Yes! My secret number was "
@@ -95,39 +88,45 @@ interface state =
                                     ++ ".\n"
                                 )
 
-                        else if guessCount >= allowedGuessCount then
-                            Node.standardOutWrite
-                                ("⛔ That was your last guess. My secret number would have been "
-                                    ++ (playing.secretNumber |> String.fromInt)
-                                    ++ ".\n"
-                                )
-
                         else
-                            [ Node.standardOutWrite
-                                ((lastGuess |> String.fromInt)
-                                    ++ " is "
-                                    ++ (if lastGuess < playing.secretNumber then
-                                            "less than"
+                            let
+                                guessCount : Int
+                                guessCount =
+                                    (guessesBeforeLast |> List.length) + 1
+                            in
+                            if guessCount >= allowedGuessCount then
+                                Node.standardOutWrite
+                                    ("⛔ That was your last guess. My secret number would have been "
+                                        ++ (playing.secretNumber |> String.fromInt)
+                                        ++ ".\n"
+                                    )
 
-                                        else
-                                            "greater than"
-                                       )
-                                    ++ " my secret number. "
-                                    ++ (allowedGuessCount - guessCount |> String.fromInt)
-                                    ++ " guesses remaining."
-                                    ++ "\nYour "
-                                    ++ (if guessCount == allowedGuessCount then
-                                            "last"
+                            else
+                                [ Node.standardOutWrite
+                                    ((lastGuess |> String.fromInt)
+                                        ++ " is "
+                                        ++ (if lastGuess < playing.secretNumber then
+                                                "less than"
 
-                                        else
-                                            "next"
-                                       )
-                                    ++ " guess: > "
-                                )
-                            , Node.standardInListen
-                                |> Node.interfaceFutureMap (\guess -> Playing (handleGuess guess playing))
-                            ]
-                                |> Node.interfaceBatch
+                                            else
+                                                "greater than"
+                                           )
+                                        ++ " my secret number. "
+                                        ++ (allowedGuessCount - guessCount |> String.fromInt)
+                                        ++ " guesses remaining."
+                                        ++ "\nYour "
+                                        ++ (if guessCount == allowedGuessCount then
+                                                "last"
+
+                                            else
+                                                "next"
+                                           )
+                                        ++ " guess: > "
+                                    )
+                                , Node.standardInListen
+                                    |> Node.interfaceFutureMap (\guess -> Playing (handleGuess guess playing))
+                                ]
+                                    |> Node.interfaceBatch
 
 
 handleGuess : String -> StatePlaying -> StatePlaying

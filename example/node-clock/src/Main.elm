@@ -1,4 +1,4 @@
-port module Main exposing (State(..), main)
+port module Main exposing (main)
 
 {-| Shameless port of [blaix/gren-tui' clock example](https://github.com/blaix/gren-tui/tree/main/examples/v3/clock)
 -}

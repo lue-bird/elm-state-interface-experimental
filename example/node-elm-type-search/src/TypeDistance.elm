@@ -157,7 +157,7 @@ distanceVarApply varName applyName =
     in
     case maybeReservedVarTypeList of
         Just typeList ->
-            if typeList |> List.any (\typeName -> typeName == applyName) then
+            if typeList |> List.member applyName then
                 lowPenalty
 
             else

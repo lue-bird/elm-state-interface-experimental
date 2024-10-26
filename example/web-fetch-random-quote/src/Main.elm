@@ -1,4 +1,4 @@
-port module Main exposing (State(..), main)
+port module Main exposing (main)
 
 import Bytes exposing (Bytes)
 import Bytes.Decode

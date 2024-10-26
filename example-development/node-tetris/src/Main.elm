@@ -1,4 +1,4 @@
-port module Main exposing (State(..), main)
+port module Main exposing (main)
 
 {-| simplified tetris (no mirrored L and S for example)
 
@@ -18,7 +18,6 @@ import Duration
 import Json.Encode
 import Node
 import Random
-import Time
 
 
 main : Node.Program State
@@ -112,11 +111,16 @@ interface state =
                                 pieceKindCoordinates playing.fallingPiece.kind playing.fallingPiece.turn
                                     |> List.all
                                         (\c ->
-                                            (playing.groundPieceCoordinates
-                                                |> Array.get (playing.fallingPiece.y + c.y)
-                                                |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x - 1))
-                                            )
-                                                == Just Nothing
+                                            case
+                                                playing.groundPieceCoordinates
+                                                    |> Array.get (playing.fallingPiece.y + c.y)
+                                                    |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x - 1))
+                                            of
+                                                Just Nothing ->
+                                                    True
+
+                                                _ ->
+                                                    False
                                         )
                             then
                                 Playing
@@ -138,11 +142,16 @@ interface state =
                                 pieceKindCoordinates playing.fallingPiece.kind playing.fallingPiece.turn
                                     |> List.all
                                         (\c ->
-                                            (playing.groundPieceCoordinates
-                                                |> Array.get (playing.fallingPiece.y + c.y)
-                                                |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x + 1))
-                                            )
-                                                == Just Nothing
+                                            case
+                                                playing.groundPieceCoordinates
+                                                    |> Array.get (playing.fallingPiece.y + c.y)
+                                                    |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x + 1))
+                                            of
+                                                Just Nothing ->
+                                                    True
+
+                                                _ ->
+                                                    False
                                         )
                             then
                                 Playing
@@ -164,11 +173,16 @@ interface state =
                                 pieceKindCoordinates playing.fallingPiece.kind (playing.fallingPiece.turn |> pieceTurnByQuarterClockwise)
                                     |> List.all
                                         (\c ->
-                                            (playing.groundPieceCoordinates
-                                                |> Array.get (playing.fallingPiece.y + c.y)
-                                                |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x))
-                                            )
-                                                == Just Nothing
+                                            case
+                                                playing.groundPieceCoordinates
+                                                    |> Array.get (playing.fallingPiece.y + c.y)
+                                                    |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x))
+                                            of
+                                                Just Nothing ->
+                                                    True
+
+                                                _ ->
+                                                    False
                                         )
                             then
                                 Playing
@@ -185,16 +199,21 @@ interface state =
                             else
                                 Playing playing
 
-                        else if input |> Ansi.Decode.isUpArrow then
+                        else if input |> Ansi.Decode.isDownArrow then
                             if
                                 pieceKindCoordinates playing.fallingPiece.kind (playing.fallingPiece.turn |> pieceTurnByQuarterCounterclockwise)
                                     |> List.all
                                         (\c ->
-                                            (playing.groundPieceCoordinates
-                                                |> Array.get (playing.fallingPiece.y + c.y)
-                                                |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x))
-                                            )
-                                                == Just Nothing
+                                            case
+                                                playing.groundPieceCoordinates
+                                                    |> Array.get (playing.fallingPiece.y + c.y)
+                                                    |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x))
+                                            of
+                                                Just Nothing ->
+                                                    True
+
+                                                _ ->
+                                                    False
                                         )
                             then
                                 Playing
@@ -216,7 +235,7 @@ interface state =
                     )
             , Node.timePeriodicallyListen (Duration.seconds (0.05 + 0.3 * (20 + playing.ticks |> Basics.toFloat) ^ -0.2))
                 |> Node.interfaceFutureMap
-                    (\nextSecondTime ->
+                    (\_ ->
                         if
                             pieceKindCoordinates playing.fallingPiece.kind playing.fallingPiece.turn
                                 |> List.any
@@ -368,7 +387,18 @@ fieldRemoveFollRow field =
             field
                 |> Array.foldl
                     (\row soFar ->
-                        if row |> arrayAny (\c -> c == Nothing) then
+                        if
+                            row
+                                |> arrayAny
+                                    (\c ->
+                                        case c of
+                                            Nothing ->
+                                                True
+
+                                            _ ->
+                                                False
+                                    )
+                        then
                             { removedRowCount = soFar.removedRowCount
                             , newRows = soFar.newRows |> Array.push row
                             }
@@ -577,25 +607,6 @@ arrayAny isNeedle array =
         |> Array.foldl
             (\element soFar -> soFar || (element |> isNeedle))
             False
-
-
-textPadHorizontally : Int -> (String -> String)
-textPadHorizontally padCharCount text =
-    String.repeat padCharCount " "
-        ++ text
-        ++ String.repeat padCharCount " "
-
-
-ansiHighlight : String -> String
-ansiHighlight text =
-    text
-        |> Ansi.Color.backgroundColor Ansi.Color.brightCyan
-        |> Ansi.Color.fontColor Ansi.Color.black
-
-
-doubleDigitFormat : Int -> String
-doubleDigitFormat number =
-    number |> String.fromInt |> String.padLeft 2 '0'
 
 
 port toJs : Json.Encode.Value -> Cmd event_
