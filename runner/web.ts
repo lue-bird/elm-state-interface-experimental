@@ -141,7 +141,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 }
                 abortSignal.addEventListener("abort", _event => {
                     domListenAbortControllers.delete(id)
-                    // it is possible that the "newDomNode" has been replaced
+                    // it is possible that the dom node" has been replaced
                     // by e.g.a text where there was an Element previously
                     const appConfigDomELementChildElementOnDelete = domElementAtIndex(appConfig.domElement, 0)
                     const toRemove =
@@ -433,15 +433,20 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     }
 
     function domNodeInElementAtReversePath(overallParent: Element, reversePath: number[]): ChildNode | null {
-        let soFar: Element | null = overallParent
-        for (
-            let pathIndex = reversePath.length - 1;
-            pathIndex >= 1; // ! notice the 1
-            pathIndex--
-        ) {
-            soFar = domElementAtIndex(soFar, reversePath[pathIndex] ?? 0)
+        const innermostIndex = reversePath[0]
+        if (innermostIndex === undefined) {
+            return overallParent
+        } else {
+            let soFar: Element | null = overallParent
+            for (
+                let pathIndex = reversePath.length - 1;
+                pathIndex >= 1; // ! notice the 1
+                pathIndex--
+            ) {
+                soFar = domElementAtIndex(soFar, reversePath[pathIndex] ?? 0)
+            }
+            return domNodeAtIndex(soFar, innermostIndex)
         }
-        return domNodeAtIndex(soFar, reversePath[0] ?? 0)
     }
     function domElementOrDummyInElementAtReversePath(overallParent: Element, reversePath: number[]): ChildNode {
         let soFar: Element | null = overallParent
