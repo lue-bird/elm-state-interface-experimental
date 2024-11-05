@@ -385,6 +385,12 @@ function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, send
         })
         .catch((error) => {
             sendToElm({ tag: "Err", value: error })
+            setTimeout(
+                () => {
+                    recentlyWrittenToFilePaths.delete(write.path)
+                },
+                100
+            )
         })
 }
 
