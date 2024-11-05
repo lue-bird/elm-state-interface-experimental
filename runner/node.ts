@@ -367,7 +367,7 @@ function queueAbortable(abortSignal: AbortSignal, action: () => void) {
 }
 
 
-function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, sendToElm: (v: any) => void, abortSignal: AbortSignal | undefined) {
+function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, sendToElm: (v: any) => void, abortSignal: AbortSignal) {
     recentlyWrittenToFilePaths.add(write.path)
     fs.promises.writeFile(
         write.path,
@@ -392,6 +392,14 @@ function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, send
                 100
             )
         })
+    abortSignal.addEventListener("abort", (_event) => {
+        setTimeout(
+            () => {
+                recentlyWrittenToFilePaths.delete(write.path)
+            },
+            100
+        )
+    })
 }
 
 function watchPath(
@@ -399,28 +407,37 @@ function watchPath(
     abortSignal: AbortSignal,
     sendToElm: (event: { tag: "Removed" | "AddedOrChanged", value: string }) => void
 ) {
-    // most editors chunk up their file edits in 2, see
+    // most editors chunk up their file edits in 2 or 4, see
     // https://stackoverflow.com/questions/12978924/fs-watch-fired-twice-when-i-change-the-watched-file
-    let debounced = true
+    // https://thisdavej.com/how-to-watch-for-file-changes-in-node-js/
+    // so we buffer until the latest chunk after 25ms still has no other chunk arrive in the meantime
+    let timeoutIdWaitingForLastChunk: NodeJS.Timeout | null = null
 
     fs.watch(
         pathToWatch,
         { recursive: true, signal: abortSignal },
         (_event, fileName) => {
-            if (debounced && fileName !== null) {
+            if (fileName !== null) {
                 const fullPath =
                     path.basename(pathToWatch) == fileName ?
                         pathToWatch
                         :
                         path.join(pathToWatch, fileName)
                 if (!recentlyWrittenToFilePaths.has(fullPath)) {
-                    debounced = false
-                    setTimeout(() => { debounced = true }, 100)
-                    if (fs.existsSync(fullPath)) {
-                        sendToElm({ tag: "AddedOrChanged", value: fullPath })
-                    } else {
-                        sendToElm({ tag: "Removed", value: fullPath })
-                    }
+                    const currentAttemptTimeoutIdWaitingForLastChunk =
+                        setTimeout(
+                            () => {
+                                if (currentAttemptTimeoutIdWaitingForLastChunk === timeoutIdWaitingForLastChunk) {
+                                    if (fs.existsSync(fullPath)) {
+                                        sendToElm({ tag: "AddedOrChanged", value: fullPath })
+                                    } else {
+                                        sendToElm({ tag: "Removed", value: fullPath })
+                                    }
+                                }
+                            },
+                            25
+                        )
+                    timeoutIdWaitingForLastChunk = currentAttemptTimeoutIdWaitingForLastChunk
                 }
             }
         }
