@@ -268,14 +268,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     })
             }
             case "FileWrite": return (write: { contentUnsignedInt8s: number[], path: string }) => {
-                recentlyWrittenToFilePaths.add(write.path)
                 fileWrite(write, sendToElm, abortSignal)
-                setTimeout(
-                    () => {
-                        recentlyWrittenToFilePaths.delete(write.path)
-                    },
-                    100
-                )
             }
             case "FileRequest": return (path: string) => {
                 fs.promises.readFile(path, { signal: abortSignal })
@@ -375,6 +368,7 @@ function queueAbortable(abortSignal: AbortSignal, action: () => void) {
 
 
 function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, sendToElm: (v: any) => void, abortSignal: AbortSignal | undefined) {
+    recentlyWrittenToFilePaths.add(write.path)
     fs.promises.writeFile(
         write.path,
         Uint8Array.from(write.contentUnsignedInt8s),
@@ -382,9 +376,15 @@ function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, send
     )
         .then(() => {
             sendToElm({ tag: "Ok", value: null })
+            setTimeout(
+                () => {
+                    recentlyWrittenToFilePaths.delete(write.path)
+                },
+                100
+            )
         })
         .catch((error) => {
-            sendToElm({ tag: "Ok", value: error })
+            sendToElm({ tag: "Err", value: error })
         })
 }
 
