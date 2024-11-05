@@ -42,7 +42,15 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "Remove": return (_config: null) => {
                 const abortController = abortControllers.get(id)
                 if (abortController !== undefined) {
-                    abortController.abort()
+                    try {
+                        abortController.abort()
+                    } catch (errorOnAbort) {
+                        console.warn(
+                            "Removing an interface aborted an operation which lead to an error:",
+                            errorOnAbort,
+                            "Try to keep such interfaces alive until you receive confirmation they completed"
+                        )
+                    }
                     abortControllers.delete(id)
                 } else {
                     notifyOfBug("trying to remove an interface that was already aborted")
@@ -69,7 +77,11 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     const stringInput = buffer.toString()
                     if (stringInput == "\u0003") { // ctrl+c
                         abortControllers.forEach((abortController) => {
-                            abortController.abort()
+                            try {
+                                abortController.abort()
+                            } catch (errorOnAbort) {
+                                console.warn("forceful abort of an operation lead to an error ", errorOnAbort)
+                            }
                         })
                         appConfig.ports.toJs.unsubscribe(listenToElm)
                         process.stdout.write("\u{001B}[?25h\n") // show cursor
