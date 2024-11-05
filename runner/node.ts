@@ -239,7 +239,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         config.pointInTime - Date.now()
                     )
                 abortSignal.addEventListener("abort", _event => {
-                    clearInterval(timeOnceId)
+                    clearTimeout(timeOnceId)
                 })
             }
             case "RandomUnsignedInt32sRequest": return (config: number) => {

@@ -210,7 +210,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                         config.pointInTime - Date.now()
                     )
                 abortSignal.addEventListener("abort", _event => {
-                    window.clearInterval(timeOnceId)
+                    window.clearTimeout(timeOnceId)
                 })
             }
             case "RandomUnsignedInt32sRequest": return (config: number) => {
