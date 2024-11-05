@@ -246,7 +246,11 @@ type InterfaceSingle future
         , on : Result { code : String, message : String } () -> future
         }
     | FileRemove String
-    | FileWrite { contentUnsignedInt8s : List Int, path : String }
+    | FileWrite
+        { contentUnsignedInt8s : List Int
+        , path : String
+        , on : Result { code : String, message : String } () -> future
+        }
     | FileRequest
         { path : String
         , on : Result { code : String, message : String } Bytes -> future
@@ -415,7 +419,11 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             FileRemove path
 
         FileWrite write ->
-            FileWrite write
+            FileWrite
+                { path = write.path
+                , contentUnsignedInt8s = write.contentUnsignedInt8s
+                , on = \result -> write.on result |> futureChange
+                }
 
         FileRequest request ->
             FileRequest
@@ -924,8 +932,26 @@ interfaceSingleFutureJsonDecoder interface =
         FileRemove _ ->
             Nothing
 
-        FileWrite _ ->
-            Nothing
+        FileWrite write ->
+            Json.Decode.oneOf
+                [ Json.Decode.LocalExtra.variant "Ok"
+                    (Json.Decode.null (Ok ()))
+                , Json.Decode.LocalExtra.variant "Err"
+                    (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+                        (Json.Decode.oneOf
+                            [ Json.Decode.field "code" Json.Decode.string
+                            , Json.Decode.succeed ""
+                            ]
+                        )
+                        (Json.Decode.oneOf
+                            [ Json.Decode.field "message" Json.Decode.string
+                            , Json.Decode.succeed ""
+                            ]
+                        )
+                    )
+                ]
+                |> Json.Decode.map write.on
+                |> Just
 
         FileRequest request ->
             Json.Decode.oneOf
@@ -1593,11 +1619,12 @@ at a given path with given [`Bytes`](https://dark.elm.dmy.fr/packages/elm/bytes/
 Uses [`fs.writeFile`](https://nodejs.org/api/fs.html#fswritefilefile-data-options-callback)
 
 -}
-fileWrite : { path : String, content : Bytes } -> Interface future_
+fileWrite : { path : String, content : Bytes } -> Interface (Result { code : String, message : String } ())
 fileWrite write =
     FileWrite
         { path = write.path
         , contentUnsignedInt8s = write.content |> Bytes.LocalExtra.toUnsignedInt8List
+        , on = identity
         }
         |> interfaceFromSingle
 

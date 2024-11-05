@@ -256,7 +256,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     })
             }
             case "FileWrite": return (write: { contentUnsignedInt8s: number[], path: string }) => {
-                fileWrite(write, abortSignal)
+                fileWrite(write, sendToElm, abortSignal)
             }
             case "FileRequest": return (path: string) => {
                 fs.promises.readFile(path, { signal: abortSignal })
@@ -340,15 +340,17 @@ function queueAbortable(abortSignal: AbortSignal, action: () => void) {
 }
 
 
-function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, abortSignal: AbortSignal | undefined) {
+function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, sendToElm: (v: any) => void, abortSignal: AbortSignal | undefined) {
     fs.promises.writeFile(
         write.path,
         Uint8Array.from(write.contentUnsignedInt8s),
         { signal: abortSignal }
     )
-        .then(() => { })
+        .then(() => {
+            sendToElm({ tag: "Ok", value: null })
+        })
         .catch((error) => {
-            console.warn("failed to write to file", error)
+            sendToElm({ tag: "Ok", value: error })
         })
 }
 
