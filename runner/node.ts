@@ -298,8 +298,21 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         }
                     })
             }
-            case "FileChangeListen": return (path: string) => {
-                watchPath(path, abortSignal, event => { sendToElm(event) })
+            case "FileChangeListen": return (path: string) => {                
+                // if you have a nice solution to wait for
+                // files popping into existence, please show me
+                const retryIntervalId = setInterval(
+                    () => {
+                        if(fs.existsSync(path)) {
+                            clearInterval(retryIntervalId)
+                            watchPath(path, abortSignal, sendToElm)
+                        }
+                    },
+                    2000
+                )
+                abortSignal.addEventListener("abort", (_event) => {
+                    clearInterval(retryIntervalId)
+                })
             }
             case "DirectorySubPathsRequest": return (path: string) => {
                 fs.promises.readdir(path, { recursive: true })
