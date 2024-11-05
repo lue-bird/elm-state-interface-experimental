@@ -394,6 +394,7 @@ function watchPath(
         (_event, fileName) => {
             if (debounced) {
                 debounced = false
+                setTimeout(() => { debounced = true }, 100)
                 if (fileName !== null) {
                     const fullPath =
                         path.basename(pathToWatch) == fileName ?
@@ -406,8 +407,6 @@ function watchPath(
                         sendToElm({ tag: "Removed", value: fullPath })
                     }
                 }
-            } else {
-                setTimeout(() => { debounced = true }, 100)
             }
         }
     )
