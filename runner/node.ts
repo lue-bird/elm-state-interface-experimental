@@ -268,7 +268,14 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     })
             }
             case "FileWrite": return (write: { contentUnsignedInt8s: number[], path: string }) => {
+                recentlyWrittenToFilePaths.add(write.path)
                 fileWrite(write, sendToElm, abortSignal)
+                setTimeout(
+                    () => {
+                        recentlyWrittenToFilePaths.delete(write.path)
+                    },
+                    100
+                )
             }
             case "FileRequest": return (path: string) => {
                 fs.promises.readFile(path, { signal: abortSignal })
@@ -298,12 +305,12 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         }
                     })
             }
-            case "FileChangeListen": return (path: string) => {                
+            case "FileChangeListen": return (path: string) => {
                 // if you have a nice solution to wait for
                 // files popping into existence, please show me
                 const retryIntervalId = setInterval(
                     () => {
-                        if(fs.existsSync(path)) {
+                        if (fs.existsSync(path)) {
                             clearInterval(retryIntervalId)
                             watchPath(path, abortSignal, sendToElm)
                         }
@@ -347,7 +354,9 @@ const httpRequestsAwaitingResponse: Map<number /* port */, ((response: HttpServe
     new Map()
 const httpResponsesAwaitingRequest: Map<number /* port */, HttpServerResponse> =
     new Map()
-
+// prevents watching and falling into duplicate work or even an infinite loop
+const recentlyWrittenToFilePaths: Set<string> =
+    new Set()
 
 
 type HttpServerResponse = {
@@ -392,15 +401,15 @@ function watchPath(
         pathToWatch,
         { recursive: true, signal: abortSignal },
         (_event, fileName) => {
-            if (debounced) {
-                debounced = false
-                setTimeout(() => { debounced = true }, 100)
-                if (fileName !== null) {
-                    const fullPath =
-                        path.basename(pathToWatch) == fileName ?
-                            pathToWatch
-                            :
-                            path.join(pathToWatch, fileName)
+            if (debounced && fileName !== null) {
+                const fullPath =
+                    path.basename(pathToWatch) == fileName ?
+                        pathToWatch
+                        :
+                        path.join(pathToWatch, fileName)
+                if (!recentlyWrittenToFilePaths.has(fullPath)) {
+                    debounced = false
+                    setTimeout(() => { debounced = true }, 100)
                     if (fs.existsSync(fullPath)) {
                         sendToElm({ tag: "AddedOrChanged", value: fullPath })
                     } else {
