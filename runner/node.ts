@@ -14,6 +14,9 @@ export function programStart(appConfig: { ports: ElmPorts }) {
     process.addListener("exit", (_event) => {
         process.stdout.write("\u{001B}[?25h") // show cursor
     })
+    process.addListener("SIGTERM", (_event) => {
+        process.stdout.write("\u{001B}[?25h") // show cursor
+    })
     function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
         // uncomment for debugging
         // (process.stdout as any)?._handle?.setBlocking(true) // make log sync https://github.com/nodejs/node/issues/11568#issuecomment-282765300
