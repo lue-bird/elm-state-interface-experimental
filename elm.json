@@ -3,7 +3,7 @@
     "name": "lue-bird/elm-state-interface-experimental",
     "summary": "fast-moving, less tested version of elm-state-interface",
     "license": "MIT",
-    "version": "7.0.0",
+    "version": "8.0.0",
     "exposed-modules": [
         "Web",
         "Node"
