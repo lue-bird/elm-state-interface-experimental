@@ -865,8 +865,8 @@ interfaceSingleFutureJsonDecoder interface =
     case interface of
         HttpRequestSend send ->
             Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Success" httpSuccessResponseJsonDecoder
-                , Json.Decode.LocalExtra.variant "Error" httpErrorJsonDecoder
+                [ Json.Decode.LocalExtra.variant "Ok" httpSuccessResponseJsonDecoder
+                , Json.Decode.LocalExtra.variant "Err" httpErrorJsonDecoder
                     |> Json.Decode.map Err
                 ]
                 |> Json.Decode.map send.on

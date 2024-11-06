@@ -2382,12 +2382,12 @@ interfaceSingleFutureJsonDecoder interface =
         AudioSourceLoad sourceLoad ->
             Json.Decode.oneOf
                 [ Json.Decode.map (\duration -> Ok { url = sourceLoad.url, duration = duration })
-                    (Json.Decode.LocalExtra.variant "Success"
+                    (Json.Decode.LocalExtra.variant "Ok"
                         (Json.Decode.field "durationInSeconds"
                             (Json.Decode.map Duration.seconds Json.Decode.float)
                         )
                     )
-                , Json.Decode.LocalExtra.variant "Error"
+                , Json.Decode.LocalExtra.variant "Err"
                     (Json.Decode.map Err audioSourceLoadErrorJsonDecoder)
                 ]
                 |> Json.Decode.map sourceLoad.on
@@ -2447,8 +2447,8 @@ interfaceSingleFutureJsonDecoder interface =
 
         HttpRequestSend request ->
             Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Success" httpSuccessResponseJsonDecoder
-                , Json.Decode.LocalExtra.variant "Error" httpErrorJsonDecoder
+                [ Json.Decode.LocalExtra.variant "Ok" httpSuccessResponseJsonDecoder
+                , Json.Decode.LocalExtra.variant "Err" httpErrorJsonDecoder
                     |> Json.Decode.map Err
                 ]
                 |> Json.Decode.map request.on

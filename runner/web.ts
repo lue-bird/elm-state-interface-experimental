@@ -798,7 +798,7 @@ interface HttpRequest {
 }
 type HttpResponse =
     | {
-        tag: "Success",
+        tag: "Ok",
         value: {
             statusCode: number,
             statusText: string,
@@ -806,7 +806,7 @@ type HttpResponse =
             bodyAsciiString: string
         }
     }
-    | { tag: "Error", value: any }
+    | { tag: "Err", value: any }
 
 function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<HttpResponse> {
     return fetch(request.url, {
@@ -829,7 +829,7 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
                 // use intermediate ArrayBuffer bc chromium does not support .bytes() yet
                 // https://developer.mozilla.org/en-US/docs/Web/API/Blob/bytes
                 .then((bodyArrayBuffer) => ({
-                    tag: "Success" as const,
+                    tag: "Ok" as const,
                     value: {
                         statusCode: response.status,
                         statusText: response.statusText,
@@ -841,7 +841,7 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
                     }
                 }))
         )
-        .catch((error) => ({ tag: "Error" as const, value: error }))
+        .catch((error) => ({ tag: "Err" as const, value: error }))
 }
 
 
@@ -871,11 +871,11 @@ function audioSourceLoad(url: string, sendToElm: (v: any) => void, abortSignal: 
         .then(buffer => {
             audioBuffers.set(url, buffer)
             sendToElm({
-                tag: "Success", value: { durationInSeconds: buffer.length / buffer.sampleRate }
+                tag: "Ok", value: { durationInSeconds: buffer.length / buffer.sampleRate }
             })
         })
         .catch(error => {
-            sendToElm({ tag: "Error", value: error?.message !== undefined ? error.message : "NetworkError" })
+            sendToElm({ tag: "Err", value: error?.message !== undefined ? error.message : "NetworkError" })
         })
 }
 
