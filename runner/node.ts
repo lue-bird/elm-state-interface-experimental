@@ -11,10 +11,18 @@ export interface ElmPorts {
 }
 
 export function programStart(appConfig: { ports: ElmPorts }) {
-    process.addListener("exit", (_event) => {
+    process.addListener("beforeExit", (_event) => {
         process.stdout.write("\u{001B}[?25h") // show cursor
     })
-    process.addListener("SIGTERM", (_event) => {
+    process.addListener("SIGINT", (_event) => {
+        abortControllers.forEach((abortController) => {
+            try {
+                abortController.abort()
+            } catch (errorOnAbort) {
+                console.warn("forceful abort of an operation lead to an error ", errorOnAbort)
+            }
+        })
+        appConfig.ports.toJs.unsubscribe(listenToElm)
         process.stdout.write("\u{001B}[?25h") // show cursor
     })
     function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
