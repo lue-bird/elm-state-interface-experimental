@@ -1,6 +1,6 @@
 {
     "name": "@lue-bird/elm-state-interface-experimental",
-    "version": "3.0.5",
+    "version": "3.0.6",
     "description": "fast-moving, less tested version of elm-state-interface",
     "author": "lue-bird",
     "license": "MIT",
