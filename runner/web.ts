@@ -91,7 +91,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             case "NavigationUrlRequest": return (_config: null) => {
                 sendToElm(window.location.href)
             }
-            case "FileDownload": return (config: { mimeType: string, name: string, contentUnsignedInt8s: number[] }) => {
+            case "FileDownload": return (config: { mimeType: string, name: string, contentAsciiString: string }) => {
                 fileDownloadBytes(config)
             }
             case "ClipboardReplaceBy": return (config: string) => {
@@ -769,10 +769,10 @@ function noOnOrFormAction(key: string) {
 }
 
 
-function fileDownloadBytes(config: { mimeType: string, name: string, contentUnsignedInt8s: number[] }) {
+function fileDownloadBytes(config: { mimeType: string, name: string, contentAsciiString: string }) {
     const temporaryAnchorDomElement: HTMLAnchorElement = window.document.createElement("a")
     const blob = new Blob(
-        [new Uint8Array(config.contentUnsignedInt8s)],
+        [asciiStringToBytes(config.contentAsciiString)],
         { type: config.mimeType }
     )
     const objectUrl = URL.createObjectURL(blob)
@@ -794,7 +794,7 @@ interface HttpRequest {
     url: string
     method: string
     headers: { name: string, value: string }[]
-    bodyUnsignedInt8s: Uint8Array
+    bodyAsciiString: string | null
 }
 type HttpResponse =
     | {
@@ -803,7 +803,7 @@ type HttpResponse =
             statusCode: number,
             statusText: string,
             headers: { name: string, value: string }[],
-            bodyUnsignedInt8s: number[]
+            bodyAsciiString: string
         }
     }
     | { tag: "Error", value: any }
@@ -812,9 +812,9 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
     return fetch(request.url, {
         method: request.method,
         body:
-            request.bodyUnsignedInt8s === null ?
+            request.bodyAsciiString === null ?
                 null
-                : new Blob([new Uint8Array(request.bodyUnsignedInt8s)]),
+                : new Blob([asciiStringToBytes(request.bodyAsciiString)]),
         headers: new Headers(request.headers.map(header => {
             // removing the type makes ts think that  tuple: string[]
             const tuple: [string, string] = [header.name, header.value]
@@ -836,8 +836,8 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
                         headers:
                             Array.from(response.headers.entries())
                                 .map(([name, value]) => ({ name: name, value: value })),
-                        bodyUnsignedInt8s:
-                            Array.from(new Uint8Array(bodyArrayBuffer))
+                        bodyAsciiString:
+                            bytesToAsciiString(new Uint8Array(bodyArrayBuffer))
                     }
                 }))
         )
@@ -1034,6 +1034,22 @@ function askForNotificationPermissionIfNotAsked(): Promise<"granted" | "denied">
 }
 
 // helpers
+
+function asciiStringToBytes(string: string): Uint8Array {
+    const result = new Uint8Array(string.length);
+    for (let i = 0; i < string.length; i++) {
+        result[i] = string.charCodeAt(i)
+    }
+    return result;
+}
+function bytesToAsciiString(bytes: Uint8Array): string {
+    let result = ""
+    for (let i = 0; i < bytes.length; i++) {
+        result += String.fromCharCode(bytes[i] as number)
+    }
+    return result
+}
+
 
 function warn(warning: string) {
     window?.console.warn(warning + " (lue-bird/elm-state-interface-experimental)")

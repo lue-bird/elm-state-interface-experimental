@@ -411,8 +411,8 @@ If you need more things like json encoders/decoders, [open an issue](https://git
 import Angle exposing (Angle)
 import AppUrl exposing (AppUrl)
 import AppUrl.LocalExtra
+import AsciiString
 import Bytes exposing (Bytes)
-import Bytes.LocalExtra
 import Dict
 import Duration exposing (Duration)
 import FastDict
@@ -636,7 +636,7 @@ type InterfaceSingle future
     | NavigationLoad String
     | NavigationReload ()
     | NavigationUrlRequest (AppUrl -> future)
-    | FileDownload { mimeType : String, name : String, contentUnsignedInt8s : List Int }
+    | FileDownload { mimeType : String, name : String, contentAsciiString : String }
     | ClipboardReplaceBy String
     | ClipboardRequest (String -> future)
     | AudioSourceLoad { url : String, on : Result AudioSourceLoadError AudioSource -> future }
@@ -653,7 +653,7 @@ type InterfaceSingle future
         { url : String
         , method : String
         , headers : List { name : String, value : String }
-        , bodyUnsignedInt8s : Maybe (List Int)
+        , bodyAsciiString : Maybe String
         , on : Result HttpError Bytes -> future
         }
     | TimePosixRequest (Time.Posix -> future)
@@ -993,7 +993,7 @@ In all these examples, you end up converting the narrow future representation of
 to a broader representation for the parent interface
 
 -}
-interfaceFutureMap : (future -> mappedFuture) -> (Interface future -> Interface mappedFuture)
+interfaceFutureMap : (future -> mappedFuture) -> Interface future -> Interface mappedFuture
 interfaceFutureMap futureChange interface =
     interface
         |> internalFastDictMap
@@ -1017,7 +1017,7 @@ internalFastDictInnerMap func dict =
             InternalFastDictInnerNode color key (func value) (internalFastDictInnerMap func left) (internalFastDictInnerMap func right)
 
 
-interfaceSingleFutureMap : (future -> mappedFuture) -> (InterfaceSingle future -> InterfaceSingle mappedFuture)
+interfaceSingleFutureMap : (future -> mappedFuture) -> InterfaceSingle future -> InterfaceSingle mappedFuture
 interfaceSingleFutureMap futureChange interfaceSingle =
     case interfaceSingle of
         DocumentTitleReplaceBy title ->
@@ -1102,7 +1102,7 @@ interfaceSingleFutureMap futureChange interfaceSingle =
             { url = send.url
             , method = send.method
             , headers = send.headers
-            , bodyUnsignedInt8s = send.bodyUnsignedInt8s
+            , bodyAsciiString = send.bodyAsciiString
             , on = \responseBytes -> send.on responseBytes |> futureChange
             }
                 |> HttpRequestSend
@@ -1201,7 +1201,7 @@ notificationAskForPermissionSingle =
     NotificationAskForPermission ()
 
 
-domNodeFutureMap : (future -> mappedFuture) -> (DomTextOrElementHeader future -> DomTextOrElementHeader mappedFuture)
+domNodeFutureMap : (future -> mappedFuture) -> DomTextOrElementHeader future -> DomTextOrElementHeader mappedFuture
 domNodeFutureMap futureChange domElementToMap =
     case domElementToMap of
         DomHeaderText text ->
@@ -1211,7 +1211,7 @@ domNodeFutureMap futureChange domElementToMap =
             domElementHeader |> domElementHeaderFutureMap futureChange |> DomElementHeader
 
 
-domElementHeaderFutureMap : (future -> mappedFuture) -> (DomElementHeader future -> DomElementHeader mappedFuture)
+domElementHeaderFutureMap : (future -> mappedFuture) -> DomElementHeader future -> DomElementHeader mappedFuture
 domElementHeaderFutureMap futureChange domElementToMap =
     { namespace = domElementToMap.namespace
     , tag = domElementToMap.tag
@@ -1238,7 +1238,8 @@ domElementHeaderFutureMap futureChange domElementToMap =
 
 sortedKeyValueListMap :
     ({ key : key, value : value } -> newValue)
-    -> (SortedKeyValueList key value -> SortedKeyValueList key newValue)
+    -> SortedKeyValueList key value
+    -> SortedKeyValueList key newValue
 sortedKeyValueListMap elementChange (SortedKeyValueList sortedKeyValueList) =
     SortedKeyValueList
         (sortedKeyValueList
@@ -1529,8 +1530,8 @@ interfaceSingleToJson interfaceSingle =
                     Json.Encode.object
                         [ ( "name", config.name |> Json.Encode.string )
                         , ( "mimeType", config.mimeType |> Json.Encode.string )
-                        , ( "contentUnsignedInt8s"
-                          , config.contentUnsignedInt8s |> Json.Encode.list Json.Encode.int
+                        , ( "contentAsciiString"
+                          , config.contentAsciiString |> Json.Encode.string
                           )
                         ]
                 }
@@ -1609,10 +1610,9 @@ interfaceSingleToJson interfaceSingle =
                                             ]
                                     )
                           )
-                        , ( "bodyUnsignedInt8s"
-                          , send.bodyUnsignedInt8s
-                                |> Json.Encode.LocalExtra.nullable
-                                    (Json.Encode.list Json.Encode.int)
+                        , ( "bodyAsciiString"
+                          , send.bodyAsciiString
+                                |> Json.Encode.LocalExtra.nullable Json.Encode.string
                           )
                         ]
                 }
@@ -2263,7 +2263,7 @@ programInit appConfig =
 
 {-| The "subscriptions" part for an embedded program
 -}
-programSubscriptions : ProgramConfig state -> (ProgramState state -> Sub (ProgramEvent state))
+programSubscriptions : ProgramConfig state -> ProgramState state -> Sub (ProgramEvent state)
 programSubscriptions appConfig (State state) =
     appConfig.ports.fromJs
         (\interfaceJson ->
@@ -2796,7 +2796,7 @@ gamepadButtonJsonDecoder =
         (Json.Decode.field "value" Json.Decode.float)
 
 
-listPadToAtLeast : Int -> a -> (List a -> List a)
+listPadToAtLeast : Int -> a -> List a -> List a
 listPadToAtLeast newMinimumSize paddingElement list =
     list
         ++ List.repeat (newMinimumSize - (list |> List.length)) paddingElement
@@ -2860,9 +2860,8 @@ buttonMapping =
             , leftThumbstickButton = Just 6
             , rightThumbstickButton = Just 7
             , homeButton = Just 10
-
-            -- these are only analog
-            , leftTrigger = Nothing
+            , -- these are only analog
+              leftTrigger = Nothing
             , rightTrigger = Nothing
             }
         |> fastDictInsertSameValueFor
@@ -2889,8 +2888,8 @@ buttonMapping =
                 , arrowDown = Nothing
                 , homeButton = Nothing
             }
-        -- nintendo style
-        |> fastDictInsertSameValueFor
+        |> -- nintendo style
+           fastDictInsertSameValueFor
             [ "057e-2009-Pro Controller"
             , "Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)"
             , "057e-2009-Pro Wireless Gamepad"
@@ -2908,26 +2907,26 @@ buttonMapping =
                 , secondary = Just 0
                 , quaternary = Just 2
             }
-        -- dualsense style
-        -- too unclear to me how arrows and dpad are interpreted.
-        -- Like, some different button indexes belong to the same button output.
-        -- And some button values seem to be mixed up in the axis values
-        --     [ "54c-ce6-DualSense Wireless Controller"
-        --     , "DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)"
-        --     , "054c-0ce6-Wireless Controller"
-        --     , "Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)"
-        --     ]
-        -- 8BitDo style
-        -- too unclear to me how arrows and dpad are interpreted. Some button values seem to be mixed up in the axis values
-        --    [ "2dc8-5112-8BitDo Lite 2"
-        --    , "8BitDo Lite 2 (Vendor: 2dc8 Product: 5112)"
-        --    , "2dc8-5112-Bluetooth Wireless Controller   "
-        --    , "Bluetooth Wireless Controller    (Vendor: 2dc8 Product: 5112)"
-        --    , "8BitDo Lite 2 Extended Gamepad"
-        --    ]
-        --
-        -- playstation 3 style
-        |> fastDictInsertSameValueFor
+        |> -- dualsense style
+           -- too unclear to me how arrows and dpad are interpreted.
+           -- Like, some different button indexes belong to the same button output.
+           -- And some button values seem to be mixed up in the axis values
+           --     [ "54c-ce6-DualSense Wireless Controller"
+           --     , "DualSense Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)"
+           --     , "054c-0ce6-Wireless Controller"
+           --     , "Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 0ce6)"
+           --     ]
+           -- 8BitDo style
+           -- too unclear to me how arrows and dpad are interpreted. Some button values seem to be mixed up in the axis values
+           --    [ "2dc8-5112-8BitDo Lite 2"
+           --    , "8BitDo Lite 2 (Vendor: 2dc8 Product: 5112)"
+           --    , "2dc8-5112-Bluetooth Wireless Controller   "
+           --    , "Bluetooth Wireless Controller    (Vendor: 2dc8 Product: 5112)"
+           --    , "8BitDo Lite 2 Extended Gamepad"
+           --    ]
+           --
+           -- playstation 3 style
+           fastDictInsertSameValueFor
             [ "54c-268-PLAYSTATION(R)3 Controller"
             , "PS3 GamePad (Vendor: 054c Product: 0268)"
             ]
@@ -2950,8 +2949,8 @@ buttonMapping =
             , homeButton = Nothing
             , touchpad = Nothing
             }
-        -- playstation 4 style
-        |> fastDictInsertSameValueFor
+        |> -- playstation 4 style
+           fastDictInsertSameValueFor
             [ "54c-9cc-Wireless Controller" ]
             { primary = Just 1
             , secondary = Just 2
@@ -2972,8 +2971,8 @@ buttonMapping =
             , homeButton = Just 12
             , touchpad = Just 13
             }
-        -- logi style
-        |> fastDictInsertSameValueFor
+        |> -- logi style
+           fastDictInsertSameValueFor
             [ "046d- c216-Logitech Dual Action"
             , "Logitech Dual Action (STANDARD GAMEPAD Vendor: 046d Product: c216)"
             ]
@@ -3001,7 +3000,8 @@ buttonMapping =
 fastDictInsertSameValueFor :
     List comparableKey
     -> value
-    -> (FastDict.Dict comparableKey value -> FastDict.Dict comparableKey value)
+    -> FastDict.Dict comparableKey value
+    -> FastDict.Dict comparableKey value
 fastDictInsertSameValueFor keyList value dict =
     keyList
         |> List.foldl
@@ -3049,10 +3049,8 @@ httpResponseJsonDecoder =
                 )
             )
         )
-        (Json.Decode.field "bodyUnsignedInt8s"
-            (Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
-                (Json.Decode.list Json.Decode.int)
-            )
+        (Json.Decode.field "bodyAsciiString"
+            (Json.Decode.map AsciiString.toBytes Json.Decode.string)
         )
 
 
@@ -3211,7 +3209,7 @@ type alias GamepadButtonMap =
 
 {-| The "update" part for an embedded program
 -}
-programUpdate : ProgramConfig state -> (ProgramEvent state -> ProgramState state -> ( ProgramState state, Cmd (ProgramEvent state) ))
+programUpdate : ProgramConfig state -> ProgramEvent state -> ProgramState state -> ( ProgramState state, Cmd (ProgramEvent state) )
 programUpdate appConfig event state =
     case event of
         JsEventFailedToDecode jsonError ->
@@ -3256,11 +3254,10 @@ programUpdate appConfig event state =
 interfacesDiffMap :
     ({ id : String, diff : InterfaceSingleDiff future } -> combined)
     ->
-        ({ old : Interface future
-         , updated : Interface future
-         }
-         -> List combined
-        )
+        { old : Interface future
+        , updated : Interface future
+        }
+    -> List combined
 interfacesDiffMap idAndDiffCombine interfaces =
     internalFastDictMerge
         (\removedId _ soFar ->
@@ -3285,10 +3282,8 @@ interfacesDiffMap idAndDiffCombine interfaces =
 
 interfaceSingleEditsMap :
     (InterfaceSingleEdit -> fromSingeEdit)
-    ->
-        ({ old : InterfaceSingle future, updated : InterfaceSingle future }
-         -> List fromSingeEdit
-        )
+    -> { old : InterfaceSingle future, updated : InterfaceSingle future }
+    -> List fromSingeEdit
 interfaceSingleEditsMap fromSingeEdit interfaces =
     case interfaces.old of
         DomNodeRender domElementPreviouslyRendered ->
@@ -3461,10 +3456,8 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
 
 domTextOrElementHeaderDiffMap :
     (DomEdit -> fromDomEdit)
-    ->
-        ({ old : DomTextOrElementHeader state, updated : DomTextOrElementHeader state }
-         -> List fromDomEdit
-        )
+    -> { old : DomTextOrElementHeader state, updated : DomTextOrElementHeader state }
+    -> List fromDomEdit
 domTextOrElementHeaderDiffMap fromDomEdit nodes =
     case nodes.old of
         DomHeaderText oldText ->
@@ -3504,10 +3497,8 @@ domTextOrElementHeaderDiffMap fromDomEdit nodes =
 
 domElementHeaderDiffMap :
     (DomEdit -> fromDomEdit)
-    ->
-        ({ old : DomElementHeader future, updated : DomElementHeader future }
-         -> List fromDomEdit
-        )
+    -> { old : DomElementHeader future, updated : DomElementHeader future }
+    -> List fromDomEdit
 domElementHeaderDiffMap fromDomEdit elements =
     if elements.old.tag /= elements.updated.tag then
         [ elements.updated
@@ -3622,11 +3613,10 @@ sortedKeyValueListEditAndRemoveDiffMapBy :
     -> ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
     -> { remove : key -> removeSingle, edit : { key : key, value : value } -> editSingle }
     ->
-        ({ old : SortedKeyValueList key value
-         , updated : SortedKeyValueList key value
-         }
-         -> Maybe fromRemoveAndEdit
-        )
+        { old : SortedKeyValueList key value
+        , updated : SortedKeyValueList key value
+        }
+    -> Maybe fromRemoveAndEdit
 sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDiffSingle dicts =
     let
         diff : { remove : List removeSingle, edit : List editSingle }
@@ -3724,7 +3714,8 @@ sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList
 
 audioDiffMap :
     (AudioEdit -> fromAudioEdit)
-    -> ({ old : Audio, updated : Audio } -> List fromAudioEdit)
+    -> { old : Audio, updated : Audio }
+    -> List fromAudioEdit
 audioDiffMap fromAudioEdit audios =
     (if audios.old.volume == audios.updated.volume then
         []
@@ -4342,9 +4333,9 @@ httpRequestSend request =
     { url = request.url
     , method = request.method
     , headers = request.headers
-    , bodyUnsignedInt8s =
+    , bodyAsciiString =
         request.body
-            |> Maybe.map Bytes.LocalExtra.toUnsignedInt8List
+            |> Maybe.map AsciiString.fromBytes
     , on = identity
     }
         |> HttpRequestSend
@@ -4363,7 +4354,7 @@ fileDownloadBytes fileDownloadConfig =
     FileDownload
         { name = fileDownloadConfig.name
         , mimeType = fileDownloadConfig.mimeType
-        , contentUnsignedInt8s = fileDownloadConfig.content |> Bytes.LocalExtra.toUnsignedInt8List
+        , contentAsciiString = fileDownloadConfig.content |> AsciiString.fromBytes
         }
         |> interfaceFromSingle
 
@@ -4988,7 +4979,7 @@ with
         = Clicked
 
 -}
-domFutureMap : (future -> mappedFuture) -> (DomNode future -> DomNode mappedFuture)
+domFutureMap : (future -> mappedFuture) -> DomNode future -> DomNode mappedFuture
 domFutureMap futureChange domElementToMap =
     case domElementToMap of
         DomText string ->
@@ -4998,7 +4989,7 @@ domFutureMap futureChange domElementToMap =
             element |> elementFutureMap futureChange |> DomElement
 
 
-elementFutureMap : (future -> mappedFuture) -> (DomElement future -> DomElement mappedFuture)
+elementFutureMap : (future -> mappedFuture) -> DomElement future -> DomElement mappedFuture
 elementFutureMap futureChange domElementToMap =
     { header = domElementToMap.header |> domElementHeaderFutureMap futureChange
     , subs =
@@ -5233,7 +5224,8 @@ to create a [`SortedKeyValueList`](Web#SortedKeyValueList)
 -}
 sortedKeyValueListFromListBy :
     (key -> comparable_)
-    -> (List { value : value, key : key } -> SortedKeyValueList key value)
+    -> List { value : value, key : key }
+    -> SortedKeyValueList key value
 sortedKeyValueListFromListBy keyToComparable unsortedList =
     SortedKeyValueList
         (unsortedList
@@ -5455,7 +5447,8 @@ domListenToPreventingDefaultAction eventName =
 -}
 domModifierFutureMap :
     (future -> mappedFuture)
-    -> (DomModifier future -> DomModifier mappedFuture)
+    -> DomModifier future
+    -> DomModifier mappedFuture
 domModifierFutureMap futureChange modifier =
     modifier
         |> Rope.LocalExtra.mapFast
@@ -5466,7 +5459,8 @@ domModifierFutureMap futureChange modifier =
 
 domModifierSingleMap :
     (future -> mappedFuture)
-    -> (DomModifierSingle future -> DomModifierSingle mappedFuture)
+    -> DomModifierSingle future
+    -> DomModifierSingle mappedFuture
 domModifierSingleMap futureChange modifier =
     case modifier of
         Attribute keyValue ->
@@ -5568,7 +5562,7 @@ type alias DomElement future =
 `Web.audioStereoPan -0.9` for example means that the sound is almost fully balanced towards the left speaker
 
 -}
-audioStereoPan : AudioParameterTimeline -> (Audio -> Audio)
+audioStereoPan : AudioParameterTimeline -> Audio -> Audio
 audioStereoPan signedPercentageTimeline audio =
     { audio
         | stereoPan =
@@ -5592,7 +5586,7 @@ see [Audio time stretching and pitch scaling](https://en.wikipedia.org/wiki/Audi
 Help appreciated!
 
 -}
-audioSpeedScaleBy : AudioParameterTimeline -> (Audio -> Audio)
+audioSpeedScaleBy : AudioParameterTimeline -> Audio -> Audio
 audioSpeedScaleBy speedScaleFactorTimeline audio =
     { audio
         | speed =
@@ -5606,7 +5600,7 @@ audioSpeedScaleBy speedScaleFactorTimeline audio =
 1 preserves the current volume, 0.5 halves it, and 0 mutes it.
 If the the volume is less than 0, 0 will be used instead.
 -}
-audioVolumeScaleBy : AudioParameterTimeline -> (Audio -> Audio)
+audioVolumeScaleBy : AudioParameterTimeline -> Audio -> Audio
 audioVolumeScaleBy volumeScaleFactor audio =
     { audio
         | volume =
@@ -5616,7 +5610,7 @@ audioVolumeScaleBy volumeScaleFactor audio =
     }
 
 
-audioAddProcessing : AudioProcessing -> (Audio -> Audio)
+audioAddProcessing : AudioProcessing -> Audio -> Audio
 audioAddProcessing newLastProcessing audio =
     { audio
         | processingLastToFirst = audio.processingLastToFirst |> (::) newLastProcessing
@@ -5631,7 +5625,7 @@ If you need some nice impulse wavs to try it out, there's a few at [`dhiogoboza/
 If you know more nice ones, don't hesitate to open an issue or a PR.
 
 -}
-audioAddLinearConvolutionWith : AudioSource -> (Audio -> Audio)
+audioAddLinearConvolutionWith : AudioSource -> Audio -> Audio
 audioAddLinearConvolutionWith bufferAudioSource audio =
     audio |> audioAddProcessing (AudioLinearConvolution { sourceUrl = bufferAudioSource.url })
 
@@ -5642,7 +5636,7 @@ frequencies above it are attenuated.
 Has a 12dB/octave rolloff and no peak at the cutoff.
 
 -}
-audioAddLowpassUntilFrequency : AudioParameterTimeline -> (Audio -> Audio)
+audioAddLowpassUntilFrequency : AudioParameterTimeline -> Audio -> Audio
 audioAddLowpassUntilFrequency cutoffFrequency audio =
     audio |> audioAddProcessing (AudioLowpass { cutoffFrequency = cutoffFrequency })
 
@@ -5653,7 +5647,7 @@ frequencies above it pass through.
 Has a 12dB/octave rolloff and no peak at the cutoff.
 
 -}
-audioAddHighpassFromFrequency : AudioParameterTimeline -> (Audio -> Audio)
+audioAddHighpassFromFrequency : AudioParameterTimeline -> Audio -> Audio
 audioAddHighpassFromFrequency cutoffFrequency audio =
     audio |> audioAddProcessing (AudioHighpass { cutoffFrequency = cutoffFrequency })
 
@@ -5712,7 +5706,7 @@ audioPlay audio =
         |> interfaceFromSingle
 
 
-audioParameterValuesAlter : (Float -> Float) -> (AudioParameterTimeline -> AudioParameterTimeline)
+audioParameterValuesAlter : (Float -> Float) -> AudioParameterTimeline -> AudioParameterTimeline
 audioParameterValuesAlter valueAlter timeline =
     { startValue = timeline.startValue |> valueAlter
     , keyFrames =
@@ -5755,7 +5749,7 @@ Let's define an audio function that fades in to 1 and then fades out until it's 
 You do not have to worry about order.
 
 -}
-audioParameterThrough : Time.Posix -> Float -> (AudioParameterTimeline -> AudioParameterTimeline)
+audioParameterThrough : Time.Posix -> Float -> AudioParameterTimeline -> AudioParameterTimeline
 audioParameterThrough keyFrameMoment keyFrameValue audioParameterTimelineSoFar =
     { startValue = audioParameterTimelineSoFar.startValue
     , keyFrames =
@@ -5763,7 +5757,7 @@ audioParameterThrough keyFrameMoment keyFrameValue audioParameterTimelineSoFar =
     }
 
 
-audioParameterScaleAlongParameter : Time.Posix -> AudioParameterTimeline -> (AudioParameterTimeline -> AudioParameterTimeline)
+audioParameterScaleAlongParameter : Time.Posix -> AudioParameterTimeline -> AudioParameterTimeline -> AudioParameterTimeline
 audioParameterScaleAlongParameter startTime timelineToScaleBy audioParameterTimelineToScale =
     let
         startValue : Float
@@ -5787,7 +5781,8 @@ audioParameterKeyFramesScaleAlong :
     { toScaleBy : List { time : Time.Posix, value : Float }
     , previous : { time : Time.Posix, value : Float }
     }
-    -> (List { time : Time.Posix, value : Float } -> List { time : Time.Posix, value : Float })
+    -> List { time : Time.Posix, value : Float }
+    -> List { time : Time.Posix, value : Float }
 audioParameterKeyFramesScaleAlong state toScale =
     List.map2
         (\keyFrameToScale keyFrameToScaleBy ->
@@ -5803,7 +5798,8 @@ audioParameterKeyFramesAddSubs :
     { subs : List Time.Posix
     , previous : { time : Time.Posix, value : Float }
     }
-    -> (List { time : Time.Posix, value : Float } -> List { time : Time.Posix, value : Float })
+    -> List { time : Time.Posix, value : Float }
+    -> List { time : Time.Posix, value : Float }
 audioParameterKeyFramesAddSubs state keyFrames =
     -- IGNORE TCO
     case state.subs of

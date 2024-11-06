@@ -159,7 +159,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                             headers:
                                 Object.entries(request.headers)
                                     .map(([name, value]) => ({ name: name, value: value })),
-                            data: Array.from(Buffer.concat(dataChunks))
+                            dataAsciiString: bytesToAsciiString(Buffer.concat(dataChunks))
                         }
                     })
                     function sendResponse(response: HttpServerResponse) {
@@ -197,12 +197,12 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 port: number,
                 statusCode: number,
                 headers: { name: string, value: string }[],
-                dataUnsignedInt8s: number[]
+                dataAsciiString: string
             }) => {
                 const response: HttpServerResponse = {
                     statusCode: config.statusCode,
                     headers: config.headers,
-                    data: Buffer.from(config.dataUnsignedInt8s)
+                    data: asciiStringToBytes(config.dataAsciiString)
                 }
                 const httpRequestAwaitingResponse = httpRequestsAwaitingResponse.get(config.port)
                 if (httpRequestAwaitingResponse === undefined) {
@@ -278,13 +278,13 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         console.warn("failed to unlink file", error)
                     })
             }
-            case "FileWrite": return (write: { contentUnsignedInt8s: number[], path: string }) => {
+            case "FileWrite": return (write: { contentAsciiString: string, path: string }) => {
                 fileWrite(write, sendToElm, abortSignal)
             }
             case "FileRequest": return (path: string) => {
                 fs.promises.readFile(path, { signal: abortSignal })
                     .then((contentBuffer) => {
-                        sendToElm({ tag: "Ok", value: Array.from(contentBuffer) })
+                        sendToElm({ tag: "Ok", value: bytesToAsciiString(contentBuffer) })
                     })
                     .catch((error) => {
                         if (!abortSignal.aborted) {
@@ -366,7 +366,7 @@ const recentlyWrittenToFilePaths: Set<string> =
 type HttpServerResponse = {
     statusCode: number,
     headers: { name: string, value: string }[],
-    data: Buffer
+    data: Uint8Array
 }
 
 
@@ -378,11 +378,11 @@ function queueAbortable(abortSignal: AbortSignal, action: () => void) {
 }
 
 
-function fileWrite(write: { path: string, contentUnsignedInt8s: number[] }, sendToElm: (v: any) => void, abortSignal: AbortSignal) {
+function fileWrite(write: { path: string, contentAsciiString: string }, sendToElm: (v: any) => void, abortSignal: AbortSignal) {
     recentlyWrittenToFilePaths.add(write.path)
     fs.promises.writeFile(
         write.path,
-        Uint8Array.from(write.contentUnsignedInt8s),
+        asciiStringToBytes(write.contentAsciiString),
         { signal: abortSignal }
     )
         .then(() => {
@@ -462,7 +462,7 @@ interface HttpRequest {
     url: string
     method: string
     headers: { name: string, value: string }[]
-    bodyUnsignedInt8s: Uint8Array
+    bodyAsciiString: string | null
 }
 type HttpResponse =
     | {
@@ -471,7 +471,7 @@ type HttpResponse =
             statusCode: number,
             statusText: string,
             headers: { name: string, value: string }[],
-            bodyUnsignedInt8s: number[]
+            bodyAsciiString: string
         }
     }
     | { tag: "Error", value: any }
@@ -480,9 +480,9 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
     return fetch(request.url, {
         method: request.method,
         body:
-            request.bodyUnsignedInt8s === null ?
+            request.bodyAsciiString === null ?
                 null
-                : new Blob([new Uint8Array(request.bodyUnsignedInt8s)]),
+                : new Blob([asciiStringToBytes(request.bodyAsciiString)]),
         headers: new Headers(request.headers.map(header => {
             // removing the type makes ts think that  tuple: string[]
             const tuple: [string, string] = [header.name, header.value]
@@ -504,12 +504,28 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
                         headers:
                             Array.from(response.headers.entries())
                                 .map(([name, value]) => ({ name: name, value: value })),
-                        bodyUnsignedInt8s:
-                            Array.from(new Uint8Array(bodyArrayBuffer))
+                        bodyAsciiString:
+                            bytesToAsciiString(new Uint8Array(bodyArrayBuffer))
                     }
                 }))
         )
         .catch((error) => ({ tag: "Error" as const, value: error }))
+}
+
+
+function asciiStringToBytes(string: string): Uint8Array {
+    const result = new Uint8Array(string.length);
+    for (let i = 0; i < string.length; i++) {
+        result[i] = string.charCodeAt(i)
+    }
+    return result;
+}
+function bytesToAsciiString(bytes: Uint8Array): string {
+    let result = ""
+    for (let i = 0; i < bytes.length; i++) {
+        result += String.fromCharCode(bytes[i] as number)
+    }
+    return result
 }
 
 

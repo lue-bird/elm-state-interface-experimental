@@ -1,5 +1,8 @@
 module Tests exposing (tests)
 
+import AsciiString
+import Bytes
+import Bytes.Encode
 import Expect
 import Fuzz
 import List.LocalExtra
@@ -43,6 +46,24 @@ tests =
                             )
                 )
             ]
+        , Test.describe "bytes intermediate representation: ascii string"
+            [ Test.fuzz asciiStringFuzz
+                "roundtrip over bytes"
+                (\asciiString ->
+                    asciiString
+                        |> AsciiString.toBytes
+                        |> AsciiString.fromBytes
+                        |> Expect.equal asciiString
+                )
+            , Test.fuzz bytesFuzz
+                "roundtrip over ascii string"
+                (\bytes ->
+                    bytes
+                        |> AsciiString.fromBytes
+                        |> AsciiString.toBytes
+                        |> Expect.equal bytes
+                )
+            ]
         ]
 
 
@@ -76,3 +97,25 @@ exampleTreeToStructuredId tree =
 type ExampleTree
     = Leaf Int
     | Branch (List ExampleTree)
+
+
+bytesFuzz : Fuzz.Fuzzer Bytes.Bytes
+bytesFuzz =
+    Fuzz.listOfLengthBetween 0
+        30
+        (Fuzz.intRange 0 255)
+        |> Fuzz.map
+            (\unsignedInt8s ->
+                unsignedInt8s
+                    |> List.map Bytes.Encode.unsignedInt8
+                    |> Bytes.Encode.sequence
+                    |> Bytes.Encode.encode
+            )
+
+
+asciiStringFuzz : Fuzz.Fuzzer String
+asciiStringFuzz =
+    Fuzz.listOfLengthBetween 0
+        30
+        Fuzz.asciiChar
+        |> Fuzz.map String.fromList

@@ -102,8 +102,8 @@ If you need more things like json encoders/decoders, [open an issue](https://git
 
 -}
 
+import AsciiString
 import Bytes exposing (Bytes)
-import Bytes.LocalExtra
 import Duration exposing (Duration)
 import FastDict
 import Json.Decode
@@ -221,7 +221,7 @@ type InterfaceSingle future
         { url : String
         , method : String
         , headers : List { name : String, value : String }
-        , bodyUnsignedInt8s : Maybe (List Int)
+        , bodyAsciiString : Maybe String
         , on : Result HttpError Bytes -> future
         }
     | HttpRequestListen
@@ -232,7 +232,7 @@ type InterfaceSingle future
         { portNumber : Int
         , statusCode : Int
         , headers : List { name : String, value : String }
-        , dataUnsignedInt8s : List Int
+        , dataAsciiString : String
         }
     | TimePosixRequest (Time.Posix -> future)
     | TimezoneOffsetRequest (Int -> future)
@@ -247,7 +247,7 @@ type InterfaceSingle future
         }
     | FileRemove String
     | FileWrite
-        { contentUnsignedInt8s : List Int
+        { contentAsciiString : String
         , path : String
         , on : Result { code : String, message : String } () -> future
         }
@@ -346,7 +346,7 @@ In all these examples, you end up converting the narrow future representation of
 to a broader representation for the parent interface
 
 -}
-interfaceFutureMap : (future -> mappedFuture) -> (Interface future -> Interface mappedFuture)
+interfaceFutureMap : (future -> mappedFuture) -> Interface future -> Interface mappedFuture
 interfaceFutureMap futureChange interface =
     interface
         |> FastDict.map
@@ -355,14 +355,14 @@ interfaceFutureMap futureChange interface =
             )
 
 
-interfaceSingleFutureMap : (future -> mappedFuture) -> (InterfaceSingle future -> InterfaceSingle mappedFuture)
+interfaceSingleFutureMap : (future -> mappedFuture) -> InterfaceSingle future -> InterfaceSingle mappedFuture
 interfaceSingleFutureMap futureChange interfaceSingle =
     case interfaceSingle of
         HttpRequestSend send ->
             { url = send.url
             , method = send.method
             , headers = send.headers
-            , bodyUnsignedInt8s = send.bodyUnsignedInt8s
+            , bodyAsciiString = send.bodyAsciiString
             , on = \responseBytes -> send.on responseBytes |> futureChange
             }
                 |> HttpRequestSend
@@ -421,7 +421,7 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         FileWrite write ->
             FileWrite
                 { path = write.path
-                , contentUnsignedInt8s = write.contentUnsignedInt8s
+                , contentAsciiString = write.contentAsciiString
                 , on = \result -> write.on result |> futureChange
                 }
 
@@ -536,10 +536,9 @@ interfaceSingleToJson interfaceSingle =
                                             ]
                                     )
                           )
-                        , ( "bodyUnsignedInt8s"
-                          , send.bodyUnsignedInt8s
-                                |> Json.Encode.LocalExtra.nullable
-                                    (Json.Encode.list Json.Encode.int)
+                        , ( "bodyAsciiString"
+                          , send.bodyAsciiString
+                                |> Json.Encode.LocalExtra.nullable Json.Encode.string
                           )
                         ]
                 }
@@ -565,7 +564,7 @@ interfaceSingleToJson interfaceSingle =
                                             ]
                                     )
                           )
-                        , ( "dataUnsignedInt8s", send.dataUnsignedInt8s |> Json.Encode.list Json.Encode.int )
+                        , ( "dataAsciiString", send.dataAsciiString |> Json.Encode.string )
                         ]
                 }
 
@@ -609,7 +608,7 @@ interfaceSingleToJson interfaceSingle =
                 , value =
                     Json.Encode.object
                         [ ( "path", write.path |> Json.Encode.string )
-                        , ( "contentUnsignedInt8s", write.contentUnsignedInt8s |> Json.Encode.list Json.Encode.int )
+                        , ( "contentAsciiString", write.contentAsciiString |> Json.Encode.string )
                         ]
                 }
 
@@ -692,7 +691,7 @@ interfaceSingleToStructuredId interfaceSingle =
                                             ]
                                     )
                           )
-                        , ( "dataUnsignedInt8s", send.dataUnsignedInt8s |> Json.Encode.list Json.Encode.int )
+                        , ( "dataAsciiString", send.dataAsciiString |> Json.Encode.string )
                         ]
                 }
 
@@ -738,7 +737,7 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value =
                     StructuredId.ofParts
                         [ write.path |> StructuredId.ofString
-                        , write.contentUnsignedInt8s |> StructuredId.ofList StructuredId.ofInt
+                        , write.contentAsciiString |> Json.Encode.string
                         ]
                 }
 
@@ -825,7 +824,7 @@ programInit appConfig =
 
 {-| The "subscriptions" part for an embedded program
 -}
-programSubscriptions : ProgramConfig state -> (ProgramState state -> Sub (ProgramEvent state))
+programSubscriptions : ProgramConfig state -> ProgramState state -> Sub (ProgramEvent state)
 programSubscriptions appConfig (State state) =
     appConfig.ports.fromJs
         (\interfaceJson ->
@@ -957,9 +956,7 @@ interfaceSingleFutureJsonDecoder interface =
             Json.Decode.oneOf
                 [ Json.Decode.LocalExtra.variant "Ok"
                     (Json.Decode.map Ok
-                        (Json.Decode.list Json.Decode.int
-                            |> Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
-                        )
+                        (Json.Decode.map AsciiString.toBytes Json.Decode.string)
                     )
                 , Json.Decode.LocalExtra.variant "Err"
                     (Json.Decode.map2 (\code message -> Err { code = code, message = message })
@@ -1085,10 +1082,8 @@ httpServerEventJsonDecoder =
                         )
                     )
                 )
-                (Json.Decode.field "data"
-                    (Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
-                        (Json.Decode.list Json.Decode.int)
-                    )
+                (Json.Decode.field "dataAsciiString"
+                    (Json.Decode.map AsciiString.toBytes Json.Decode.string)
                 )
             )
         , Json.Decode.LocalExtra.variant "HttpResponseSent"
@@ -1161,10 +1156,8 @@ httpResponseJsonDecoder =
                 )
             )
         )
-        (Json.Decode.field "bodyUnsignedInt8s"
-            (Json.Decode.map Bytes.LocalExtra.fromUnsignedInt8List
-                (Json.Decode.list Json.Decode.int)
-            )
+        (Json.Decode.field "bodyAsciiString"
+            (Json.Decode.map AsciiString.toBytes Json.Decode.string)
         )
 
 
@@ -1186,7 +1179,7 @@ httpErrorJsonDecoder =
 
 {-| The "update" part for an embedded program
 -}
-programUpdate : ProgramConfig state -> (ProgramEvent state -> ProgramState state -> ( ProgramState state, Cmd (ProgramEvent state) ))
+programUpdate : ProgramConfig state -> ProgramEvent state -> ProgramState state -> ( ProgramState state, Cmd (ProgramEvent state) )
 programUpdate appConfig event state =
     case event of
         JsEventFailedToDecode jsonError ->
@@ -1231,11 +1224,10 @@ programUpdate appConfig event state =
 interfacesDiffMap :
     ({ id : String, diff : InterfaceSingleDiff future } -> combined)
     ->
-        ({ old : Interface future
-         , updated : Interface future
-         }
-         -> List combined
-        )
+        { old : Interface future
+        , updated : Interface future
+        }
+    -> List combined
 interfacesDiffMap idAndDiffCombine interfaces =
     FastDict.merge
         (\removedId _ soFar ->
@@ -1260,10 +1252,8 @@ interfacesDiffMap idAndDiffCombine interfaces =
 
 interfaceSingleEditsMap :
     (InterfaceSingleEdit -> fromSingeEdit)
-    ->
-        ({ old : InterfaceSingle future, updated : InterfaceSingle future }
-         -> List fromSingeEdit
-        )
+    -> { old : InterfaceSingle future, updated : InterfaceSingle future }
+    -> List fromSingeEdit
 interfaceSingleEditsMap fromSingeEdit interfaces =
     case interfaces.old of
         HttpRequestSend _ ->
@@ -1623,7 +1613,7 @@ fileWrite : { path : String, content : Bytes } -> Interface (Result { code : Str
 fileWrite write =
     FileWrite
         { path = write.path
-        , contentUnsignedInt8s = write.content |> Bytes.LocalExtra.toUnsignedInt8List
+        , contentAsciiString = write.content |> AsciiString.fromBytes
         , on = identity
         }
         |> interfaceFromSingle
@@ -1788,7 +1778,7 @@ httpRequestListenAndMaybeRespond info =
                 { portNumber = info.portNumber
                 , statusCode = response.statusCode
                 , headers = response.headers
-                , dataUnsignedInt8s = response.data |> Bytes.LocalExtra.toUnsignedInt8List
+                , dataAsciiString = response.data |> AsciiString.fromBytes
                 }
                 |> interfaceFromSingle
             ]
@@ -1864,9 +1854,9 @@ httpRequestSend request =
     { url = request.url
     , method = request.method
     , headers = request.headers
-    , bodyUnsignedInt8s =
+    , bodyAsciiString =
         request.body
-            |> Maybe.map Bytes.LocalExtra.toUnsignedInt8List
+            |> Maybe.map AsciiString.fromBytes
     , on = identity
     }
         |> HttpRequestSend
