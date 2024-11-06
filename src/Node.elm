@@ -691,7 +691,7 @@ interfaceSingleToStructuredId interfaceSingle =
                                             ]
                                     )
                           )
-                        , ( "dataAsciiString", send.dataAsciiString |> Json.Encode.string )
+                        , ( "dataAsciiString", send.dataAsciiString |> StructuredId.ofString )
                         ]
                 }
 
@@ -737,7 +737,7 @@ interfaceSingleToStructuredId interfaceSingle =
                 , value =
                     StructuredId.ofParts
                         [ write.path |> StructuredId.ofString
-                        , write.contentAsciiString |> Json.Encode.string
+                        , write.contentAsciiString |> StructuredId.ofString
                         ]
                 }
 
