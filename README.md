@@ -9,6 +9,7 @@
 >   - simplify web socket API
 >   - simplify web http request send API
 >   - internal: replace `Dict` values to sorted assoc-list, `FastDict.Dict` or in the case of `Web.Interface`, a custom FastDict clone
+>   - internal: transport `Bytes` over ports faster
 
 ### define an app in a simple, safe and declarative way
 
