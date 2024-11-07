@@ -20,9 +20,9 @@ encoder string =
 
 encodeChunks : String -> List Bytes.Encode.Encoder -> List Bytes.Encode.Encoder
 encodeChunks input soFar =
-    case String.toList (String.left 4 input) of
+    case String.toList (String.slice 0 4 input) of
         [ a, b, c, d ] ->
-            encodeChunks (String.dropLeft 4 input)
+            encodeChunks (String.slice 4 (String.length input) input)
                 (Bytes.Encode.unsignedInt32 Bytes.BE
                     (Bitwise.or
                         (Bitwise.or
@@ -38,7 +38,7 @@ encodeChunks input soFar =
                 )
 
         a :: _ ->
-            encodeChunks (String.dropLeft 1 input)
+            encodeChunks (String.slice 1 (String.length input) input)
                 (Bytes.Encode.unsignedInt8
                     (asciiCharToInt a)
                     :: soFar
