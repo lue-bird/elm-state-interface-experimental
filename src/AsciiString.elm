@@ -13,16 +13,17 @@ toBytes string =
 
 encoder : String -> Bytes.Encode.Encoder
 encoder string =
-    encodeChunks string []
+    encodeChunks string (string |> String.length) []
         |> List.reverse
         |> Bytes.Encode.sequence
 
 
-encodeChunks : String -> List Bytes.Encode.Encoder -> List Bytes.Encode.Encoder
-encodeChunks input soFar =
+encodeChunks : String -> Int -> List Bytes.Encode.Encoder -> List Bytes.Encode.Encoder
+encodeChunks input inputLength soFar =
     case String.toList (String.slice 0 4 input) of
         [ a, b, c, d ] ->
-            encodeChunks (String.slice 4 (String.length input) input)
+            encodeChunks (String.slice 4 inputLength input)
+                inputLength
                 (Bytes.Encode.unsignedInt32 Bytes.BE
                     (Bitwise.or
                         (Bitwise.or
@@ -38,7 +39,8 @@ encodeChunks input soFar =
                 )
 
         a :: _ ->
-            encodeChunks (String.slice 1 (String.length input) input)
+            encodeChunks (String.slice 1 inputLength input)
+                inputLength
                 (Bytes.Encode.unsignedInt8
                     (asciiCharToInt a)
                     :: soFar
