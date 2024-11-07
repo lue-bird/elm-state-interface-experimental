@@ -117,5 +117,5 @@ asciiStringFuzz : Fuzz.Fuzzer String
 asciiStringFuzz =
     Fuzz.listOfLengthBetween 0
         30
-        Fuzz.asciiChar
+        (Fuzz.map Char.fromCode (Fuzz.intRange 0 255))
         |> Fuzz.map String.fromList
