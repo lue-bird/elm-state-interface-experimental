@@ -1,5 +1,13 @@
 module AsciiString exposing (fromBytes, toBytes)
 
+{-| Intermediate Bytes representation for transport over ports
+where each character represents a byte.
+
+For a performance comparison with other methods,
+see <https://github.com/lue-bird/elm-bytes-ports-benchmark>
+
+-}
+
 import Bitwise
 import Bytes exposing (Bytes)
 import Bytes.Decode
