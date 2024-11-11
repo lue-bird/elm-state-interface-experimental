@@ -3534,33 +3534,36 @@ domElementHeaderDiffMap fromDomEdit elements =
         { old = elements.old.styles, updated = elements.updated.styles }
             |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                 (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
-                { remove = Basics.identity, edit = Basics.identity }
+                Basics.identity
+                Basics.identity
             |> List.LocalExtra.fromMaybe
             |> List.LocalExtra.consJust
                 ({ old = elements.old.attributes, updated = elements.updated.attributes }
                     |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                         (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
-                        { remove = Basics.identity, edit = Basics.identity }
+                        Basics.identity
+                        Basics.identity
                 )
             |> List.LocalExtra.consJust
                 ({ old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
                     |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
                         (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
-                        { remove = \k -> { namespace = k.namespace, key = k.key }
-                        , edit = \entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value }
-                        }
+                        (\entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value })
+                        (\k -> { namespace = k.namespace, key = k.key })
                 )
             |> List.LocalExtra.consJust
                 ({ old = elements.old.stringProperties, updated = elements.updated.stringProperties }
                     |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                         (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
-                        { remove = Basics.identity, edit = Basics.identity }
+                        Basics.identity
+                        Basics.identity
                 )
             |> List.LocalExtra.consJust
                 ({ old = elements.old.boolProperties, updated = elements.updated.boolProperties }
                     |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                         (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
-                        { remove = Basics.identity, edit = Basics.identity }
+                        Basics.identity
+                        Basics.identity
                 )
             |> List.LocalExtra.consJust
                 (if elements.old.scrollToPosition == elements.updated.scrollToPosition then
@@ -3633,20 +3636,21 @@ replacementDomElementScrollPositionRequest =
 sortedKeyValueListEditAndRemoveDiffMapBy :
     (key -> comparable_)
     -> ({ remove : List removeSingle, edit : List editSingle } -> fromRemoveAndEdit)
-    -> { remove : key -> removeSingle, edit : { key : key, value : value } -> editSingle }
+    -> ({ key : key, value : value } -> editSingle)
+    -> (key -> removeSingle)
     ->
         { old : SortedKeyValueList key value
         , updated : SortedKeyValueList key value
         }
     -> Maybe fromRemoveAndEdit
-sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDiffSingle dicts =
+sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDiffSingleEdit asDiffSingleRemove dicts =
     let
         diff : { remove : List removeSingle, edit : List editSingle }
         diff =
             sortedKeyValueListMergeBy keyToComparable
                 (\removed soFar ->
                     { edit = soFar.edit
-                    , remove = asDiffSingle.remove removed.key :: soFar.remove
+                    , remove = fromEditAndRemove removed.key :: soFar.remove
                     }
                 )
                 (\old updated soFar ->
@@ -3655,12 +3659,12 @@ sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDif
 
                     else
                         { remove = soFar.remove
-                        , edit = asDiffSingle.edit updated :: soFar.edit
+                        , edit = asDiffSingleEdit updated :: soFar.edit
                         }
                 )
                 (\updated soFar ->
                     { remove = soFar.remove
-                    , edit = asDiffSingle.edit updated :: soFar.edit
+                    , edit = asDiffSingleEdit updated :: soFar.edit
                     }
                 )
                 (dicts.old |> sortedKeyValueListToList)
