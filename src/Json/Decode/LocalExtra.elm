@@ -19,7 +19,7 @@ onlyString specificAllowedString =
                     () |> Json.Decode.succeed
 
                 else
-                    ([ "expected only \"", specificAllowedString, "\"" ] |> String.concat)
+                    ("expected only \"" ++ specificAllowedString ++ "\"")
                         |> Json.Decode.fail
             )
 
