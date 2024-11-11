@@ -1274,11 +1274,11 @@ sortedKeyValueListToList (SortedKeyValueList sortedKeyValueList) =
     sortedKeyValueList
 
 
-toJsToJson : { id : String, diff : InterfaceSingleDiff future_ } -> Json.Encode.Value
-toJsToJson toJs =
+idAndDiffToJson : String -> InterfaceSingleDiff future_ -> Json.Encode.Value
+idAndDiffToJson id diff =
     Json.Encode.object
-        [ ( "id", toJs.id |> Json.Encode.string )
-        , ( "diff", toJs.diff |> interfaceSingleDiffToJson )
+        [ ( "id", id |> Json.Encode.string )
+        , ( "diff", diff |> interfaceSingleDiffToJson )
         ]
 
 
@@ -2255,8 +2255,7 @@ programInit appConfig =
     , initialInterface
         |> internalFastDictFoldl
             (\id new soFar ->
-                appConfig.ports.toJs
-                    ({ id = id, diff = new |> Add } |> toJsToJson)
+                appConfig.ports.toJs (idAndDiffToJson id (new |> Add))
                     :: soFar
             )
             []
@@ -3254,10 +3253,9 @@ programUpdate appConfig event state =
                     )
                         |> ConsoleError
               in
-              { id = notifyOfBugInterface |> interfaceSingleToStructuredId |> StructuredId.toString
-              , diff = notifyOfBugInterface |> Add
-              }
-                |> toJsToJson
+              idAndDiffToJson
+                (notifyOfBugInterface |> interfaceSingleToStructuredId |> StructuredId.toString)
+                (notifyOfBugInterface |> Add)
                 |> appConfig.ports.toJs
             )
 
@@ -3273,7 +3271,7 @@ programUpdate appConfig event state =
             ( State { interface = updatedInterface, appState = updatedAppState }
             , { old = oldState.interface, updated = updatedInterface }
                 |> interfacesDiffMap
-                    (\diff -> appConfig.ports.toJs (diff |> toJsToJson))
+                    (\id diff -> appConfig.ports.toJs (idAndDiffToJson id diff))
                 |> Cmd.batch
             )
 
@@ -3281,7 +3279,7 @@ programUpdate appConfig event state =
 {-| Determine which outgoing effects need to be executed based on the difference between old and updated interfaces
 -}
 interfacesDiffMap :
-    ({ id : String, diff : InterfaceSingleDiff future } -> combined)
+    (String -> InterfaceSingleDiff future -> combined)
     ->
         { old : Interface future
         , updated : Interface future
@@ -3290,18 +3288,18 @@ interfacesDiffMap :
 interfacesDiffMap idAndDiffCombine interfaces =
     internalFastDictMerge
         (\removedId _ soFar ->
-            idAndDiffCombine { id = removedId, diff = remove } :: soFar
+            idAndDiffCombine removedId remove :: soFar
         )
         (\id old updated soFar ->
             List.LocalExtra.appendFast
                 ({ old = old, updated = updated }
                     |> interfaceSingleEditsMap
-                        (\edit -> idAndDiffCombine { id = id, diff = edit |> Edit })
+                        (\edit -> idAndDiffCombine id (edit |> Edit))
                 )
                 soFar
         )
         (\addedId onlyNew soFar ->
-            idAndDiffCombine { id = addedId, diff = onlyNew |> Add }
+            idAndDiffCombine addedId (onlyNew |> Add)
                 :: soFar
         )
         interfaces.old
@@ -3657,7 +3655,7 @@ sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDif
             sortedKeyValueListMergeBy keyToComparable
                 (\removed soFar ->
                     { edit = soFar.edit
-                    , remove = fromEditAndRemove removed.key :: soFar.remove
+                    , remove = asDiffSingleRemove removed.key :: soFar.remove
                     }
                 )
                 (\old updated soFar ->

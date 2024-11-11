@@ -464,11 +464,11 @@ type ProgramEvent appState
     | JsEventEnabledConstructionOfNewAppState appState
 
 
-toJsToJson : { id : String, diff : InterfaceSingleDiff future_ } -> Json.Encode.Value
-toJsToJson toJs =
+idAndDiffToJson : String -> InterfaceSingleDiff future_ -> Json.Encode.Value
+idAndDiffToJson id diff =
     Json.Encode.object
-        [ ( "id", toJs.id |> Json.Encode.string )
-        , ( "diff", toJs.diff |> interfaceSingleDiffToJson )
+        [ ( "id", id |> Json.Encode.string )
+        , ( "diff", diff |> interfaceSingleDiffToJson )
         ]
 
 
@@ -781,8 +781,7 @@ programInit appConfig =
     , initialInterface
         |> FastDict.foldl
             (\id new soFar ->
-                appConfig.ports.toJs
-                    ({ id = id, diff = new |> Add } |> toJsToJson)
+                appConfig.ports.toJs (idAndDiffToJson id (new |> Add))
                     :: soFar
             )
             []
@@ -798,7 +797,7 @@ programSubscriptions appConfig (State state) =
         (\interfaceJson ->
             interfaceJson
                 |> Json.Decode.decodeValue
-                    (Json.Decode.field "id" Json.Decode.string
+                    (idStringJsonDecoder
                         |> Json.Decode.andThen
                             (\originalInterfaceId ->
                                 case state.interface |> FastDict.get originalInterfaceId of
@@ -813,8 +812,7 @@ programSubscriptions appConfig (State state) =
                                     Nothing ->
                                         "no associated interface found among ids\n"
                                             ++ (state.interface
-                                                    |> FastDict.toList
-                                                    |> List.map Tuple.first
+                                                    |> FastDict.keys
                                                     |> String.join "\n"
                                                )
                                             |> Json.Decode.fail
@@ -823,6 +821,11 @@ programSubscriptions appConfig (State state) =
                     )
                 |> Result.LocalExtra.valueOrOnError JsEventFailedToDecode
         )
+
+
+idStringJsonDecoder : Json.Decode.Decoder String
+idStringJsonDecoder =
+    Json.Decode.field "id" Json.Decode.string
 
 
 {-| [json `Decoder`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Decode#Decoder)
@@ -1186,10 +1189,9 @@ programUpdate appConfig event state =
                     )
                         |> StandardErrWrite
               in
-              { id = notifyOfBugInterface |> interfaceSingleToStructuredId |> StructuredId.toString
-              , diff = notifyOfBugInterface |> Add
-              }
-                |> toJsToJson
+              idAndDiffToJson
+                (notifyOfBugInterface |> interfaceSingleToStructuredId |> StructuredId.toString)
+                (notifyOfBugInterface |> Add)
                 |> appConfig.ports.toJs
             )
 
@@ -1205,7 +1207,7 @@ programUpdate appConfig event state =
             ( State { interface = updatedInterface, appState = updatedAppState }
             , { old = oldState.interface, updated = updatedInterface }
                 |> interfacesDiffMap
-                    (\diff -> appConfig.ports.toJs (diff |> toJsToJson))
+                    (\id diff -> appConfig.ports.toJs (idAndDiffToJson id diff))
                 |> Cmd.batch
             )
 
@@ -1213,7 +1215,7 @@ programUpdate appConfig event state =
 {-| Determine which outgoing effects need to be executed based on the difference between old and updated interfaces
 -}
 interfacesDiffMap :
-    ({ id : String, diff : InterfaceSingleDiff future } -> combined)
+    (String -> InterfaceSingleDiff future -> combined)
     ->
         { old : Interface future
         , updated : Interface future
@@ -1222,11 +1224,11 @@ interfacesDiffMap :
 interfacesDiffMap idAndDiffCombine interfaces =
     FastDict.merge
         (\removedId _ soFar ->
-            idAndDiffCombine { id = removedId, diff = remove } :: soFar
+            idAndDiffCombine removedId remove :: soFar
         )
         (\_ _ _ soFar -> soFar)
         (\addedId onlyNew soFar ->
-            idAndDiffCombine { id = addedId, diff = onlyNew |> Add }
+            idAndDiffCombine addedId (onlyNew |> Add)
                 :: soFar
         )
         interfaces.old
