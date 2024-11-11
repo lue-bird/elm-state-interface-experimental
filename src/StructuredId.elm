@@ -62,14 +62,17 @@ ofVariant variant =
 
 ofMaybe : (value -> StructuredId) -> (Maybe value -> StructuredId)
 ofMaybe valueToStructuredId maybe =
-    ofVariant
-        (case maybe of
-            Nothing ->
-                { tag = "Nothing", value = ofUnit }
+    case maybe of
+        Nothing ->
+            ofMaybeNothing
 
-            Just value ->
-                { tag = "Just", value = value |> valueToStructuredId }
-        )
+        Just value ->
+            ofVariant { tag = "Just", value = value |> valueToStructuredId }
+
+
+ofMaybeNothing : StructuredId
+ofMaybeNothing =
+    ofVariant { tag = "Nothing", value = ofUnit }
 
 
 ofList : (element -> StructuredId) -> (List element -> StructuredId)

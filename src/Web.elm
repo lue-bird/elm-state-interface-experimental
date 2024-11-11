@@ -1284,17 +1284,20 @@ toJsToJson toJs =
 
 interfaceSingleDiffToJson : InterfaceSingleDiff future_ -> Json.Encode.Value
 interfaceSingleDiffToJson diff =
-    Json.Encode.LocalExtra.variant
-        (case diff of
-            Add interfaceSingleInfo ->
-                { tag = "Add", value = interfaceSingleInfo |> interfaceSingleToJson }
+    case diff of
+        Add interfaceSingleInfo ->
+            Json.Encode.LocalExtra.variant { tag = "Add", value = interfaceSingleInfo |> interfaceSingleToJson }
 
-            Edit edit ->
-                { tag = "Edit", value = edit |> interfaceSingleEditToJson }
+        Edit edit ->
+            Json.Encode.LocalExtra.variant { tag = "Edit", value = edit |> interfaceSingleEditToJson }
 
-            Remove () ->
-                { tag = "Remove", value = Json.Encode.null }
-        )
+        Remove () ->
+            interfaceSingleRemoveJson
+
+
+interfaceSingleRemoveJson : Json.Encode.Value
+interfaceSingleRemoveJson =
+    Json.Encode.LocalExtra.variant { tag = "Remove", value = Json.Encode.null }
 
 
 interfaceSingleEditToJson : InterfaceSingleEdit -> Json.Encode.Value
@@ -2269,7 +2272,7 @@ programSubscriptions appConfig (State state) =
         (\interfaceJson ->
             interfaceJson
                 |> Json.Decode.decodeValue
-                    (Json.Decode.field "id" Json.Decode.string
+                    (jsonDecodeFieldIdString
                         |> Json.Decode.andThen
                             (\originalInterfaceId ->
                                 case state.interface |> internalFastDictGet originalInterfaceId of
@@ -2294,6 +2297,11 @@ programSubscriptions appConfig (State state) =
                     )
                 |> Result.LocalExtra.valueOrOnError JsEventFailedToDecode
         )
+
+
+jsonDecodeFieldIdString : Json.Decode.Decoder String
+jsonDecodeFieldIdString =
+    Json.Decode.field "id" Json.Decode.string
 
 
 internalFastDictGet : comparable -> InternalFastDict comparable value -> Maybe value
@@ -2479,9 +2487,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         WindowSizeRequest toFuture ->
-            Json.Decode.map2 (\width height -> { width = width, height = height })
-                (Json.Decode.field "width" Json.Decode.int)
-                (Json.Decode.field "height" Json.Decode.int)
+            windowSizeJsonDecoder
                 |> Json.Decode.map toFuture
                 |> Just
 
@@ -2527,15 +2533,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         LocalStorageSetOnADifferentTabListen listen ->
-            Json.Decode.map3
-                (\appUrl oldValue newValue ->
-                    { appUrl = appUrl, oldValue = oldValue, newValue = newValue }
-                )
-                (Json.Decode.field "url"
-                    (Url.LocalExtra.jsonDecoder |> Json.Decode.map AppUrl.fromUrl)
-                )
-                (Json.Decode.field "oldValue" (Json.Decode.nullable Json.Decode.string))
-                (Json.Decode.field "newValue" Json.Decode.string)
+            localStorageSetOnADifferentTabEventJsonDecoder
                 |> Json.Decode.map listen.on
                 |> Just
 
@@ -2550,6 +2548,26 @@ interfaceSingleFutureJsonDecoder interface =
 
         GamepadsChangeListen toFuture ->
             gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
+
+
+windowSizeJsonDecoder : Json.Decode.Decoder { width : Int, height : Int }
+windowSizeJsonDecoder =
+    Json.Decode.map2 (\width height -> { width = width, height = height })
+        (Json.Decode.field "width" Json.Decode.int)
+        (Json.Decode.field "height" Json.Decode.int)
+
+
+localStorageSetOnADifferentTabEventJsonDecoder : Json.Decode.Decoder { appUrl : AppUrl, oldValue : Maybe String, newValue : String }
+localStorageSetOnADifferentTabEventJsonDecoder =
+    Json.Decode.map3
+        (\appUrl oldValue newValue ->
+            { appUrl = appUrl, oldValue = oldValue, newValue = newValue }
+        )
+        (Json.Decode.field "url"
+            (Url.LocalExtra.jsonDecoder |> Json.Decode.map AppUrl.fromUrl)
+        )
+        (Json.Decode.field "oldValue" (Json.Decode.nullable Json.Decode.string))
+        (Json.Decode.field "newValue" Json.Decode.string)
 
 
 {-| The fact that this can only be implemented linearly might seem shocking.
@@ -2677,88 +2695,97 @@ maybeGamepadJsonDecoder =
         (Json.Decode.field "connected" Json.Decode.bool
             |> Json.Decode.andThen
                 (\connected ->
-                    if not connected then
-                        Nothing |> Json.Decode.succeed
+                    if connected then
+                        Json.Decode.map Just gamepadJsonDecoder
 
                     else
-                        Json.Decode.map3
-                            (\kindId buttons thumbsticks ->
-                                let
-                                    buttonMap : GamepadButtonMap
-                                    buttonMap =
-                                        buttonMapping |> FastDict.get kindId |> Maybe.withDefault gamepadStandardButtonMap
-
-                                    at : (GamepadButtonMap -> Maybe Int) -> GamepadButton
-                                    at indexField =
-                                        case buttonMap |> indexField of
-                                            Nothing ->
-                                                gamepadButtonUnknown
-
-                                            Just index ->
-                                                buttons |> List.LocalExtra.atIndex index |> Maybe.withDefault gamepadButtonUnknown
-                                in
-                                { primaryButton = at .primary
-                                , secondaryButton = at .secondary
-                                , tertiaryButton = at .tertiary
-                                , quaternaryButton = at .quaternary
-                                , leftBumperButton = at .leftBumper
-                                , rightBumperButton = at .rightBumper
-                                , leftTriggerButton = at .leftTrigger
-                                , rightTriggerButton = at .rightTrigger
-                                , selectButton = at .select
-                                , startButton = at .start
-                                , leftThumbstickButton = at .leftThumbstickButton
-                                , rightThumbstickButton = at .rightThumbstickButton
-                                , upButton = at .arrowUp
-                                , downButton = at .arrowDown
-                                , leftButton = at .arrowLeft
-                                , rightButton = at .arrowRight
-                                , homeButton = at .homeButton
-                                , touchpadButton = at .touchpad
-                                , additionalButtons =
-                                    let
-                                        mappedButtonIndexes : List Int
-                                        mappedButtonIndexes =
-                                            [ .primary, .secondary, .tertiary, .quaternary, .leftBumper, .rightBumper, .leftTrigger, .rightTrigger, .select, .start, .leftThumbstickButton, .rightThumbstickButton, .arrowUp, .arrowDown, .arrowLeft, .arrowRight, .homeButton, .touchpad ]
-                                                |> List.filterMap (\field -> buttonMap |> field)
-                                    in
-                                    buttons
-                                        |> List.LocalExtra.justsMapIndexed
-                                            (\index button ->
-                                                if mappedButtonIndexes |> List.member index then
-                                                    Nothing
-
-                                                else
-                                                    button |> Just
-                                            )
-                                , kindId = kindId
-                                , thumbstickLeft = thumbsticks.left
-                                , thumbstickRight = thumbsticks.right
-                                , thumbsticksAdditional = thumbsticks.additional
-                                }
-                                    |> Just
-                            )
-                            (Json.Decode.field "id" Json.Decode.string)
-                            (Json.Decode.field "buttons" (Json.Decode.list gamepadButtonJsonDecoder))
-                            (Json.Decode.list Json.Decode.float
-                                |> Json.Decode.field "axes"
-                                |> Json.Decode.map
-                                    (\axes ->
-                                        case (axes |> gamepadThumbsticksFromAxes) |> listPadToAtLeast 2 gamepadThumbstickUnknown of
-                                            left :: right :: additional ->
-                                                { left = left
-                                                , right = right
-                                                , additional = additional
-                                                }
-
-                                            -- can't happen
-                                            _ ->
-                                                { left = gamepadThumbstickUnknown, right = gamepadThumbstickUnknown, additional = [] }
-                                    )
-                            )
+                        jsonDecodeSucceedNothing
                 )
         )
         |> Json.Decode.map (Maybe.andThen identity)
+
+
+jsonDecodeSucceedNothing : Json.Decode.Decoder (Maybe a_)
+jsonDecodeSucceedNothing =
+    Json.Decode.succeed Nothing
+
+
+gamepadJsonDecoder : Json.Decode.Decoder Gamepad
+gamepadJsonDecoder =
+    Json.Decode.map3
+        (\kindId buttons thumbsticks ->
+            let
+                buttonMap : GamepadButtonMap
+                buttonMap =
+                    buttonMapping |> FastDict.get kindId |> Maybe.withDefault gamepadStandardButtonMap
+
+                at : (GamepadButtonMap -> Maybe Int) -> GamepadButton
+                at indexField =
+                    case buttonMap |> indexField of
+                        Nothing ->
+                            gamepadButtonUnknown
+
+                        Just index ->
+                            buttons |> List.LocalExtra.atIndex index |> Maybe.withDefault gamepadButtonUnknown
+            in
+            { primaryButton = at .primary
+            , secondaryButton = at .secondary
+            , tertiaryButton = at .tertiary
+            , quaternaryButton = at .quaternary
+            , leftBumperButton = at .leftBumper
+            , rightBumperButton = at .rightBumper
+            , leftTriggerButton = at .leftTrigger
+            , rightTriggerButton = at .rightTrigger
+            , selectButton = at .select
+            , startButton = at .start
+            , leftThumbstickButton = at .leftThumbstickButton
+            , rightThumbstickButton = at .rightThumbstickButton
+            , upButton = at .arrowUp
+            , downButton = at .arrowDown
+            , leftButton = at .arrowLeft
+            , rightButton = at .arrowRight
+            , homeButton = at .homeButton
+            , touchpadButton = at .touchpad
+            , additionalButtons =
+                let
+                    mappedButtonIndexes : List Int
+                    mappedButtonIndexes =
+                        [ .primary, .secondary, .tertiary, .quaternary, .leftBumper, .rightBumper, .leftTrigger, .rightTrigger, .select, .start, .leftThumbstickButton, .rightThumbstickButton, .arrowUp, .arrowDown, .arrowLeft, .arrowRight, .homeButton, .touchpad ]
+                            |> List.filterMap (\field -> buttonMap |> field)
+                in
+                buttons
+                    |> List.LocalExtra.justsMapIndexed
+                        (\index button ->
+                            if mappedButtonIndexes |> List.member index then
+                                Nothing
+
+                            else
+                                button |> Just
+                        )
+            , kindId = kindId
+            , thumbstickLeft = thumbsticks.left
+            , thumbstickRight = thumbsticks.right
+            , thumbsticksAdditional = thumbsticks.additional
+            }
+        )
+        (Json.Decode.field "id" Json.Decode.string)
+        (Json.Decode.field "buttons" (Json.Decode.list gamepadButtonJsonDecoder))
+        (Json.Decode.list Json.Decode.float
+            |> Json.Decode.field "axes"
+            |> Json.Decode.map
+                (\axes ->
+                    case (axes |> gamepadThumbsticksFromAxes) |> listPadToAtLeast 2 gamepadThumbstickUnknown of
+                        left :: right :: additional ->
+                            { left = left
+                            , right = right
+                            , additional = additional
+                            }
+
+                        -- can't happen
+                        _ ->
+                            { left = gamepadThumbstickUnknown, right = gamepadThumbstickUnknown, additional = [] }
+                )
+        )
 
 
 gamepadButtonUnknown : GamepadButton
@@ -3512,13 +3539,13 @@ domElementHeaderDiffMap fromDomEdit elements =
         { old = elements.old.styles, updated = elements.updated.styles }
             |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                 (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
-                { remove = identity, edit = Basics.identity }
+                { remove = Basics.identity, edit = Basics.identity }
             |> List.LocalExtra.fromMaybe
             |> List.LocalExtra.consJust
                 ({ old = elements.old.attributes, updated = elements.updated.attributes }
                     |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                         (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
+                        { remove = Basics.identity, edit = Basics.identity }
                 )
             |> List.LocalExtra.consJust
                 ({ old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
@@ -3532,13 +3559,13 @@ domElementHeaderDiffMap fromDomEdit elements =
                 ({ old = elements.old.stringProperties, updated = elements.updated.stringProperties }
                     |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                         (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
+                        { remove = Basics.identity, edit = Basics.identity }
                 )
             |> List.LocalExtra.consJust
                 ({ old = elements.old.boolProperties, updated = elements.updated.boolProperties }
                     |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
                         (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
-                        { remove = identity, edit = Basics.identity }
+                        { remove = Basics.identity, edit = Basics.identity }
                 )
             |> List.LocalExtra.consJust
                 (if elements.old.scrollToPosition == elements.updated.scrollToPosition then
@@ -3643,7 +3670,7 @@ sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDif
                 )
                 (dicts.old |> sortedKeyValueListToList)
                 (dicts.updated |> sortedKeyValueListToList)
-                { remove = [], edit = [] }
+                removeEmptyEditEmpty
     in
     case diff.remove of
         [] ->
@@ -3656,6 +3683,11 @@ sortedKeyValueListEditAndRemoveDiffMapBy keyToComparable fromEditAndRemove asDif
 
         (_ :: _) as removeFilled ->
             { remove = removeFilled, edit = diff.edit } |> fromEditAndRemove |> Just
+
+
+removeEmptyEditEmpty : { remove : List a, edit : List b }
+removeEmptyEditEmpty =
+    { remove = [], edit = [] }
 
 
 {-| Fold the lists of 2 [`SortedKeyValueList`](#SortedKeyValueList)s depending on where keys are present.
