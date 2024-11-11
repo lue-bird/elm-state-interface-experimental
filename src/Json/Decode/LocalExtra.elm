@@ -5,9 +5,16 @@ import Json.Decode
 
 variant : String -> (Json.Decode.Decoder value -> Json.Decode.Decoder value)
 variant name valueJsonDecoder =
-    Json.Decode.map2 (\() variantValue -> variantValue)
-        (Json.Decode.field "tag" (onlyString name))
-        (Json.Decode.field "value" valueJsonDecoder)
+    Json.Decode.field "tag" Json.Decode.string
+        |> Json.Decode.andThen
+            (\tag ->
+                if tag == name then
+                    Json.Decode.field "value" valueJsonDecoder
+
+                else
+                    ("expected only \"" ++ name ++ "\"")
+                        |> Json.Decode.fail
+            )
 
 
 onlyString : String -> Json.Decode.Decoder ()
