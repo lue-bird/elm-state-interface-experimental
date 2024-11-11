@@ -2410,23 +2410,16 @@ interfaceSingleFutureJsonDecoder interface =
                     let
                         eventListenDecoder : Json.Decode.Decoder future
                         eventListenDecoder =
-                            Json.Decode.LocalExtra.variant "EventListen"
-                                (Json.Decode.map2 (\eventListen event -> eventListen.on event)
-                                    (Json.Decode.field "name"
-                                        (Json.Decode.string
-                                            |> Json.Decode.andThen
-                                                (\specificEventName ->
-                                                    case element.eventListens |> sortedKeyValueListGetAtStringKey specificEventName of
-                                                        Nothing ->
-                                                            Json.Decode.fail "received event of a kind that isn't listened for"
+                            domEventListenEventJsonDecoder
+                                |> Json.Decode.andThen
+                                    (\specificEvent ->
+                                        case element.eventListens |> sortedKeyValueListGetAtStringKey specificEvent.name of
+                                            Nothing ->
+                                                Json.Decode.fail "received event of a kind that isn't listened for"
 
-                                                        Just eventListen ->
-                                                            eventListen |> Json.Decode.succeed
-                                                )
-                                        )
+                                            Just eventListen ->
+                                                Json.Decode.succeed (eventListen.on specificEvent.value)
                                     )
-                                    (Json.Decode.field "event" Json.Decode.value)
-                                )
                     in
                     (case element.scrollPositionRequest of
                         Nothing ->
@@ -2451,9 +2444,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         HttpRequestSend request ->
-            Json.Decode.LocalExtra.resultOkErr
-                httpSuccessResponseJsonDecoder
-                (Json.Decode.map Err httpErrorJsonDecoder)
+            httpRequestSendEventJsonDecoder
                 |> Json.Decode.map request.on
                 |> Just
 
@@ -2543,6 +2534,22 @@ interfaceSingleFutureJsonDecoder interface =
 
         GamepadsChangeListen toFuture ->
             gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
+
+
+domEventListenEventJsonDecoder : Json.Decode.Decoder { name : String, value : Json.Decode.Value }
+domEventListenEventJsonDecoder =
+    Json.Decode.LocalExtra.variant "EventListen"
+        (Json.Decode.map2 (\name value -> { name = name, value = value })
+            (Json.Decode.field "name" Json.Decode.string)
+            (Json.Decode.field "event" Json.Decode.value)
+        )
+
+
+httpRequestSendEventJsonDecoder : Json.Decode.Decoder (Result HttpError Bytes)
+httpRequestSendEventJsonDecoder =
+    Json.Decode.LocalExtra.resultOkErr
+        httpSuccessResponseJsonDecoder
+        (Json.Decode.map Err httpErrorJsonDecoder)
 
 
 windowSizeJsonDecoder : Json.Decode.Decoder { width : Int, height : Int }

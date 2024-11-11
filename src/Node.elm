@@ -876,20 +876,7 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         DirectoryMake make ->
-            Json.Decode.LocalExtra.resultOkErr
-                (Json.Decode.null (Ok ()))
-                (Json.Decode.map2 (\code message -> Err { code = code, message = message })
-                    (Json.Decode.oneOf
-                        [ Json.Decode.field "code" Json.Decode.string
-                        , Json.Decode.succeed ""
-                        ]
-                    )
-                    (Json.Decode.oneOf
-                        [ Json.Decode.field "message" Json.Decode.string
-                        , Json.Decode.succeed ""
-                        ]
-                    )
-                )
+            directoryMakeResultJsonDecoder
                 |> Json.Decode.map make.on
                 |> Just
 
@@ -897,85 +884,27 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         FileWrite write ->
-            Json.Decode.LocalExtra.resultOkErr
-                (Json.Decode.null (Ok ()))
-                (Json.Decode.map2 (\code message -> Err { code = code, message = message })
-                    (Json.Decode.oneOf
-                        [ Json.Decode.field "code" Json.Decode.string
-                        , Json.Decode.succeed ""
-                        ]
-                    )
-                    (Json.Decode.oneOf
-                        [ Json.Decode.field "message" Json.Decode.string
-                        , Json.Decode.succeed ""
-                        ]
-                    )
-                )
+            fileWriteResultJsonDecoder
                 |> Json.Decode.map write.on
                 |> Just
 
         FileRequest request ->
-            Json.Decode.LocalExtra.resultOkErr
-                (Json.Decode.map Ok
-                    (Json.Decode.map AsciiString.toBytes Json.Decode.string)
-                )
-                (Json.Decode.map2 (\code message -> Err { code = code, message = message })
-                    (Json.Decode.oneOf
-                        [ Json.Decode.field "code" Json.Decode.string
-                        , Json.Decode.succeed ""
-                        ]
-                    )
-                    (Json.Decode.oneOf
-                        [ Json.Decode.field "message" Json.Decode.string
-                        , Json.Decode.succeed ""
-                        ]
-                    )
-                )
+            fileResultJsonDecoder
                 |> Json.Decode.map request.on
                 |> Just
 
         FileChangeListen listen ->
-            Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Removed"
-                    (Json.Decode.map FileRemoved Json.Decode.string)
-                , Json.Decode.LocalExtra.variant "AddedOrChanged"
-                    (Json.Decode.map FileAddedOrChanged Json.Decode.string)
-                ]
+            fileChangeJsonDecoder
                 |> Json.Decode.map listen.on
                 |> Just
 
         FileInfoRequest request ->
-            Json.Decode.nullable
-                (Json.Decode.map3
-                    (\kind byteCount lastContentChangeTime ->
-                        { kind = kind, byteCount = byteCount, lastContentChangeTime = lastContentChangeTime }
-                    )
-                    (Json.Decode.field "kind" fileKindJsonDecoder)
-                    (Json.Decode.field "byteCount" Json.Decode.int)
-                    (Json.Decode.field "lastContentChangePosixMilliseconds"
-                        (Json.Decode.map Time.millisToPosix Json.Decode.int)
-                    )
-                )
+            fileInfoJsonDecoder
                 |> Json.Decode.map request.on
                 |> Just
 
         DirectorySubPathsRequest request ->
-            Json.Decode.LocalExtra.resultOkErr
-                (Json.Decode.map Ok
-                    (Json.Decode.list Json.Decode.string)
-                )
-                (Json.Decode.map2 (\code message -> Err { code = code, message = message })
-                    (Json.Decode.oneOf
-                        [ Json.Decode.field "code" Json.Decode.string
-                        , Json.Decode.succeed ""
-                        ]
-                    )
-                    (Json.Decode.oneOf
-                        [ Json.Decode.field "message" Json.Decode.string
-                        , Json.Decode.succeed ""
-                        ]
-                    )
-                )
+            directorySubPathsResultJsonDecoder
                 |> Json.Decode.map request.on
                 |> Just
 
@@ -985,7 +914,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         LaunchArgumentsRequest on ->
-            Json.Decode.list Json.Decode.string
+            launchArgumentsJsonDecoder
                 |> Json.Decode.map on
                 |> Just
 
@@ -1017,6 +946,112 @@ interfaceSingleFutureJsonDecoder interface =
             Json.Decode.string
                 |> Json.Decode.map on
                 |> Just
+
+
+launchArgumentsJsonDecoder : Json.Decode.Decoder (List String)
+launchArgumentsJsonDecoder =
+    Json.Decode.list Json.Decode.string
+
+
+fileInfoJsonDecoder : Json.Decode.Decoder (Maybe { kind : FileKind, byteCount : Int, lastContentChangeTime : Time.Posix })
+fileInfoJsonDecoder =
+    Json.Decode.nullable
+        (Json.Decode.map3
+            (\kind byteCount lastContentChangeTime ->
+                { kind = kind, byteCount = byteCount, lastContentChangeTime = lastContentChangeTime }
+            )
+            (Json.Decode.field "kind" fileKindJsonDecoder)
+            (Json.Decode.field "byteCount" Json.Decode.int)
+            (Json.Decode.field "lastContentChangePosixMilliseconds"
+                (Json.Decode.map Time.millisToPosix Json.Decode.int)
+            )
+        )
+
+
+fileWriteResultJsonDecoder : Json.Decode.Decoder (Result { code : String, message : String } ())
+fileWriteResultJsonDecoder =
+    Json.Decode.LocalExtra.resultOkErr
+        (Json.Decode.null (Ok ()))
+        (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+            (Json.Decode.oneOf
+                [ Json.Decode.field "code" Json.Decode.string
+                , Json.Decode.succeed ""
+                ]
+            )
+            (Json.Decode.oneOf
+                [ Json.Decode.field "message" Json.Decode.string
+                , Json.Decode.succeed ""
+                ]
+            )
+        )
+
+
+directoryMakeResultJsonDecoder : Json.Decode.Decoder (Result { code : String, message : String } ())
+directoryMakeResultJsonDecoder =
+    Json.Decode.LocalExtra.resultOkErr
+        (Json.Decode.null (Ok ()))
+        (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+            (Json.Decode.oneOf
+                [ Json.Decode.field "code" Json.Decode.string
+                , Json.Decode.succeed ""
+                ]
+            )
+            (Json.Decode.oneOf
+                [ Json.Decode.field "message" Json.Decode.string
+                , Json.Decode.succeed ""
+                ]
+            )
+        )
+
+
+fileChangeJsonDecoder : Json.Decode.Decoder FileChange
+fileChangeJsonDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.LocalExtra.variant "Removed"
+            (Json.Decode.map FileRemoved Json.Decode.string)
+        , Json.Decode.LocalExtra.variant "AddedOrChanged"
+            (Json.Decode.map FileAddedOrChanged Json.Decode.string)
+        ]
+
+
+directorySubPathsResultJsonDecoder : Json.Decode.Decoder (Result { code : String, message : String } (List String))
+directorySubPathsResultJsonDecoder =
+    Json.Decode.LocalExtra.resultOkErr
+        (Json.Decode.map Ok
+            (Json.Decode.list Json.Decode.string)
+        )
+        (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+            (Json.Decode.oneOf
+                [ Json.Decode.field "code" Json.Decode.string
+                , Json.Decode.succeed ""
+                ]
+            )
+            (Json.Decode.oneOf
+                [ Json.Decode.field "message" Json.Decode.string
+                , Json.Decode.succeed ""
+                ]
+            )
+        )
+
+
+fileResultJsonDecoder : Json.Decode.Decoder (Result { code : String, message : String } Bytes)
+fileResultJsonDecoder =
+    Json.Decode.LocalExtra.resultOkErr
+        (Json.Decode.map (\asciiString -> Ok (asciiString |> AsciiString.toBytes))
+            Json.Decode.string
+        )
+        (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+            (Json.Decode.oneOf
+                [ Json.Decode.field "code" Json.Decode.string
+                , Json.Decode.succeed ""
+                ]
+            )
+            (Json.Decode.oneOf
+                [ Json.Decode.field "message" Json.Decode.string
+                , Json.Decode.succeed ""
+                ]
+            )
+        )
 
 
 httpServerEventJsonDecoder : Json.Decode.Decoder HttpServerEvent
