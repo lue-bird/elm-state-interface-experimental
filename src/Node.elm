@@ -1672,7 +1672,7 @@ contained in the directory at the given path (and any contained directory).
                 (\subNamesOrError ->
                     subNamesOrError
                         |> Result.withDefault []
-                        |> List.map (\subName -> path ++ "/" ++ subName)
+                        |> List.map (\subName -> directoryPath ++ "/" ++ subName)
                 )
 
 Uses [`fs.readdir({ recursive: true })`](https://nodejs.org/api/fs.html#fsreaddirpath-options-callback)
