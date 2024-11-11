@@ -110,7 +110,6 @@ import Json.Decode
 import Json.Decode.LocalExtra
 import Json.Encode
 import Json.Encode.LocalExtra
-import List.LocalExtra
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Result.LocalExtra
 import StructuredId exposing (StructuredId)
@@ -122,52 +121,33 @@ import Time.LocalExtra
 {- Hey! Here's how to add a new interface:
 
 
-     - choose a name with roughly the shape `DomainSubjectVerb`
+   - choose a name with roughly the shape `DomainSubjectVerb`
 
-     - to `Node.InterfaceSingle`, add a variant `| [YourName] ..additional info (and future handles)..`
+   - to `Node.InterfaceSingle`, add a variant `| [YourName] ..additional info (and future handles)..`
 
-     - inside `Node.interfaceSingleFutureJsonDecoder`, specify what js values you expect to decode
+   - inside `Node.interfaceSingleFutureJsonDecoder`, specify what js values you expect to decode
 
-     - inside `Node.interfaceSingleToStructuredId`, assign a unique identifier to your interface
+   - inside `Node.interfaceSingleToStructuredId`, assign a unique identifier to your interface
 
-       This helps recognize when interfaces have been added, have changed or have been deleted.
-       Unless you want to allow your interface to be edited while it's running,
-       it usually contains all the info from the `DomainSubjectVerb` variant (not including functions)
+     This helps recognize when interfaces have been added, have changed or have been deleted.
+     It usually contains all the info from the `DomainSubjectVerb` variant (not including functions)
 
-     - in `runner/node.ts` inside `interfaceAddImplementation`, add
-       ```javascript
-       case "[YourName]": return (yourInput) => {
-           // perform your stuff
+   - in `runner/node.ts` inside `interfaceAddImplementation`, add
+     ```javascript
+     case "[YourName]": return (yourInput) => {
+         // perform your stuff
 
-           // in case you want to send something to elm, use
-           sendToElm({- your value -})
+         // in case you want to send something to elm, use
+         sendToElm({- your value -})
 
-           // in case you want to do something once the interface gets removed,
-           // either use the `abortSignal` directly or add
-           abortSignal.addEventListener("abort", _event => {
-               // remove your stuff
-           })
-       }
-       ```
+         // in case you want to do something once the interface gets removed,
+         // either use the `abortSignal` directly or add
+         abortSignal.addEventListener("abort", _event => {
+             // remove your stuff
+         })
+     }
+     ```
 
-    - inside `Node.interfaceSingleEditsMap`, add a case `[YourName] -> []`.
-      If your running interface can be changed, read the section below
-
-
-   Sometimes, removing + adding the new interface would not be the same as editing the existing one or would at least perform worse.
-   For example, changing the volume of an audio should not require removing and and re-adding all audio nodes.
-
-   If you also want to enable editing a running interface:
-
-    - to `Node.InterfaceSingleEdit`, add a variant `| Edit[YourName] ..your diff info..`
-    - inside `Node.interfaceSingleEditsMap`, set the case
-      ```elm
-      [YourName] old ->
-          case case interfaces.updated of
-              [YourName] new ->
-                  Edit[YourName] ..the diff..
-      ```
-    - in `runner/node.ts` inside `interfaceEditImplementation`, add a `case "Edit[YourName]" : return (yourInput) => { ... }`
 -}
 
 
@@ -499,20 +479,8 @@ interfaceSingleDiffToJson diff =
             Add interfaceSingleInfo ->
                 { tag = "Add", value = interfaceSingleInfo |> interfaceSingleToJson }
 
-            Edit edit ->
-                { tag = "Edit", value = edit |> interfaceSingleEditToJson }
-
             Remove () ->
                 { tag = "Remove", value = Json.Encode.null }
-        )
-
-
-interfaceSingleEditToJson : InterfaceSingleEdit -> Json.Encode.Value
-interfaceSingleEditToJson edit =
-    Json.Encode.LocalExtra.variant
-        (case edit of
-            EditNoneYet ever ->
-                Basics.never ever
         )
 
 
@@ -1233,14 +1201,7 @@ interfacesDiffMap idAndDiffCombine interfaces =
         (\removedId _ soFar ->
             idAndDiffCombine { id = removedId, diff = remove } :: soFar
         )
-        (\id old updated soFar ->
-            List.LocalExtra.appendFast
-                ({ old = old, updated = updated }
-                    |> interfaceSingleEditsMap
-                        (\edit -> idAndDiffCombine { id = id, diff = edit |> Edit })
-                )
-                soFar
-        )
+        (\_ _ _ soFar -> soFar)
         (\addedId onlyNew soFar ->
             idAndDiffCombine { id = addedId, diff = onlyNew |> Add }
                 :: soFar
@@ -1248,91 +1209,6 @@ interfacesDiffMap idAndDiffCombine interfaces =
         interfaces.old
         interfaces.updated
         []
-
-
-interfaceSingleEditsMap :
-    (InterfaceSingleEdit -> fromSingeEdit)
-    -> { old : InterfaceSingle future, updated : InterfaceSingle future }
-    -> List fromSingeEdit
-interfaceSingleEditsMap fromSingeEdit interfaces =
-    case interfaces.old of
-        HttpRequestSend _ ->
-            []
-
-        HttpRequestListen _ ->
-            []
-
-        HttpResponseSend _ ->
-            []
-
-        TimePosixRequest _ ->
-            []
-
-        TimezoneOffsetRequest _ ->
-            []
-
-        TimeOnce _ ->
-            []
-
-        TimePeriodicallyListen _ ->
-            []
-
-        TimezoneNameRequest _ ->
-            []
-
-        RandomUnsignedInt32sRequest _ ->
-            []
-
-        Exit _ ->
-            []
-
-        DirectoryMake _ ->
-            []
-
-        FileRemove _ ->
-            []
-
-        FileWrite _ ->
-            []
-
-        FileChangeListen _ ->
-            []
-
-        FileRequest _ ->
-            []
-
-        FileInfoRequest _ ->
-            []
-
-        DirectorySubPathsRequest _ ->
-            []
-
-        WorkingDirectoryPathRequest _ ->
-            []
-
-        LaunchArgumentsRequest _ ->
-            []
-
-        TerminalSizeRequest _ ->
-            []
-
-        TerminalSizeChangeListen _ ->
-            []
-
-        ProcessTitleSet _ ->
-            []
-
-        StandardOutWrite _ ->
-            []
-
-        StandardErrWrite _ ->
-            []
-
-        StandardInListen _ ->
-            []
-
-        StandardInRawListen _ ->
-            []
 
 
 remove : InterfaceSingleDiff irrelevantFuture_
@@ -1344,15 +1220,7 @@ remove =
 -}
 type InterfaceSingleDiff irrelevantFuture
     = Add (InterfaceSingle irrelevantFuture)
-    | Edit InterfaceSingleEdit
     | Remove ()
-
-
-{-| Individual message to js to sync up with the latest interface type,
-describing changes to an existing interface with the same identity
--}
-type InterfaceSingleEdit
-    = EditNoneYet Never
 
 
 {-| Create a [`Program`](#Program):
