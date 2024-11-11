@@ -832,11 +832,11 @@ interfaceSingleFutureJsonDecoder : InterfaceSingle future -> Maybe (Json.Decode.
 interfaceSingleFutureJsonDecoder interface =
     case interface of
         HttpRequestSend send ->
-            Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Ok" httpSuccessResponseJsonDecoder
-                , Json.Decode.LocalExtra.variant "Err" httpErrorJsonDecoder
+            Json.Decode.LocalExtra.resultOkErr
+                httpSuccessResponseJsonDecoder
+                (httpErrorJsonDecoder
                     |> Json.Decode.map Err
-                ]
+                )
                 |> Json.Decode.map send.on
                 |> Just
 
@@ -876,23 +876,20 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         DirectoryMake make ->
-            Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Ok"
-                    (Json.Decode.null (Ok ()))
-                , Json.Decode.LocalExtra.variant "Err"
-                    (Json.Decode.map2 (\code message -> Err { code = code, message = message })
-                        (Json.Decode.oneOf
-                            [ Json.Decode.field "code" Json.Decode.string
-                            , Json.Decode.succeed ""
-                            ]
-                        )
-                        (Json.Decode.oneOf
-                            [ Json.Decode.field "message" Json.Decode.string
-                            , Json.Decode.succeed ""
-                            ]
-                        )
+            Json.Decode.LocalExtra.resultOkErr
+                (Json.Decode.null (Ok ()))
+                (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+                    (Json.Decode.oneOf
+                        [ Json.Decode.field "code" Json.Decode.string
+                        , Json.Decode.succeed ""
+                        ]
                     )
-                ]
+                    (Json.Decode.oneOf
+                        [ Json.Decode.field "message" Json.Decode.string
+                        , Json.Decode.succeed ""
+                        ]
+                    )
+                )
                 |> Json.Decode.map make.on
                 |> Just
 
@@ -900,46 +897,40 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         FileWrite write ->
-            Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Ok"
-                    (Json.Decode.null (Ok ()))
-                , Json.Decode.LocalExtra.variant "Err"
-                    (Json.Decode.map2 (\code message -> Err { code = code, message = message })
-                        (Json.Decode.oneOf
-                            [ Json.Decode.field "code" Json.Decode.string
-                            , Json.Decode.succeed ""
-                            ]
-                        )
-                        (Json.Decode.oneOf
-                            [ Json.Decode.field "message" Json.Decode.string
-                            , Json.Decode.succeed ""
-                            ]
-                        )
+            Json.Decode.LocalExtra.resultOkErr
+                (Json.Decode.null (Ok ()))
+                (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+                    (Json.Decode.oneOf
+                        [ Json.Decode.field "code" Json.Decode.string
+                        , Json.Decode.succeed ""
+                        ]
                     )
-                ]
+                    (Json.Decode.oneOf
+                        [ Json.Decode.field "message" Json.Decode.string
+                        , Json.Decode.succeed ""
+                        ]
+                    )
+                )
                 |> Json.Decode.map write.on
                 |> Just
 
         FileRequest request ->
-            Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Ok"
-                    (Json.Decode.map Ok
-                        (Json.Decode.map AsciiString.toBytes Json.Decode.string)
+            Json.Decode.LocalExtra.resultOkErr
+                (Json.Decode.map Ok
+                    (Json.Decode.map AsciiString.toBytes Json.Decode.string)
+                )
+                (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+                    (Json.Decode.oneOf
+                        [ Json.Decode.field "code" Json.Decode.string
+                        , Json.Decode.succeed ""
+                        ]
                     )
-                , Json.Decode.LocalExtra.variant "Err"
-                    (Json.Decode.map2 (\code message -> Err { code = code, message = message })
-                        (Json.Decode.oneOf
-                            [ Json.Decode.field "code" Json.Decode.string
-                            , Json.Decode.succeed ""
-                            ]
-                        )
-                        (Json.Decode.oneOf
-                            [ Json.Decode.field "message" Json.Decode.string
-                            , Json.Decode.succeed ""
-                            ]
-                        )
+                    (Json.Decode.oneOf
+                        [ Json.Decode.field "message" Json.Decode.string
+                        , Json.Decode.succeed ""
+                        ]
                     )
-                ]
+                )
                 |> Json.Decode.map request.on
                 |> Just
 
@@ -969,25 +960,22 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         DirectorySubPathsRequest request ->
-            Json.Decode.oneOf
-                [ Json.Decode.LocalExtra.variant "Ok"
-                    (Json.Decode.map Ok
-                        (Json.Decode.list Json.Decode.string)
+            Json.Decode.LocalExtra.resultOkErr
+                (Json.Decode.map Ok
+                    (Json.Decode.list Json.Decode.string)
+                )
+                (Json.Decode.map2 (\code message -> Err { code = code, message = message })
+                    (Json.Decode.oneOf
+                        [ Json.Decode.field "code" Json.Decode.string
+                        , Json.Decode.succeed ""
+                        ]
                     )
-                , Json.Decode.LocalExtra.variant "Err"
-                    (Json.Decode.map2 (\code message -> Err { code = code, message = message })
-                        (Json.Decode.oneOf
-                            [ Json.Decode.field "code" Json.Decode.string
-                            , Json.Decode.succeed ""
-                            ]
-                        )
-                        (Json.Decode.oneOf
-                            [ Json.Decode.field "message" Json.Decode.string
-                            , Json.Decode.succeed ""
-                            ]
-                        )
+                    (Json.Decode.oneOf
+                        [ Json.Decode.field "message" Json.Decode.string
+                        , Json.Decode.succeed ""
+                        ]
                     )
-                ]
+                )
                 |> Json.Decode.map request.on
                 |> Just
 

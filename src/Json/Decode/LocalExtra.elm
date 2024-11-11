@@ -1,4 +1,4 @@
-module Json.Decode.LocalExtra exposing (onlyString, variant)
+module Json.Decode.LocalExtra exposing (onlyString, resultOkErr, variant)
 
 import Json.Decode
 
@@ -21,4 +21,21 @@ onlyString specificAllowedString =
                 else
                     ([ "expected only \"", specificAllowedString, "\"" ] |> String.concat)
                         |> Json.Decode.fail
+            )
+
+
+resultOkErr : Json.Decode.Decoder a -> Json.Decode.Decoder a -> Json.Decode.Decoder a
+resultOkErr errJsonDecoder okJsonDecoder =
+    Json.Decode.field "tag" Json.Decode.string
+        |> Json.Decode.andThen
+            (\tag ->
+                case tag of
+                    "Ok" ->
+                        okJsonDecoder
+
+                    "Err" ->
+                        errJsonDecoder
+
+                    _ ->
+                        Json.Decode.fail "expected either Ok or Err"
             )
