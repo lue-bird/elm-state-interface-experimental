@@ -32,16 +32,25 @@ onlyString specificAllowedString =
 
 
 resultOkErr : Json.Decode.Decoder a -> Json.Decode.Decoder a -> Json.Decode.Decoder a
-resultOkErr errJsonDecoder okJsonDecoder =
+resultOkErr okJsonDecoder errJsonDecoder =
+    let
+        valueOkJsonDecoder : Json.Decode.Decoder a
+        valueOkJsonDecoder =
+            Json.Decode.field "value" okJsonDecoder
+
+        valueErrJsonDecoder : Json.Decode.Decoder a
+        valueErrJsonDecoder =
+            Json.Decode.field "value" errJsonDecoder
+    in
     Json.Decode.field "tag" Json.Decode.string
         |> Json.Decode.andThen
             (\tag ->
                 case tag of
                     "Ok" ->
-                        okJsonDecoder
+                        valueOkJsonDecoder
 
                     "Err" ->
-                        errJsonDecoder
+                        valueErrJsonDecoder
 
                     _ ->
                         Json.Decode.fail "expected either Ok or Err"
