@@ -814,7 +814,7 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
         body:
             request.bodyAsciiString === null ?
                 null
-                : new Blob([asciiStringToBytes(request.bodyAsciiString)]),
+                : asciiStringToBytes(request.bodyAsciiString),
         headers: new Headers(request.headers.map(header => {
             // removing the type makes ts think that  tuple: string[]
             const tuple: [string, string] = [header.name, header.value]
@@ -824,10 +824,7 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
     })
         .then((response) =>
             response
-                .blob()
-                .then((bodyBlob) => bodyBlob.arrayBuffer())
-                // use intermediate ArrayBuffer bc chromium does not support .bytes() yet
-                // https://developer.mozilla.org/en-US/docs/Web/API/Blob/bytes
+                .arrayBuffer()
                 .then((bodyArrayBuffer) => ({
                     tag: "Ok" as const,
                     value: {

@@ -4,6 +4,8 @@ import * as http from "node:http"
 import * as timers from "node:timers"
 // https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/57677
 import { default as process } from "node:process"
+import { Buffer } from "node:buffer"
+
 
 export interface ElmPorts {
     toJs: {
@@ -486,7 +488,7 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
         body:
             request.bodyAsciiString === null ?
                 null
-                : new Blob([asciiStringToBytes(request.bodyAsciiString)]),
+                : asciiStringToBytes(request.bodyAsciiString),
         headers: new Headers(request.headers.map(header => {
             // removing the type makes ts think that  tuple: string[]
             const tuple: [string, string] = [header.name, header.value]
@@ -496,8 +498,7 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
     })
         .then((response) =>
             response
-                .blob()
-                .then((bodyBlob) => bodyBlob.arrayBuffer())
+                .arrayBuffer()
                 // use intermediate ArrayBuffer bc chromium does not support .bytes() yet
                 // https://developer.mozilla.org/en-US/docs/Web/API/Blob/bytes
                 .then((bodyArrayBuffer) => ({
