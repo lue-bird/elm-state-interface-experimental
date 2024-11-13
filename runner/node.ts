@@ -1,6 +1,9 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import * as http from "node:http"
+import * as timers from "node:timers"
+// https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/57677
+import { default as process } from "node:process"
 
 export interface ElmPorts {
     toJs: {
@@ -235,22 +238,22 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
             case "TimePeriodicallyListen": return (config: { milliSeconds: number }) => {
                 const timePeriodicallyListenId =
-                    setInterval(
+                    timers.setInterval(
                         () => { sendToElm(Date.now()) },
                         config.milliSeconds
                     )
                 abortSignal.addEventListener("abort", _event => {
-                    clearInterval(timePeriodicallyListenId)
+                    timers.clearInterval(timePeriodicallyListenId)
                 })
             }
             case "TimeOnce": return (config: { pointInTime: number }) => {
                 const timeOnceId =
-                    setTimeout(
+                    timers.setTimeout(
                         () => { sendToElm(Date.now()) },
                         config.pointInTime - Date.now()
                     )
                 abortSignal.addEventListener("abort", _event => {
-                    clearTimeout(timeOnceId)
+                    timers.clearTimeout(timeOnceId)
                 })
             }
             case "RandomUnsignedInt32sRequest": return (config: number) => {
@@ -312,17 +315,18 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "FileChangeListen": return (path: string) => {
                 // if you have a nice solution to wait for
                 // files popping into existence, please show me
-                const retryIntervalId = setInterval(
-                    () => {
-                        if (fs.existsSync(path)) {
-                            clearInterval(retryIntervalId)
-                            watchPath(path, abortSignal, sendToElm)
-                        }
-                    },
-                    2000
-                )
+                const retryIntervalId =
+                    timers.setInterval(
+                        () => {
+                            if (fs.existsSync(path)) {
+                                timers.clearInterval(retryIntervalId)
+                                watchPath(path, abortSignal, sendToElm)
+                            }
+                        },
+                        2000
+                    )
                 abortSignal.addEventListener("abort", (_event) => {
-                    clearInterval(retryIntervalId)
+                    timers.clearInterval(retryIntervalId)
                 })
             }
             case "DirectorySubPathsRequest": return (path: string) => {
@@ -371,9 +375,9 @@ type HttpServerResponse = {
 
 
 function queueAbortable(abortSignal: AbortSignal, action: () => void) {
-    const immediateId = setImmediate(action)
+    const immediateId = timers.setImmediate(action)
     abortSignal.addEventListener("abort", _event => {
-        clearImmediate(immediateId)
+        timers.clearImmediate(immediateId)
     })
 }
 
@@ -387,7 +391,7 @@ function fileWrite(write: { path: string, contentAsciiString: string }, sendToEl
     )
         .then(() => {
             sendToElm({ tag: "Ok", value: null })
-            setTimeout(
+            timers.setTimeout(
                 () => {
                     recentlyWrittenToFilePaths.delete(write.path)
                 },
@@ -396,7 +400,7 @@ function fileWrite(write: { path: string, contentAsciiString: string }, sendToEl
         })
         .catch((error) => {
             sendToElm({ tag: "Err", value: error })
-            setTimeout(
+            timers.setTimeout(
                 () => {
                     recentlyWrittenToFilePaths.delete(write.path)
                 },
@@ -404,7 +408,7 @@ function fileWrite(write: { path: string, contentAsciiString: string }, sendToEl
             )
         })
     abortSignal.addEventListener("abort", (_event) => {
-        setTimeout(
+        timers.setTimeout(
             () => {
                 recentlyWrittenToFilePaths.delete(write.path)
             },
@@ -436,7 +440,7 @@ function watchPath(
                         path.join(pathToWatch, fileName)
                 if (!recentlyWrittenToFilePaths.has(fullPath)) {
                     const currentAttemptTimeoutIdWaitingForLastChunk =
-                        setTimeout(
+                        timers.setTimeout(
                             () => {
                                 if (currentAttemptTimeoutIdWaitingForLastChunk === timeoutIdWaitingForLastChunk) {
                                     if (fs.existsSync(fullPath)) {
