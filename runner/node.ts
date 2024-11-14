@@ -15,9 +15,14 @@ export interface ElmPorts {
     fromJs: { send: (toElm: any) => void }
 }
 
+function showCursor() {
+    if (process.stdout.isTTY) {
+        process.stdout.write("\u{001B}[?25h")
+    }
+}
 export function programStart(appConfig: { ports: ElmPorts }) {
     process.addListener("beforeExit", (_event) => {
-        process.stdout.write("\u{001B}[?25h") // show cursor
+        showCursor() // show cursor
     })
     process.addListener("SIGINT", (_event) => {
         abortControllers.forEach((abortController) => {
@@ -28,7 +33,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
         })
         appConfig.ports.toJs.unsubscribe(listenToElm)
-        process.stdout.write("\u{001B}[?25h") // show cursor
+        showCursor()
     })
     function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
         // uncomment for debugging
@@ -104,7 +109,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                             }
                         })
                         appConfig.ports.toJs.unsubscribe(listenToElm)
-                        process.stdout.write("\u{001B}[?25h\n") // show cursor
+                        showCursor()
                     } else {
                         sendToElm(stringInput)
                     }
