@@ -111,108 +111,65 @@ interface state =
                                 Playing playing
 
                             Node.StreamDataReceived input ->
-                                if input |> Ansi.Decode.isLeftArrow then
-                                    let
-                                        fallingPieceAfterSuccessfulMove : { x : Int, y : Int, turn : PieceTurn, kind : PieceKind }
-                                        fallingPieceAfterSuccessfulMove =
-                                            { x = playing.fallingPiece.x - 1
-                                            , y = playing.fallingPiece.y
-                                            , turn = playing.fallingPiece.turn
-                                            , kind = playing.fallingPiece.kind
-                                            }
-                                    in
-                                    if
-                                        fallingPieceCollidesWithGroundOrSides
-                                            { groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece = fallingPieceAfterSuccessfulMove
-                                            }
-                                    then
+                                let
+                                    fallingPieceAfterSuccessfulMoveOrNothingIfNoAction :
+                                        Maybe
+                                            { x : Int, y : Int, turn : PieceTurn, kind : PieceKind }
+                                    fallingPieceAfterSuccessfulMoveOrNothingIfNoAction =
+                                        if input |> Ansi.Decode.isLeftArrow then
+                                            Just
+                                                { x = playing.fallingPiece.x - 1
+                                                , y = playing.fallingPiece.y
+                                                , turn = playing.fallingPiece.turn
+                                                , kind = playing.fallingPiece.kind
+                                                }
+
+                                        else if input |> Ansi.Decode.isRightArrow then
+                                            Just
+                                                { x = playing.fallingPiece.x + 1
+                                                , y = playing.fallingPiece.y
+                                                , turn = playing.fallingPiece.turn
+                                                , kind = playing.fallingPiece.kind
+                                                }
+
+                                        else if input |> Ansi.Decode.isUpArrow then
+                                            Just
+                                                { x = playing.fallingPiece.x
+                                                , y = playing.fallingPiece.y
+                                                , turn = playing.fallingPiece.turn |> pieceTurnByQuarterClockwise
+                                                , kind = playing.fallingPiece.kind
+                                                }
+
+                                        else if input |> Ansi.Decode.isDownArrow then
+                                            Just
+                                                { x = playing.fallingPiece.x
+                                                , y = playing.fallingPiece.y
+                                                , turn = playing.fallingPiece.turn |> pieceTurnByQuarterCounterclockwise
+                                                , kind = playing.fallingPiece.kind
+                                                }
+
+                                        else
+                                            Nothing
+                                in
+                                case fallingPieceAfterSuccessfulMoveOrNothingIfNoAction of
+                                    Nothing ->
                                         Playing playing
 
-                                    else
-                                        Playing
-                                            { ticks = playing.ticks
-                                            , fallingPiece = fallingPieceAfterSuccessfulMove
-                                            , groundPieceCoordinates = playing.groundPieceCoordinates
-                                            }
+                                    Just fallingPieceAfterSuccessfulMove ->
+                                        if
+                                            fallingPieceCollidesWithGroundOrSides
+                                                { groundPieceCoordinates = playing.groundPieceCoordinates
+                                                , fallingPiece = fallingPieceAfterSuccessfulMove
+                                                }
+                                        then
+                                            Playing playing
 
-                                else if input |> Ansi.Decode.isRightArrow then
-                                    let
-                                        fallingPieceAfterSuccessfulMove : { x : Int, y : Int, turn : PieceTurn, kind : PieceKind }
-                                        fallingPieceAfterSuccessfulMove =
-                                            { x = playing.fallingPiece.x + 1
-                                            , y = playing.fallingPiece.y
-                                            , turn = playing.fallingPiece.turn
-                                            , kind = playing.fallingPiece.kind
-                                            }
-                                    in
-                                    if
-                                        fallingPieceCollidesWithGroundOrSides
-                                            { groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece = fallingPieceAfterSuccessfulMove
-                                            }
-                                    then
-                                        Playing playing
-
-                                    else
-                                        Playing
-                                            { ticks = playing.ticks
-                                            , groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece = fallingPieceAfterSuccessfulMove
-                                            }
-
-                                else if input |> Ansi.Decode.isUpArrow then
-                                    let
-                                        fallingPieceAfterSuccessfulMove : { x : Int, y : Int, turn : PieceTurn, kind : PieceKind }
-                                        fallingPieceAfterSuccessfulMove =
-                                            { x = playing.fallingPiece.x
-                                            , y = playing.fallingPiece.y
-                                            , turn = playing.fallingPiece.turn |> pieceTurnByQuarterClockwise
-                                            , kind = playing.fallingPiece.kind
-                                            }
-                                    in
-                                    if
-                                        fallingPieceCollidesWithGroundOrSides
-                                            { groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece = fallingPieceAfterSuccessfulMove
-                                            }
-                                    then
-                                        Playing playing
-
-                                    else
-                                        Playing
-                                            { ticks = playing.ticks
-                                            , groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece = fallingPieceAfterSuccessfulMove
-                                            }
-
-                                else if input |> Ansi.Decode.isDownArrow then
-                                    let
-                                        fallingPieceAfterSuccessfulMove : { x : Int, y : Int, turn : PieceTurn, kind : PieceKind }
-                                        fallingPieceAfterSuccessfulMove =
-                                            { x = playing.fallingPiece.x
-                                            , y = playing.fallingPiece.y
-                                            , turn = playing.fallingPiece.turn |> pieceTurnByQuarterCounterclockwise
-                                            , kind = playing.fallingPiece.kind
-                                            }
-                                    in
-                                    if
-                                        fallingPieceCollidesWithGroundOrSides
-                                            { groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece = fallingPieceAfterSuccessfulMove
-                                            }
-                                    then
-                                        Playing playing
-
-                                    else
-                                        Playing
-                                            { ticks = playing.ticks
-                                            , groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece = fallingPieceAfterSuccessfulMove
-                                            }
-
-                                else
-                                    Playing playing
+                                        else
+                                            Playing
+                                                { ticks = playing.ticks
+                                                , groundPieceCoordinates = playing.groundPieceCoordinates
+                                                , fallingPiece = fallingPieceAfterSuccessfulMove
+                                                }
                     )
             , Node.timePeriodicallyListen (Duration.seconds (0.05 + 0.3 * (20 + playing.ticks |> Basics.toFloat) ^ -0.2))
                 |> Node.interfaceFutureMap
