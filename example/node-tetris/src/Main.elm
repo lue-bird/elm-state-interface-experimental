@@ -111,154 +111,83 @@ interface state =
                                 Playing playing
 
                             Node.StreamDataReceived input ->
-                                if input |> Ansi.Decode.isLeftArrow then
-                                    if
-                                        pieceKindCoordinates playing.fallingPiece.kind playing.fallingPiece.turn
-                                            |> List.all
-                                                (\c ->
-                                                    case
-                                                        playing.groundPieceCoordinates
-                                                            |> Array.get (playing.fallingPiece.y + c.y)
-                                                            |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x - 1))
-                                                    of
-                                                        Just Nothing ->
-                                                            True
-
-                                                        _ ->
-                                                            False
-                                                )
-                                    then
-                                        Playing
-                                            { ticks = playing.ticks
-                                            , fallingPiece =
-                                                { kind = playing.fallingPiece.kind
-                                                , turn = playing.fallingPiece.turn
+                                let
+                                    fallingPieceAfterSuccessfulMoveOrNothingIfNoAction :
+                                        Maybe
+                                            { x : Int, y : Int, turn : PieceTurn, kind : PieceKind }
+                                    fallingPieceAfterSuccessfulMoveOrNothingIfNoAction =
+                                        if input |> Ansi.Decode.isLeftArrow then
+                                            Just
+                                                { x = playing.fallingPiece.x - 1
                                                 , y = playing.fallingPiece.y
-                                                , x = playing.fallingPiece.x - 1
-                                                }
-                                            , groundPieceCoordinates = playing.groundPieceCoordinates
-                                            }
-
-                                    else
-                                        Playing playing
-
-                                else if input |> Ansi.Decode.isRightArrow then
-                                    if
-                                        pieceKindCoordinates playing.fallingPiece.kind playing.fallingPiece.turn
-                                            |> List.all
-                                                (\c ->
-                                                    case
-                                                        playing.groundPieceCoordinates
-                                                            |> Array.get (playing.fallingPiece.y + c.y)
-                                                            |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x + 1))
-                                                    of
-                                                        Just Nothing ->
-                                                            True
-
-                                                        _ ->
-                                                            False
-                                                )
-                                    then
-                                        Playing
-                                            { ticks = playing.ticks
-                                            , groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece =
-                                                { kind = playing.fallingPiece.kind
                                                 , turn = playing.fallingPiece.turn
-                                                , y = playing.fallingPiece.y
-                                                , x = playing.fallingPiece.x + 1
+                                                , kind = playing.fallingPiece.kind
                                                 }
-                                            }
 
-                                    else
-                                        Playing playing
+                                        else if input |> Ansi.Decode.isRightArrow then
+                                            Just
+                                                { x = playing.fallingPiece.x + 1
+                                                , y = playing.fallingPiece.y
+                                                , turn = playing.fallingPiece.turn
+                                                , kind = playing.fallingPiece.kind
+                                                }
 
-                                else if input |> Ansi.Decode.isUpArrow then
-                                    if
-                                        pieceKindCoordinates playing.fallingPiece.kind (playing.fallingPiece.turn |> pieceTurnByQuarterClockwise)
-                                            |> List.all
-                                                (\c ->
-                                                    case
-                                                        playing.groundPieceCoordinates
-                                                            |> Array.get (playing.fallingPiece.y + c.y)
-                                                            |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x))
-                                                    of
-                                                        Just Nothing ->
-                                                            True
-
-                                                        _ ->
-                                                            False
-                                                )
-                                    then
-                                        Playing
-                                            { ticks = playing.ticks
-                                            , groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece =
-                                                { kind = playing.fallingPiece.kind
-                                                , x = playing.fallingPiece.x
+                                        else if input |> Ansi.Decode.isUpArrow then
+                                            Just
+                                                { x = playing.fallingPiece.x
                                                 , y = playing.fallingPiece.y
                                                 , turn = playing.fallingPiece.turn |> pieceTurnByQuarterClockwise
+                                                , kind = playing.fallingPiece.kind
                                                 }
-                                            }
 
-                                    else
-                                        Playing playing
-
-                                else if input |> Ansi.Decode.isDownArrow then
-                                    if
-                                        pieceKindCoordinates playing.fallingPiece.kind (playing.fallingPiece.turn |> pieceTurnByQuarterCounterclockwise)
-                                            |> List.all
-                                                (\c ->
-                                                    case
-                                                        playing.groundPieceCoordinates
-                                                            |> Array.get (playing.fallingPiece.y + c.y)
-                                                            |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x))
-                                                    of
-                                                        Just Nothing ->
-                                                            True
-
-                                                        _ ->
-                                                            False
-                                                )
-                                    then
-                                        Playing
-                                            { ticks = playing.ticks
-                                            , groundPieceCoordinates = playing.groundPieceCoordinates
-                                            , fallingPiece =
-                                                { kind = playing.fallingPiece.kind
-                                                , x = playing.fallingPiece.x
+                                        else if input |> Ansi.Decode.isDownArrow then
+                                            Just
+                                                { x = playing.fallingPiece.x
                                                 , y = playing.fallingPiece.y
                                                 , turn = playing.fallingPiece.turn |> pieceTurnByQuarterCounterclockwise
+                                                , kind = playing.fallingPiece.kind
                                                 }
-                                            }
 
-                                    else
+                                        else
+                                            Nothing
+                                in
+                                case fallingPieceAfterSuccessfulMoveOrNothingIfNoAction of
+                                    Nothing ->
                                         Playing playing
 
-                                else
-                                    Playing playing
+                                    Just fallingPieceAfterSuccessfulMove ->
+                                        if
+                                            fallingPieceCollidesWithGroundOrSides
+                                                { groundPieceCoordinates = playing.groundPieceCoordinates
+                                                , fallingPiece = fallingPieceAfterSuccessfulMove
+                                                }
+                                        then
+                                            Playing playing
+
+                                        else
+                                            Playing
+                                                { ticks = playing.ticks
+                                                , groundPieceCoordinates = playing.groundPieceCoordinates
+                                                , fallingPiece = fallingPieceAfterSuccessfulMove
+                                                }
                     )
             , Node.timePeriodicallyListen (Duration.seconds (0.05 + 0.3 * (20 + playing.ticks |> Basics.toFloat) ^ -0.2))
                 |> Node.interfaceFutureMap
                     (\_ ->
+                        let
+                            fallingPieceAfterSuccessfulMove : { x : Int, y : Int, turn : PieceTurn, kind : PieceKind }
+                            fallingPieceAfterSuccessfulMove =
+                                { x = playing.fallingPiece.x
+                                , y = playing.fallingPiece.y + 1
+                                , turn = playing.fallingPiece.turn
+                                , kind = playing.fallingPiece.kind
+                                }
+                        in
                         if
-                            pieceKindCoordinates playing.fallingPiece.kind playing.fallingPiece.turn
-                                |> List.any
-                                    (\c ->
-                                        case
-                                            playing.groundPieceCoordinates
-                                                |> Array.get (playing.fallingPiece.y + c.y + 1)
-                                                |> Maybe.andThen (Array.get (playing.fallingPiece.x + c.x))
-                                        of
-                                            Nothing ->
-                                                True
-
-                                            Just Nothing ->
-                                                False
-
-                                            Just (Just _) ->
-                                                True
-                                    )
+                            fallingPieceCollidesWithGroundOrSides
+                                { groundPieceCoordinates = playing.groundPieceCoordinates
+                                , fallingPiece = fallingPieceAfterSuccessfulMove
+                                }
                         then
                             if playing.fallingPiece.y == 0 then
                                 GameOver { ticks = playing.ticks }
@@ -285,12 +214,7 @@ interface state =
                         else
                             Playing
                                 { ticks = playing.ticks + 1
-                                , fallingPiece =
-                                    { kind = playing.fallingPiece.kind
-                                    , turn = playing.fallingPiece.turn
-                                    , x = playing.fallingPiece.x
-                                    , y = playing.fallingPiece.y + 1
-                                    }
+                                , fallingPiece = fallingPieceAfterSuccessfulMove
                                 , groundPieceCoordinates = playing.groundPieceCoordinates
                                 }
                     )
@@ -303,6 +227,31 @@ interface state =
                     ++ (gameOver.ticks |> String.fromInt |> Ansi.Font.bold)
                     ++ "\n\n\n"
                 )
+
+
+fallingPieceCollidesWithGroundOrSides :
+    { fallingPiece : { kind : PieceKind, turn : PieceTurn, y : Int, x : Int }
+    , groundPieceCoordinates : Array (Array (Maybe PieceKind))
+    }
+    -> Bool
+fallingPieceCollidesWithGroundOrSides state =
+    pieceKindCoordinates state.fallingPiece.kind state.fallingPiece.turn
+        |> List.any
+            (\c ->
+                case
+                    state.groundPieceCoordinates
+                        |> Array.get (state.fallingPiece.y + c.y)
+                        |> Maybe.andThen (Array.get (state.fallingPiece.x + c.x))
+                of
+                    Nothing ->
+                        True
+
+                    Just Nothing ->
+                        False
+
+                    Just (Just _) ->
+                        True
+            )
 
 
 pieceKindRandom : Random.Generator PieceKind
