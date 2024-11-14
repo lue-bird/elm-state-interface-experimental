@@ -1,8 +1,13 @@
 port module Main exposing (main)
 
+{-| Copy a simple [benchmarks](https://dark.elm.dmy.fr/packages/elm-explorations/benchmark/latest/)
+project template to the current working directory
+-}
+
 import Bytes.Encode
 import Json.Encode
 import Node
+import Web
 
 
 main : Node.Program State
@@ -17,7 +22,10 @@ main =
 type State
     = State
         { benchmarkDirectory : OperationState
+        , elmJson : OperationState
         , srcDirectory : OperationState
+        , benchmarksElm : OperationState
+        , webMainElm : OperationState
         }
 
 
@@ -28,7 +36,13 @@ type OperationState
 
 initialState : State
 initialState =
-    State { benchmarkDirectory = NotStarted, srcDirectory = NotStarted }
+    State
+        { benchmarkDirectory = NotStarted
+        , elmJson = NotStarted
+        , srcDirectory = NotStarted
+        , benchmarksElm = NotStarted
+        , webMainElm = NotStarted
+        }
 
 
 benchmarkDirectoryName : String
@@ -38,100 +52,112 @@ benchmarkDirectoryName =
 
 interface : State -> Node.Interface State
 interface (State state) =
-    [ case ( state.benchmarkDirectory, state.srcDirectory ) of
-        ( Result benchmarkDirectoryResult, Result srcDirectoryResult ) ->
-            case ( benchmarkDirectoryResult, srcDirectoryResult ) of
-                ( Ok (), Ok () ) ->
-                    [ Node.fileWrite
-                        { path = benchmarkDirectoryName ++ "/elm.json"
-                        , content = initElmJsonSource |> Bytes.Encode.string |> Bytes.Encode.encode
-                        }
-                    , Node.fileWrite
-                        { path = benchmarkDirectoryName ++ "/src/WebMain.elm"
-                        , content = initWebMainElmSource |> Bytes.Encode.string |> Bytes.Encode.encode
-                        }
-                    , Node.fileWrite
-                        { path = benchmarkDirectoryName ++ "/src/Benchmarks.elm"
-                        , content = initBenchmarksElmSource |> Bytes.Encode.string |> Bytes.Encode.encode
-                        }
-                    , Node.standardOutWrite
-                        ("""
+    [ case ( state.webMainElm, state.benchmarksElm, state.elmJson ) of
+        ( Result (Ok ()), Result (Ok ()), Result (Ok ()) ) ->
+            Node.standardOutWrite
+                ("""
     """
-                            ++ benchmarkDirectoryName
-                            ++ """/
+                    ++ benchmarkDirectoryName
+                    ++ """/
       ┣ elm.json
       ┗ src/
           ┣ Benchmarks.elm
           ┗ WebMain.elm
 
 Add benchmarks in """
-                            ++ benchmarkDirectoryName
-                            ++ """/src/Benchmarks.elm
-Run with  cd """
-                            ++ benchmarkDirectoryName
-                            ++ """ && elm reactor , then open http://localhost:8000/src/WebMain.elm
+                    ++ benchmarkDirectoryName
+                    ++ """/src/Benchmarks.elm
+Run with `cd """
+                    ++ benchmarkDirectoryName
+                    ++ """ && elm reactor`, then open http://localhost:8000/src/WebMain.elm
 """
-                        )
-                    ]
-                        |> Node.interfaceBatch
-
-                ( benchmarkDirectoryResultMaybeError, srcDirectoryResultMaybeError ) ->
-                    [ Node.standardErrWrite
-                        ("failed to create "
-                            ++ ([ benchmarkDirectoryResultMaybeError, srcDirectoryResultMaybeError ]
-                                    |> List.filterMap
-                                        (\result ->
-                                            case result of
-                                                Ok () ->
-                                                    Nothing
-
-                                                Err error ->
-                                                    Just error
-                                        )
-                                    |> List.map
-                                        (\error ->
-                                            benchmarkDirectoryName
-                                                ++ "/ due to "
-                                                ++ error.message
-                                                ++ " (code "
-                                                ++ error.code
-                                                ++ ")"
-                                        )
-                                    |> String.join " and "
-                               )
-                        )
-                    , Node.exit 1
-                    ]
-                        |> Node.interfaceBatch
+                )
 
         _ ->
             Node.interfaceNone
     , case state.benchmarkDirectory of
-        Result _ ->
-            Node.interfaceNone
-
         NotStarted ->
             Node.directoryMake benchmarkDirectoryName
                 |> Node.interfaceFutureMap
-                    (\result ->
-                        State
-                            { benchmarkDirectory = Result result
-                            , srcDirectory = state.srcDirectory
-                            }
-                    )
-    , case state.srcDirectory of
-        Result _ ->
-            Node.interfaceNone
+                    (\result -> State { state | benchmarkDirectory = Result result })
 
-        NotStarted ->
-            Node.directoryMake (benchmarkDirectoryName ++ "/src")
-                |> Node.interfaceFutureMap
-                    (\result ->
-                        State
-                            { benchmarkDirectory = state.benchmarkDirectory
-                            , srcDirectory = Result result
-                            }
-                    )
+        Result (Err benchmarkDirectoryError) ->
+            fileCreateErrorInterface benchmarkDirectoryError
+
+        Result (Ok benchmarkDirectoryResult) ->
+            [ case state.elmJson of
+                NotStarted ->
+                    Node.fileWrite
+                        { path = benchmarkDirectoryName ++ "/elm.json"
+                        , content = initElmJsonSource |> Bytes.Encode.string |> Bytes.Encode.encode
+                        }
+                        |> Node.interfaceFutureMap
+                            (\result -> State { state | elmJson = Result result })
+
+                Result (Err elmJsonCreateError) ->
+                    fileCreateErrorInterface elmJsonCreateError
+
+                Result (Ok ()) ->
+                    Node.interfaceNone
+            , case state.srcDirectory of
+                NotStarted ->
+                    Node.directoryMake (benchmarkDirectoryName ++ "/src")
+                        |> Node.interfaceFutureMap
+                            (\result -> State { state | srcDirectory = Result result })
+
+                Result (Err srcDirectoryError) ->
+                    fileCreateErrorInterface srcDirectoryError
+
+                Result (Ok ()) ->
+                    [ case state.webMainElm of
+                        NotStarted ->
+                            Node.fileWrite
+                                { path = benchmarkDirectoryName ++ "/src/WebMain.elm"
+                                , content = initWebMainElmSource |> Bytes.Encode.string |> Bytes.Encode.encode
+                                }
+                                |> Node.interfaceFutureMap
+                                    (\result -> State { state | webMainElm = Result result })
+
+                        Result (Err elmJsonCreateError) ->
+                            fileCreateErrorInterface elmJsonCreateError
+
+                        Result (Ok ()) ->
+                            Node.interfaceNone
+                    , case state.benchmarksElm of
+                        NotStarted ->
+                            Node.fileWrite
+                                { path = benchmarkDirectoryName ++ "/src/Benchmarks.elm"
+                                , content = initBenchmarksElmSource |> Bytes.Encode.string |> Bytes.Encode.encode
+                                }
+                                |> Node.interfaceFutureMap
+                                    (\result -> State { state | benchmarksElm = Result result })
+
+                        Result (Err elmJsonCreateError) ->
+                            fileCreateErrorInterface elmJsonCreateError
+
+                        Result (Ok ()) ->
+                            Node.interfaceNone
+                    ]
+                        |> Node.interfaceBatch
+            ]
+                |> Node.interfaceBatch
+    ]
+        |> Node.interfaceBatch
+
+
+fileCreateErrorInterface : { message : String, code : String } -> Node.Interface future_
+fileCreateErrorInterface error =
+    [ Node.standardErrWrite
+        ("failed to create "
+            ++ (benchmarkDirectoryName
+                    ++ "/ due to "
+                    ++ error.message
+                    ++ " (code "
+                    ++ error.code
+                    ++ ")"
+               )
+        )
+    , Node.exit 1
     ]
         |> Node.interfaceBatch
 

@@ -95,35 +95,40 @@ interface (State state) =
                 )
             , Node.standardInRawListen
                 |> Node.interfaceFutureMap
-                    (\input ->
-                        if input |> Ansi.Decode.isLeftArrow then
-                            State
-                                { lastSecondTime = Just lastSecondTime
-                                , timeZone = Just timeZone
-                                , displayTimeZone =
-                                    case state.displayTimeZone of
-                                        DisplayUtc ->
-                                            DisplayLocalTime
+                    (\inputEvent ->
+                        case inputEvent of
+                            Node.StreamDataEndReached ->
+                                State state
 
-                                        DisplayLocalTime ->
-                                            DisplayUtc
-                                }
+                            Node.StreamDataReceived input ->
+                                if input |> Ansi.Decode.isLeftArrow then
+                                    State
+                                        { lastSecondTime = Just lastSecondTime
+                                        , timeZone = Just timeZone
+                                        , displayTimeZone =
+                                            case state.displayTimeZone of
+                                                DisplayUtc ->
+                                                    DisplayLocalTime
 
-                        else if input |> Ansi.Decode.isRightArrow then
-                            State
-                                { lastSecondTime = Just lastSecondTime
-                                , timeZone = Just timeZone
-                                , displayTimeZone =
-                                    case state.displayTimeZone of
-                                        DisplayUtc ->
-                                            DisplayLocalTime
+                                                DisplayLocalTime ->
+                                                    DisplayUtc
+                                        }
 
-                                        DisplayLocalTime ->
-                                            DisplayUtc
-                                }
+                                else if input |> Ansi.Decode.isRightArrow then
+                                    State
+                                        { lastSecondTime = Just lastSecondTime
+                                        , timeZone = Just timeZone
+                                        , displayTimeZone =
+                                            case state.displayTimeZone of
+                                                DisplayUtc ->
+                                                    DisplayLocalTime
 
-                        else
-                            State state
+                                                DisplayLocalTime ->
+                                                    DisplayUtc
+                                        }
+
+                                else
+                                    State state
                     )
             , Node.timePeriodicallyListen (Duration.seconds 1)
                 |> Node.interfaceFutureMap

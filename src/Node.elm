@@ -4,7 +4,7 @@ module Node exposing
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
-    , standardOutWrite, standardErrWrite, standardInListen, standardInRawListen
+    , standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent(..)
     , terminalSizeRequest, terminalSizeChangeListen
     , FileKind(..), fileInfoRequest, directorySubPathsRequest
     , directoryMake, fileWrite, fileRequest, fileRemove
@@ -44,7 +44,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 ## process and terminal
 
 @docs workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
-@docs standardOutWrite, standardErrWrite, standardInListen, standardInRawListen
+@docs standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent
 @docs terminalSizeRequest, terminalSizeChangeListen
 
 
@@ -194,7 +194,7 @@ type InterfaceSingle future
     | StandardOutWrite String
     | StandardErrWrite String
     | StandardInListen (String -> future)
-    | StandardInRawListen (String -> future)
+    | StandardInRawListen (StreamReadEvent -> future)
     | TerminalSizeRequest ({ lines : Int, columns : Int } -> future)
     | TerminalSizeChangeListen ({ lines : Int, columns : Int } -> future)
     | HttpRequestSend
@@ -246,6 +246,20 @@ type InterfaceSingle future
         { path : String
         , on : Result { code : String, message : String } (List String) -> future
         }
+
+
+{-| When data is sent (possibly in chunks), you'll get a `StreamDataReceived` event.
+Once it finished sending data, you'll get a `StreamDataEndReached` event
+
+Used in [`Node.standardInListen`](#standardInListen)
+
+Uses the readable stream [data event](https://nodejs.org/api/stream.html#event-data)
+and [end event](https://nodejs.org/api/stream.html#event-end)
+
+-}
+type StreamReadEvent
+    = StreamDataReceived String
+    | StreamDataEndReached
 
 
 {-| How the connection has changed or what request has been sent.
@@ -946,9 +960,19 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         StandardInRawListen on ->
-            Json.Decode.string
+            streamReadEventJsonDecoder
                 |> Json.Decode.map on
                 |> Just
+
+
+streamReadEventJsonDecoder : Json.Decode.Decoder StreamReadEvent
+streamReadEventJsonDecoder =
+    Json.Decode.oneOf
+        [ Json.Decode.map StreamDataReceived
+            (Json.Decode.LocalExtra.variant "StreamDataReceived" Json.Decode.string)
+        , Json.Decode.LocalExtra.variant "StreamDataEndReached"
+            (Json.Decode.null StreamDataEndReached)
+        ]
 
 
 launchArgumentsJsonDecoder : Json.Decode.Decoder (List String)
@@ -1792,7 +1816,10 @@ standardInListen =
         |> interfaceFromSingle
 
 
-{-| Read text from standard in character by character (except modifiers).
+{-| Read text from standard in, regardless of linebreaks.
+
+When used as a terminal interface, user input is read character by character (except modifiers)
+as [`StreamDataReceived`](#StreamReadEvent) events.
 For nice input parsing,
 see for example [gren-tui's `stringToInput`](https://github.com/blaix/gren-tui/blob/main/src/Tui.gren#L562).
 
@@ -1800,11 +1827,19 @@ As long as [`Node.standardInRawListen`](#standardInRawListen) is part of the int
 the terminal won't echo input characters.
 However, ctrl+c will still exit the process (SIGINT).
 
+Depending on how the final program is used,
+input can also arrive from a source outside of the terminal (like a piped file),
+in which case the full thing might arrive in multiple [`StreamDataReceived`](#StreamReadEvent)
+chunks.
+
+Once all data is send (when outside terminal interface) or CTRL+D is pressed (in terminal interface),
+you'll receive a [`StreamDataEndReached`](#StreamReadEvent) event.
+
 Uses [`process.stdin.addListener("data", ...)`](https://nodejs.org/api/stream.html#event-data)
-in combination with [`process.stdin.setRawMode(true)`](https://nodejs.org/api/tty.html#readstreamsetrawmodemode)
+in combination with (when used as a terminal interface) [`process.stdin.setRawMode(true)`](https://nodejs.org/api/tty.html#readstreamsetrawmodemode)
 
 -}
-standardInRawListen : Interface String
+standardInRawListen : Interface StreamReadEvent
 standardInRawListen =
     StandardInRawListen identity
         |> interfaceFromSingle

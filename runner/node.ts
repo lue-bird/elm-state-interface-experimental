@@ -98,7 +98,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 if (process.stdin.setRawMode !== undefined) {
                     process.stdin.setRawMode(true)
                 }
-                function listen(buffer: Buffer) {
+                function dataListen(buffer: Buffer) {
                     const stringInput = buffer.toString()
                     if (stringInput == "\u0003") { // ctrl+c
                         abortControllers.forEach((abortController) => {
@@ -111,12 +111,17 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         appConfig.ports.toJs.unsubscribe(listenToElm)
                         showCursor()
                     } else {
-                        sendToElm(stringInput)
+                        sendToElm({ tag: "StreamDataReceived", value: stringInput })
                     }
                 }
-                process.stdin.addListener("data", listen)
+                function endListen() {
+                    sendToElm({ tag: "StreamDataEndReached", value: null })
+                }
+                process.stdin.addListener("data", dataListen)
+                process.stdin.addListener("end", endListen)
                 abortSignal.addEventListener("abort", (_event) => {
-                    process.stdin.removeListener("data", listen)
+                    process.stdin.removeListener("data", dataListen)
+                    process.stdin.removeListener("end", endListen)
                     if (process.stdin.setRawMode !== undefined) {
                         process.stdin.setRawMode(false)
                     }

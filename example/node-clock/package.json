@@ -3,7 +3,7 @@
   "name": "clock",
   "devDependencies": {
     "elm-esm": "^1.1.4",
-    "@lue-bird/elm-state-interface-experimental": "^3.0.0"
+    "@lue-bird/elm-state-interface-experimental": "^3.0.9"
   },
   "bin": "./src/index.js",
   "scripts": {
