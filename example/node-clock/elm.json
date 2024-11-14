@@ -17,7 +17,7 @@
             "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.8",
             "lydell/elm-app-url": "1.0.4",
             "wolfadex/elm-ansi": "3.0.0",
-            "lue-bird/elm-state-interface-experimental": "8.0.1"
+            "lue-bird/elm-state-interface-experimental": "9.0.0"
         },
         "indirect": {
             "NoRedInk/elm-random-general": "1.0.0",

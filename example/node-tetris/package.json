@@ -3,7 +3,7 @@
   "name": "tetris",
   "devDependencies": {
     "elm-esm": "^1.1.4",
-    "@lue-bird/elm-state-interface-experimental": "^3.0.9"
+    "@lue-bird/elm-state-interface-experimental": "^4.0.0"
   },
   "bin": "./src/index.js",
   "scripts": {
