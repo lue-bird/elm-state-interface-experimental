@@ -9,7 +9,7 @@
 >   - simplify web socket API
 >   - simplify web http request send API
 >   - internal: replace `Dict` values and some Rope values to sorted assoc-list or `FastDict.Dict`
->   - internal: change dom diffing algorithm (faster replacing big chunks, easier to understand)
+>   - internal: change dom diffing algorithm (faster initial create, faster replacing big chunks, easier to understand with less weirdness)
 >   - internal: transport `Bytes` over ports faster
 
 ### define an app in a simple, safe and declarative way
