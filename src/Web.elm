@@ -1064,9 +1064,9 @@ interfaceSingleEditToJson edit =
                     Json.Encode.object
                         [ ( "url", audioEdit.url |> Json.Encode.string )
                         , ( "startTime", audioEdit.startTime |> Time.posixToMillis |> Json.Encode.int )
-                        , ( "replacement"
+                        , ( "edit"
                           , Json.Encode.LocalExtra.variant
-                                (case audioEdit.replacement of
+                                (case audioEdit.edit of
                                     ReplacementAudioSpeed new ->
                                         { tag = "Speed", value = new |> audioParameterTimelineToJson }
 
@@ -3074,10 +3074,10 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
                     { old = domElementPreviouslyRendered, updated = domElementToRender }
                         |> domNodeDiffMap
                             (\diff ->
-                                { path = diff.path
-                                , edit = diff.edit
-                                }
-                                    |> EditDom
+                                EditDom
+                                    { path = diff.path
+                                    , edit = diff.edit
+                                    }
                                     |> fromSingeEdit
                             )
                         |> Rope.toList
@@ -3091,8 +3091,11 @@ interfaceSingleEditsMap fromSingeEdit interfaces =
                     { old = previouslyPlayed, updated = toPlay }
                         |> audioDiffMap
                             (\diff ->
-                                { url = toPlay.url, startTime = toPlay.startTime, replacement = diff }
-                                    |> EditAudio
+                                EditAudio
+                                    { url = toPlay.url
+                                    , startTime = toPlay.startTime
+                                    , edit = diff
+                                    }
                                     |> fromSingeEdit
                             )
 
@@ -3630,23 +3633,28 @@ audioDiffMap fromAudioEdit audios =
                 Nothing
 
              else
-                ReplacementAudioSpeed audios.updated.speed |> fromAudioEdit |> Just
+                ReplacementAudioSpeed audios.updated.speed
+                    |> fromAudioEdit
+                    |> Just
             )
         |> List.LocalExtra.consJust
             (if audios.old.stereoPan == audios.updated.stereoPan then
                 Nothing
 
              else
-                ReplacementAudioStereoPan audios.updated.stereoPan |> fromAudioEdit |> Just
+                ReplacementAudioStereoPan audios.updated.stereoPan
+                    |> fromAudioEdit
+                    |> Just
             )
         |> List.LocalExtra.consJust
             (if audios.old.processingLastToFirst == audios.updated.processingLastToFirst then
                 Nothing
 
              else
-                audios.updated.processingLastToFirst
-                    |> List.reverse
-                    |> ReplacementAudioProcessing
+                ReplacementAudioProcessing
+                    (audios.updated.processingLastToFirst
+                        |> List.reverse
+                    )
                     |> fromAudioEdit
                     |> Just
             )
@@ -3697,7 +3705,7 @@ type InterfaceSingleEdit
         { url : String
         , startTime : Time.Posix
         , -- TODO rename to edit
-          replacement : AudioEdit
+          edit : AudioEdit
         }
     | EditNotification { id : String, message : String, details : String }
 
