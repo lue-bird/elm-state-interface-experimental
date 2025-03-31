@@ -297,10 +297,10 @@ todoListUi state =
                         [ Web.domStyle "color" (Color.rgba 1 1 1 0.4 |> Color.toCssString)
                         , Web.domStyle "text-decoration" "line-through"
                         ]
-                            |> Web.Dom.modifierBatch
+                            |> Web.domModifierBatch
 
                       else
-                        Web.Dom.modifierNone
+                        Web.domModifierNone
                     ]
                     [ todo.content |> Web.domText ]
                 ]

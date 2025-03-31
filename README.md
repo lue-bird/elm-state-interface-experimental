@@ -8,7 +8,8 @@
 >   - add module `Node`, split js package into `/web` and `/node` entrypoints
 >   - simplify web socket API
 >   - simplify web http request send API
->   - internal: replace `Dict` values to sorted assoc-list, `FastDict.Dict` or in the case of `Web.Interface`, a custom FastDict clone
+>   - internal: replace `Dict` values and some Rope values to sorted assoc-list or `FastDict.Dict`
+>   - internal: change dom diffing algorithm (faster replacing big chunks, easier to understand)
 >   - internal: transport `Bytes` over ports faster
 
 ### define an app in a simple, safe and declarative way
