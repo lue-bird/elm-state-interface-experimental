@@ -7,3 +7,4 @@ runner-compiled
 package-lock.json
 2d-game/
 elmMain.js
+benchmark-diff
