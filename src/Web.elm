@@ -410,7 +410,6 @@ If you need more things like json encoders/decoders, [open an issue](https://git
 
 import Angle exposing (Angle)
 import AppUrl exposing (AppUrl)
-import AppUrl.LocalExtra
 import AsciiString
 import Bytes exposing (Bytes)
 import Dict
@@ -425,12 +424,11 @@ import List.LocalExtra
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Result.LocalExtra
 import Rope exposing (Rope)
-import Rope.LocalExtra
 import Speed exposing (Speed)
 import StructuredId exposing (StructuredId)
 import Time
 import Time.LocalExtra
-import Url.LocalExtra
+import Url exposing (Url)
 
 
 
@@ -2372,7 +2370,7 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         NavigationUrlRequest toFuture ->
-            Url.LocalExtra.jsonDecoder
+            urlJsonDecoder
                 |> Json.Decode.map AppUrl.fromUrl
                 |> Json.Decode.map toFuture
                 |> Just
@@ -2512,7 +2510,7 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         LocalStorageRemoveOnADifferentTabListen listen ->
-            Url.LocalExtra.jsonDecoder
+            urlJsonDecoder
                 |> Json.Decode.map AppUrl.fromUrl
                 |> Json.Decode.map listen.on
                 |> Just
@@ -2533,6 +2531,20 @@ interfaceSingleFutureJsonDecoder interface =
 
         GamepadsChangeListen toFuture ->
             gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
+
+
+urlJsonDecoder : Json.Decode.Decoder Url
+urlJsonDecoder =
+    Json.Decode.andThen
+        (\urlString ->
+            case urlString |> Url.fromString of
+                Nothing ->
+                    "invalid URL" |> Json.Decode.fail
+
+                Just urlParsed ->
+                    urlParsed |> Json.Decode.succeed
+        )
+        Json.Decode.string
 
 
 domEventListenEventJsonDecoder : Json.Decode.Decoder { name : String, value : Json.Decode.Value }
@@ -2565,7 +2577,7 @@ localStorageSetOnADifferentTabEventJsonDecoder =
             { appUrl = appUrl, oldValue = oldValue, newValue = newValue }
         )
         (Json.Decode.field "url"
-            (Url.LocalExtra.jsonDecoder |> Json.Decode.map AppUrl.fromUrl)
+            (urlJsonDecoder |> Json.Decode.map AppUrl.fromUrl)
         )
         (Json.Decode.field "oldValue" (Json.Decode.nullable Json.Decode.string))
         (Json.Decode.field "newValue" Json.Decode.string)
@@ -4799,12 +4811,37 @@ navigationListen =
         , on =
             Json.Decode.field "state"
                 (Json.Decode.oneOf
-                    [ Json.Decode.field "appUrl" AppUrl.LocalExtra.jsonDecoder
+                    [ Json.Decode.field "appUrl" appUrlJsonDecoder
                     , Json.Decode.null () |> Json.Decode.map (\() -> AppUrl.fromPath [])
                     ]
                 )
         }
         |> interfaceFromSingle
+
+
+appUrlJsonDecoder : Json.Decode.Decoder AppUrl
+appUrlJsonDecoder =
+    Json.Decode.string
+        |> Json.Decode.andThen
+            (\appUrlString ->
+                case appUrlString |> stringToAppUrl of
+                    Nothing ->
+                        "invalid app-specific URL" |> Json.Decode.fail
+
+                    Just appUrl ->
+                        appUrl |> Json.Decode.succeed
+            )
+
+
+stringToAppUrl : String -> Maybe AppUrl
+stringToAppUrl appUrlString =
+    if appUrlString |> String.startsWith "/" then
+        ("https://dummy.com" ++ appUrlString)
+            |> Url.fromString
+            |> Maybe.map AppUrl.fromUrl
+
+    else
+        Nothing
 
 
 {-| An [`Interface`](Web#Interface) for getting which [gamepads](Web#Gamepad)
@@ -5487,10 +5524,19 @@ domModifierFutureMap :
     -> DomModifier mappedFuture
 domModifierFutureMap futureChange modifier =
     modifier
-        |> Rope.LocalExtra.mapFast
+        |> ropeMapFast
             (\modifierSingle ->
                 modifierSingle |> domModifierSingleMap futureChange
             )
+
+
+ropeMapFast : (a -> b) -> Rope a -> Rope b
+ropeMapFast elementChange rope =
+    rope
+        |> Rope.foldr
+            (\element soFar -> elementChange element :: soFar)
+            []
+        |> Rope.fromList
 
 
 domModifierSingleMap :
