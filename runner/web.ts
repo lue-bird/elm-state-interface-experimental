@@ -422,8 +422,9 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             }
             case "AppendSubs": {
                 if (realDomNodeToEdit instanceof Element) {
+                    const indexToStartAppendingFrom = realDomNodeToEdit.childNodes.length
                     const subsAsRealDomNodes = edit.value.map((subNode: DomNode, subIndex: number) =>
-                        createDomNode([...path, subIndex], subNode, sendToElm)
+                        createDomNode([...path, indexToStartAppendingFrom + subIndex], subNode, sendToElm)
                     )
                     realDomNodeToEdit.append(...subsAsRealDomNodes)
                 } else {
@@ -452,7 +453,6 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                         sendToElm
                     )
                 } else {
-                    console.debug(realDomNodeToEdit)
                     warn("the DOM node I wanted to edit has been replaced by text. Try to disable potential interfering extensions")
                 }
                 break
