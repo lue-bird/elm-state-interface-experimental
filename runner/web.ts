@@ -356,21 +356,25 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     }
     function interfaceEditImplementation(id: string, tag: string, sendToElm: (v: any) => void): ((config: any) => void) {
         switch (tag) {
-            case "EditDom": return (config: { path: number[], edit: any }) => {
+            case "EditDom": return (config: Array<{ path: number[], edit: any }>) => {
                 const realRootDomNode = appConfig.domElement.firstChild;
                 if (realRootDomNode === null) {
                     warn("I wanted to edit a DOM node but it appears the root element has never been initialized or has been removed. Try to disable potential interfering extensions")
                 } else {
-                    const realDomNodeToEdit = domNodeInNodeAtPath(realRootDomNode, config.path)
-                    if (realDomNodeToEdit === null) {
-                        warn("I wanted to edit a DOM node but it appears it has been moved or removed. Try to disable potential interfering extensions")
-                    } else {
-                        editDom(config.path, realDomNodeToEdit, config.edit, sendToElm)
+                    for (const diffAtPath of config) {
+                        const realDomNodeToEdit = domNodeInNodeAtPath(realRootDomNode, diffAtPath.path)
+                        if (realDomNodeToEdit === null) {
+                            warn("I wanted to edit a DOM node but it appears it has been moved or removed. Try to disable potential interfering extensions")
+                        } else {
+                            editDom(diffAtPath.path, realDomNodeToEdit, diffAtPath.edit, sendToElm)
+                        }
                     }
                 }
             }
-            case "EditAudio": return (config: { url: string, startTime: number, edit: AudioEdit }) => {
-                editAudio(id, config)
+            case "EditAudio": return (config: Array<{ url: string, startTime: number, edit: AudioEdit }>) => {
+                for (const diffAtPath of config) {
+                    editAudio(id, diffAtPath)
+                }
             }
             case "EditNotification": return (config: { id: string, message: string, details: string }) => {
                 const newNotification = new Notification(

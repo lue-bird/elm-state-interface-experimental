@@ -1049,40 +1049,48 @@ interfaceSingleEditToJson : InterfaceSingleEdit -> Json.Encode.Value
 interfaceSingleEditToJson edit =
     Json.Encode.LocalExtra.variant
         (case edit of
-            EditDom editDomDiff ->
+            EditDom editDomDiffsAtPaths ->
                 { tag = "EditDom"
                 , value =
-                    Json.Encode.object
-                        [ ( "path", editDomDiff.path |> Json.Encode.list Json.Encode.int )
-                        , ( "edit", editDomDiff.edit |> editDomDiffToJson )
-                        ]
+                    editDomDiffsAtPaths
+                        |> Json.Encode.list
+                            (\editDomDiffAtPath ->
+                                Json.Encode.object
+                                    [ ( "path", editDomDiffAtPath.path |> Json.Encode.list Json.Encode.int )
+                                    , ( "edit", editDomDiffAtPath.edit |> editDomDiffToJson )
+                                    ]
+                            )
                 }
 
-            EditAudio audioEdit ->
+            EditAudio audioEditAtPaths ->
                 { tag = "EditAudio"
                 , value =
-                    Json.Encode.object
-                        [ ( "url", audioEdit.url |> Json.Encode.string )
-                        , ( "startTime", audioEdit.startTime |> Time.posixToMillis |> Json.Encode.int )
-                        , ( "edit"
-                          , Json.Encode.LocalExtra.variant
-                                (case audioEdit.edit of
-                                    ReplacementAudioSpeed new ->
-                                        { tag = "Speed", value = new |> audioParameterTimelineToJson }
+                    audioEditAtPaths
+                        |> Json.Encode.list
+                            (\editDomDiffAtPath ->
+                                Json.Encode.object
+                                    [ ( "url", editDomDiffAtPath.url |> Json.Encode.string )
+                                    , ( "startTime", editDomDiffAtPath.startTime |> Time.posixToMillis |> Json.Encode.int )
+                                    , ( "edit"
+                                      , Json.Encode.LocalExtra.variant
+                                            (case editDomDiffAtPath.edit of
+                                                ReplacementAudioSpeed new ->
+                                                    { tag = "Speed", value = new |> audioParameterTimelineToJson }
 
-                                    ReplacementAudioVolume new ->
-                                        { tag = "Volume", value = new |> audioParameterTimelineToJson }
+                                                ReplacementAudioVolume new ->
+                                                    { tag = "Volume", value = new |> audioParameterTimelineToJson }
 
-                                    ReplacementAudioStereoPan new ->
-                                        { tag = "StereoPan", value = new |> audioParameterTimelineToJson }
+                                                ReplacementAudioStereoPan new ->
+                                                    { tag = "StereoPan", value = new |> audioParameterTimelineToJson }
 
-                                    ReplacementAudioProcessing new ->
-                                        { tag = "Processing"
-                                        , value = new |> Json.Encode.list audioProcessingToJson
-                                        }
-                                )
-                          )
-                        ]
+                                                ReplacementAudioProcessing new ->
+                                                    { tag = "Processing"
+                                                    , value = new |> Json.Encode.list audioProcessingToJson
+                                                    }
+                                            )
+                                      )
+                                    ]
+                            )
                 }
 
             EditNotification editNotificationDiff ->
@@ -3046,15 +3054,16 @@ interfacesDiffMap idAndDiffCombine interfaces =
             idAndDiffCombine removedId remove :: soFar
         )
         (\id old updated soFar ->
-            List.LocalExtra.appendFast
-                ({ old = old, updated = updated }
-                    |> interfaceSingleEditsMap
-                        (\edit -> idAndDiffCombine id (edit |> Edit))
-                )
-                soFar
+            case { old = old, updated = updated } |> interfaceSingleEdit of
+                Nothing ->
+                    soFar
+
+                Just edit ->
+                    idAndDiffCombine id (Edit edit)
+                        :: soFar
         )
         (\addedId onlyNew soFar ->
-            idAndDiffCombine addedId (onlyNew |> Add)
+            idAndDiffCombine addedId (Add onlyNew)
                 :: soFar
         )
         interfaces.old
@@ -3062,182 +3071,182 @@ interfacesDiffMap idAndDiffCombine interfaces =
         []
 
 
-interfaceSingleEditsMap :
-    (InterfaceSingleEdit -> fromSingeEdit)
-    -> { old : InterfaceSingle future, updated : InterfaceSingle future }
-    -> List fromSingeEdit
-interfaceSingleEditsMap fromSingeEdit interfaces =
+interfaceSingleEdit :
+    { old : InterfaceSingle future, updated : InterfaceSingle future }
+    -> Maybe InterfaceSingleEdit
+interfaceSingleEdit interfaces =
     case interfaces.old of
         DomNodeRender domElementPreviouslyRendered ->
             case interfaces.updated of
                 DomNodeRender domElementToRender ->
-                    { old = domElementPreviouslyRendered, updated = domElementToRender }
-                        |> domNodeDiffMap
-                            (\diff ->
-                                EditDom
-                                    { path = diff.path
-                                    , edit = diff.edit
+                    EditDom
+                        ({ old = domElementPreviouslyRendered, updated = domElementToRender }
+                            |> domNodeDiffMap
+                                (\diffAtPath ->
+                                    { path = diffAtPath.path
+                                    , edit = diffAtPath.edit
                                     }
-                                    |> fromSingeEdit
-                            )
-                        |> Rope.toList
+                                )
+                            |> Rope.toList
+                        )
+                        |> Just
 
                 _ ->
-                    []
+                    Nothing
 
         AudioPlay previouslyPlayed ->
             case interfaces.updated of
                 AudioPlay toPlay ->
-                    { old = previouslyPlayed, updated = toPlay }
-                        |> audioDiffMap
-                            (\diff ->
-                                EditAudio
+                    EditAudio
+                        ({ old = previouslyPlayed, updated = toPlay }
+                            |> audioDiffMap
+                                (\diff ->
                                     { url = toPlay.url
                                     , startTime = toPlay.startTime
                                     , edit = diff
                                     }
-                                    |> fromSingeEdit
-                            )
+                                )
+                        )
+                        |> Just
 
                 _ ->
-                    []
+                    Nothing
 
         NotificationShow _ ->
             case interfaces.updated of
                 NotificationShow toShow ->
-                    [ { id = toShow.id, message = toShow.message, details = toShow.details }
+                    { id = toShow.id, message = toShow.message, details = toShow.details }
                         |> EditNotification
-                        |> fromSingeEdit
-                    ]
+                        |> Just
 
                 _ ->
-                    []
+                    Nothing
 
         DocumentTitleReplaceBy _ ->
-            []
+            Nothing
 
         DocumentAuthorSet _ ->
-            []
+            Nothing
 
         DocumentKeywordsSet _ ->
-            []
+            Nothing
 
         DocumentDescriptionSet _ ->
-            []
+            Nothing
 
         DocumentEventListen _ ->
-            []
+            Nothing
 
         ConsoleLog _ ->
-            []
+            Nothing
 
         ConsoleWarn _ ->
-            []
+            Nothing
 
         ConsoleError _ ->
-            []
+            Nothing
 
         NavigationReplaceUrl _ ->
-            []
+            Nothing
 
         NavigationPushUrl _ ->
-            []
+            Nothing
 
         NavigationGo _ ->
-            []
+            Nothing
 
         NavigationLoad _ ->
-            []
+            Nothing
 
         NavigationReload () ->
-            []
+            Nothing
 
         NavigationUrlRequest _ ->
-            []
+            Nothing
 
         FileDownload _ ->
-            []
+            Nothing
 
         ClipboardReplaceBy _ ->
-            []
+            Nothing
 
         ClipboardRequest _ ->
-            []
+            Nothing
 
         AudioSourceLoad _ ->
-            []
+            Nothing
 
         NotificationAskForPermission () ->
-            []
+            Nothing
 
         HttpRequestSend _ ->
-            []
+            Nothing
 
         TimePosixRequest _ ->
-            []
+            Nothing
 
         TimezoneOffsetRequest _ ->
-            []
+            Nothing
 
         TimeOnce _ ->
-            []
+            Nothing
 
         TimePeriodicallyListen _ ->
-            []
+            Nothing
 
         TimezoneNameRequest _ ->
-            []
+            Nothing
 
         RandomUnsignedInt32sRequest _ ->
-            []
+            Nothing
 
         WindowSizeRequest _ ->
-            []
+            Nothing
 
         WindowPreferredLanguagesRequest _ ->
-            []
+            Nothing
 
         WindowEventListen _ ->
-            []
+            Nothing
 
         WindowVisibilityChangeListen _ ->
-            []
+            Nothing
 
         WindowAnimationFrameListen _ ->
-            []
+            Nothing
 
         WindowPreferredLanguagesChangeListen _ ->
-            []
+            Nothing
 
         SocketListen _ ->
-            []
+            Nothing
 
         SocketDataSend _ ->
-            []
+            Nothing
 
         LocalStorageSet _ ->
-            []
+            Nothing
 
         LocalStorageRequest _ ->
-            []
+            Nothing
 
         LocalStorageRemoveOnADifferentTabListen _ ->
-            []
+            Nothing
 
         LocalStorageSetOnADifferentTabListen _ ->
-            []
+            Nothing
 
         GeoLocationRequest _ ->
-            []
+            Nothing
 
         GeoLocationChangeListen _ ->
-            []
+            Nothing
 
         GamepadsRequest _ ->
-            []
+            Nothing
 
         GamepadsChangeListen _ ->
-            []
+            Nothing
 
 
 domNodeDiffMap :
@@ -3700,12 +3709,14 @@ type InterfaceSingleDiff irrelevantFuture
 describing changes to an existing interface with the same identity
 -}
 type InterfaceSingleEdit
-    = EditDom { path : List Int, edit : DomEdit }
+    = EditDom (List { path : List Int, edit : DomEdit })
     | EditAudio
-        { url : String
-        , startTime : Time.Posix
-        , edit : AudioEdit
-        }
+        (List
+            { url : String
+            , startTime : Time.Posix
+            , edit : AudioEdit
+            }
+        )
     | EditNotification { id : String, message : String, details : String }
 
 
