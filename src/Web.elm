@@ -1967,16 +1967,17 @@ programSubscriptions appConfig (State state) =
                                                 Json.Decode.field "eventData" eventDataDecoder
 
                                             Nothing ->
-                                                "interface did not expect any events" |> Json.Decode.fail
+                                                Json.Decode.fail "interface did not expect any events"
 
                                     Nothing ->
-                                        "no associated interface found among ids\n"
-                                            ++ (state.interface
-                                                    |> FastDict.toList
-                                                    |> List.map Tuple.first
-                                                    |> String.join "\n"
-                                               )
-                                            |> Json.Decode.fail
+                                        Json.Decode.fail
+                                            ("no associated interface found among ids\n"
+                                                ++ (state.interface
+                                                        |> FastDict.toList
+                                                        |> List.map Tuple.first
+                                                        |> String.join "\n"
+                                                   )
+                                            )
                             )
                         |> Json.Decode.map JsEventEnabledConstructionOfNewAppState
                     )
@@ -2047,7 +2048,9 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         ClipboardRequest toFuture ->
-            Json.Decode.string |> Json.Decode.map toFuture |> Just
+            Json.Decode.string
+                |> Json.Decode.map toFuture
+                |> Just
 
         AudioSourceLoad sourceLoad ->
             Json.Decode.LocalExtra.resultOkErr
@@ -2154,10 +2157,14 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         TimePosixRequest toFuture ->
-            Time.LocalExtra.posixJsonDecoder |> Json.Decode.map toFuture |> Just
+            Time.LocalExtra.posixJsonDecoder
+                |> Json.Decode.map toFuture
+                |> Just
 
         TimezoneOffsetRequest toFuture ->
-            Json.Decode.int |> Json.Decode.map toFuture |> Just
+            Json.Decode.int
+                |> Json.Decode.map toFuture
+                |> Just
 
         TimePeriodicallyListen periodicallyListen ->
             Time.LocalExtra.posixJsonDecoder
@@ -2170,7 +2177,9 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         TimezoneNameRequest toFuture ->
-            Json.Decode.string |> Json.Decode.map toFuture |> Just
+            Json.Decode.string
+                |> Json.Decode.map toFuture
+                |> Just
 
         RandomUnsignedInt32sRequest request ->
             Json.Decode.list Json.Decode.int
@@ -2191,10 +2200,14 @@ interfaceSingleFutureJsonDecoder interface =
             listen.on |> Just
 
         WindowVisibilityChangeListen toFuture ->
-            windowVisibilityJsonDecoder |> Json.Decode.map toFuture |> Just
+            windowVisibilityJsonDecoder
+                |> Json.Decode.map toFuture
+                |> Just
 
         WindowAnimationFrameListen toFuture ->
-            Time.LocalExtra.posixJsonDecoder |> Json.Decode.map toFuture |> Just
+            Time.LocalExtra.posixJsonDecoder
+                |> Json.Decode.map toFuture
+                |> Just
 
         WindowPreferredLanguagesChangeListen toFuture ->
             Json.Decode.list Json.Decode.string
@@ -2274,10 +2287,10 @@ urlJsonDecoder =
         (\urlString ->
             case urlString |> Url.fromString of
                 Nothing ->
-                    "invalid URL" |> Json.Decode.fail
+                    Json.Decode.fail "invalid URL"
 
                 Just urlParsed ->
-                    urlParsed |> Json.Decode.succeed
+                    Json.Decode.succeed urlParsed
         )
         Json.Decode.string
 
@@ -3262,14 +3275,6 @@ domNodeDiffMap :
     -> { old : DomNode future, updated : DomNode future }
     -> Rope fromDomEdit
 domNodeDiffMap fromDomEdit nodes =
-    {- TODO |> Rope.map
-       (\editAtPath ->
-           fromDomEdit
-               { path = editAtPath.path |> List.reverse
-               , edit = editAtPath.edit
-               }
-       )
-    -}
     domNodeDiffMapFrom Rope.empty
         fromDomEdit
         nodes
@@ -3289,10 +3294,12 @@ domNodeDiffMapFrom soFar fromDomEdit nodes =
                         |> Rope.append
                             ({ path = []
                              , edit =
-                                updatedElement
-                                    |> domElementFutureMap (\_ -> ())
-                                    |> DomElement
-                                    |> ReplacementDomNode
+                                ReplacementDomNode
+                                    (DomElement
+                                        (updatedElement
+                                            |> domElementFutureMap (\_ -> ())
+                                        )
+                                    )
                              }
                                 |> fromDomEdit
                             )
@@ -4642,10 +4649,10 @@ appUrlJsonDecoder =
             (\appUrlString ->
                 case appUrlString |> stringToAppUrl of
                     Nothing ->
-                        "invalid app-specific URL" |> Json.Decode.fail
+                        Json.Decode.fail "invalid app-specific URL"
 
                     Just appUrl ->
-                        appUrl |> Json.Decode.succeed
+                        Json.Decode.succeed appUrl
             )
 
 
