@@ -2084,12 +2084,23 @@ interfaceSingleFutureJsonDecoder interface =
                                                 )
 
                                         DomElement domElementTheEventIsFiredFor ->
+                                            {- The fact that this can only be implemented linearly might seem shocking.
+                                               In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
+                                            -}
                                             case
                                                 domElementTheEventIsFiredFor.header.eventListens
                                                     |> sortedKeyValueListGetAtStringKey specificEvent.name
                                             of
                                                 Nothing ->
-                                                    Json.Decode.fail "received event of a kind that isn't listened for"
+                                                    Json.Decode.fail
+                                                        ("received event of a kind that isn't listened for. The element only listened for ["
+                                                            ++ (domElementTheEventIsFiredFor.header.eventListens
+                                                                    |> sortedKeyValueListToList
+                                                                    |> List.map .key
+                                                                    |> String.join ", "
+                                                               )
+                                                            ++ "]"
+                                                        )
 
                                                 Just eventListen ->
                                                     Json.Decode.succeed (eventListen.on specificEvent.value)
@@ -2319,9 +2330,6 @@ localStorageSetOnADifferentTabEventJsonDecoder =
         (Json.Decode.field "newValue" Json.Decode.string)
 
 
-{-| The fact that this can only be implemented linearly might seem shocking.
-In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
--}
 sortedKeyValueListGetAtStringKey : String -> SortedKeyValueList String value -> Maybe value
 sortedKeyValueListGetAtStringKey keyToFind sortedKeyValueList =
     sortedKeyValueList
