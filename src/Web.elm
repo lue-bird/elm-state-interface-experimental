@@ -3704,8 +3704,7 @@ type InterfaceSingleEdit
     | EditAudio
         { url : String
         , startTime : Time.Posix
-        , -- TODO rename to edit
-          edit : AudioEdit
+        , edit : AudioEdit
         }
     | EditNotification { id : String, message : String, details : String }
 
