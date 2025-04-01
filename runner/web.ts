@@ -414,9 +414,9 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     ) {
         switch (edit.tag) {
             case "Node": {
-                realDomNodeToEdit.parentElement?.replaceChild(
-                    createDomNode(path, edit.value, sendToElm),
-                    realDomNodeToEdit
+                domListenAbortControllers.delete(JSON.stringify(path))
+                realDomNodeToEdit.replaceWith(
+                    createDomNode(path, edit.value, sendToElm)
                 )
                 break
             }
@@ -436,6 +436,9 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 if (realDomNodeToEdit instanceof Element) {
                     for (let counter = 0; counter <= edit.value - 1; counter++) {
                         if (realDomNodeToEdit.lastChild !== null) {
+                            domListenAbortControllers.delete(
+                                JSON.stringify([path, realDomNodeToEdit.childNodes.length - 1])
+                            )
                             realDomNodeToEdit.removeChild(realDomNodeToEdit.lastChild)
                         }
                     }
@@ -556,8 +559,11 @@ function editDomModifiers(
         }
         case "EventListens": {
             const pathAsString = JSON.stringify(path)
-            domListenAbortControllers.get(pathAsString)?.abort()
-            domListenAbortControllers.delete(pathAsString)
+            const domListenAbortController = domListenAbortControllers.get(pathAsString)
+            if (domListenAbortController !== undefined) {
+                domListenAbortController.abort()
+                domListenAbortControllers.delete(pathAsString)
+            }
             domElementAddEventListens(path, domElementToEdit, replacement.value, sendToElm)
             break
         }
@@ -726,30 +732,32 @@ function domElementAddEventListens(
     eventListens: { name: string, defaultActionHandling: "DefaultActionPrevent" | "DefaultActionExecute" }[],
     sendToElm: (v: any) => void
 ) {
-    const abortController: AbortController = new AbortController()
-    eventListens.forEach(eventListen => {
-        domElement.addEventListener(
-            eventListen.name,
-            (triggeredEvent) => {
-                sendToElm({
-                    tag: "EventListen", value: {
-                        name: eventListen.name,
-                        path: path,
-                        event: triggeredEvent
+    if (eventListens.length >= 1) {
+        const abortController: AbortController = new AbortController()
+        eventListens.forEach(eventListen => {
+            domElement.addEventListener(
+                eventListen.name,
+                (triggeredEvent) => {
+                    sendToElm({
+                        tag: "EventListen", value: {
+                            name: eventListen.name,
+                            path: path,
+                            event: triggeredEvent
+                        }
+                    })
+                    switch (eventListen.defaultActionHandling) {
+                        case "DefaultActionPrevent": {
+                            triggeredEvent.preventDefault()
+                            break
+                        }
+                        case "DefaultActionExecute": { break }
                     }
-                })
-                switch (eventListen.defaultActionHandling) {
-                    case "DefaultActionPrevent": {
-                        triggeredEvent.preventDefault()
-                        break
-                    }
-                    case "DefaultActionExecute": { break }
-                }
-            },
-            { signal: abortController.signal }
-        )
-    })
-    domListenAbortControllers.set(JSON.stringify(path), abortController)
+                },
+                { signal: abortController.signal }
+            )
+        })
+        domListenAbortControllers.set(JSON.stringify(path), abortController)
+    }
 }
 
 // copied and edited from https://github.com/elm/virtual-dom/blob/master/src/Elm/Kernel/VirtualDom.js
