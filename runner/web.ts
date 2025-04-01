@@ -132,7 +132,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 const createdRealDomNode = createDomNode([], node, sendToElm)
                 appConfig.domElement.appendChild(createdRealDomNode)
                 abortSignal.addEventListener("abort", _event => {
-                    domListenAbortControllers.clear()
+                    domListenAbortControllers = new WeakMap()
                     appConfig.domElement.removeChild(createdRealDomNode)
                 })
             }
@@ -414,7 +414,9 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     ) {
         switch (edit.tag) {
             case "Node": {
-                domListenAbortControllers.delete(JSON.stringify(path))
+                if (realDomNodeToEdit instanceof Element) {
+                    domListenAbortControllers.delete(realDomNodeToEdit)
+                }
                 realDomNodeToEdit.replaceWith(
                     createDomNode(path, edit.value, sendToElm)
                 )
@@ -436,9 +438,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 if (realDomNodeToEdit instanceof Element) {
                     for (let counter = 0; counter <= edit.value - 1; counter++) {
                         if (realDomNodeToEdit.lastChild !== null) {
-                            domListenAbortControllers.delete(
-                                JSON.stringify([path, realDomNodeToEdit.childNodes.length - 1])
-                            )
+                            domListenAbortControllers.delete(realDomNodeToEdit)
                             realDomNodeToEdit.removeChild(realDomNodeToEdit.lastChild)
                         }
                     }
@@ -470,14 +470,11 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
 
 
 const abortControllers: Map<string, AbortController> = new Map()
-// TODO currently, removing or replacing trees of dom nodes
-// can lead to domListenAbortControllers for already absent elements to be
-// preserved (memory leak). consider WeakMap<Element, AbortController> instead
-const domListenAbortControllers: Map<
-    // path, JSON stringified
-    string,
-    AbortController
-> = new Map()
+// if this was Map<path, AbortController>, removing or replacing trees of dom nodes
+// could lead to domListenAbortControllers for already absent elements to be
+// preserved (memory leak).
+// Also, let not const because WeakMap has no clear() method for reasons
+let domListenAbortControllers: WeakMap<Element, AbortController> = new WeakMap()
 const audioPlaying: Map<string, AudioPlaying> = new Map()
 
 const audioBuffers: Map<string, AudioBuffer> = new Map()
@@ -561,14 +558,13 @@ function editDomModifiers(
             break
         }
         case "EventListens": {
-            const pathAsString = JSON.stringify(path)
             // alternative: _.replaceWith(_.cloneNode(true))
             // https://developer.mozilla.org/en-US/docs/Web/API/Node/cloneNode
             // TODO figure out performance
-            const domListenAbortController = domListenAbortControllers.get(pathAsString)
+            const domListenAbortController = domListenAbortControllers.get(domElementToEdit)
             if (domListenAbortController !== undefined) {
                 domListenAbortController.abort()
-                domListenAbortControllers.delete(pathAsString)
+                domListenAbortControllers.delete(domElementToEdit)
             }
             domElementAddEventListens(path, domElementToEdit, replacement.value, sendToElm)
             break
@@ -762,7 +758,7 @@ function domElementAddEventListens(
                 { signal: abortController.signal }
             )
         })
-        domListenAbortControllers.set(JSON.stringify(path), abortController)
+        domListenAbortControllers.set(domElement, abortController)
     }
 }
 
