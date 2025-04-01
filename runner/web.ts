@@ -559,6 +559,9 @@ function editDomModifiers(
         }
         case "EventListens": {
             const pathAsString = JSON.stringify(path)
+            // alternative: _.replaceWith(_.cloneNode(true))
+            // https://developer.mozilla.org/en-US/docs/Web/API/Node/cloneNode
+            // TODO figure out performance
             const domListenAbortController = domListenAbortControllers.get(pathAsString)
             if (domListenAbortController !== undefined) {
                 domListenAbortController.abort()
