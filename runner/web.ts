@@ -467,13 +467,17 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
 
 
 const abortControllers: Map<string, AbortController> = new Map()
-const domListenAbortControllers: Map<string, AbortController[]> = new Map()
+const domListenAbortControllers: Map<
+    // path, JSON stringified
+    string,
+    AbortController
+> = new Map()
 const audioPlaying: Map<string, AudioPlaying> = new Map()
 
 const audioBuffers: Map<string, AudioBuffer> = new Map()
 let audioContext: AudioContext | null = null
 
-const sockets: Map<string, (WebSocket)> = new Map()
+const sockets: Map<string, WebSocket> = new Map()
 
 
 //// other helpers
@@ -552,9 +556,7 @@ function editDomModifiers(
         }
         case "EventListens": {
             const pathAsString = JSON.stringify(path)
-            domListenAbortControllers.get(pathAsString)?.forEach(abortController => {
-                abortController.abort()
-            })
+            domListenAbortControllers.get(pathAsString)?.abort()
             domListenAbortControllers.delete(pathAsString)
             domElementAddEventListens(path, domElementToEdit, replacement.value, sendToElm)
             break
@@ -724,32 +726,30 @@ function domElementAddEventListens(
     eventListens: { name: string, defaultActionHandling: "DefaultActionPrevent" | "DefaultActionExecute" }[],
     sendToElm: (v: any) => void
 ) {
-    const elementAbortControllers =
-        eventListens.map(eventListen => {
-            const abortController: AbortController = new AbortController()
-            domElement.addEventListener(
-                eventListen.name,
-                (triggeredEvent) => {
-                    sendToElm({
-                        tag: "EventListen", value: {
-                            name: eventListen.name,
-                            path: path,
-                            event: triggeredEvent
-                        }
-                    })
-                    switch (eventListen.defaultActionHandling) {
-                        case "DefaultActionPrevent": {
-                            triggeredEvent.preventDefault()
-                            break
-                        }
-                        case "DefaultActionExecute": { break }
+    const abortController: AbortController = new AbortController()
+    eventListens.forEach(eventListen => {
+        domElement.addEventListener(
+            eventListen.name,
+            (triggeredEvent) => {
+                sendToElm({
+                    tag: "EventListen", value: {
+                        name: eventListen.name,
+                        path: path,
+                        event: triggeredEvent
                     }
-                },
-                { signal: abortController.signal }
-            )
-            return abortController
-        })
-    domListenAbortControllers.set(JSON.stringify(path), elementAbortControllers)
+                })
+                switch (eventListen.defaultActionHandling) {
+                    case "DefaultActionPrevent": {
+                        triggeredEvent.preventDefault()
+                        break
+                    }
+                    case "DefaultActionExecute": { break }
+                }
+            },
+            { signal: abortController.signal }
+        )
+    })
+    domListenAbortControllers.set(JSON.stringify(path), abortController)
 }
 
 // copied and edited from https://github.com/elm/virtual-dom/blob/master/src/Elm/Kernel/VirtualDom.js
