@@ -5174,7 +5174,16 @@ domStyle key value =
 Use [`domModifierFutureMap`](#domModifierFutureMap) to wire this to a specific event.
 
 If you want to override the browser's default behavior for that event,
-use [`domListenToPreventingDefaultAction`](#domListenToPreventingDefaultAction)
+use [`domListenToPreventingDefaultAction`](#domListenToPreventingDefaultAction).
+
+Be aware that unlike default js behavior, this event will not be passed further
+to parent dom elements (instead, it "stops propagation"/"doesn't bubble").
+For example, if you have an element on top of some background frame
+and both listen to a click event, only the button will be notified.
+
+If you for reasons can't go without bubbling,
+please [tell me about it in an issue](https://github.com/lue-bird/elm-state-interface-experimental/issues/new)
+so I can make it more customizable or find alternatives.
 
 -}
 domListenTo : String -> DomModifier Json.Decode.Value

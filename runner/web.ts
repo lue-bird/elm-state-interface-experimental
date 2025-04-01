@@ -740,6 +740,7 @@ function domElementAddEventListens(
             domElement.addEventListener(
                 eventListen.name,
                 (triggeredEvent) => {
+                    triggeredEvent.stopPropagation()
                     sendToElm({
                         tag: "EventListen", value: {
                             name: eventListen.name,
@@ -755,7 +756,10 @@ function domElementAddEventListens(
                         case "DefaultActionExecute": { break }
                     }
                 },
-                { signal: abortController.signal }
+                {
+                    signal: abortController.signal,
+                    passive: eventListen.defaultActionHandling === "DefaultActionExecute"
+                }
             )
         })
         domListenAbortControllers.set(domElement, abortController)
