@@ -470,6 +470,9 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
 
 
 const abortControllers: Map<string, AbortController> = new Map()
+// TODO currently, removing or replacing trees of dom nodes
+// can lead to domListenAbortControllers for already absent elements to be
+// preserved (memory leak). consider WeakMap<Element, AbortController> instead
 const domListenAbortControllers: Map<
     // path, JSON stringified
     string,
