@@ -3035,7 +3035,7 @@ programUpdate appConfig event state =
                      ]
                         |> String.concat
                     )
-                        |> ConsoleError
+                        |> ConsoleWarn
               in
               idAndDiffToJson
                 (notifyOfBugInterface |> interfaceSingleToStructuredId |> StructuredId.toString)
