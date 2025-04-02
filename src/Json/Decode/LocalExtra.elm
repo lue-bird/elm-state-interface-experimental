@@ -21,7 +21,7 @@ choice variantDecoders =
                             )
                 of
                     Just valueDecoder ->
-                        valueDecoder
+                        Json.Decode.field "value" valueDecoder
 
                     Nothing ->
                         Json.Decode.fail
