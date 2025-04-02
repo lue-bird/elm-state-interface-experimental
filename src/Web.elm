@@ -693,7 +693,15 @@ type DefaultActionHandling
 -}
 interfaceBatch : List (Interface future) -> Interface future
 interfaceBatch interfaces =
-    interfaces |> List.foldl FastDict.union FastDict.empty
+    interfaces |> List.foldl interfaceBatch2 FastDict.empty
+
+
+{-| Combine 2 [`Interface`](#Interface)s into one.
+Equivalent to [`interfaceBatch [ a, b ]`](#interfaceBatch) but faster.
+-}
+interfaceBatch2 : Interface future -> Interface future -> Interface future
+interfaceBatch2 =
+    FastDict.union
 
 
 {-| Doing nothing as an [`Interface`](#Interface). These two examples are equivalent:
@@ -4037,11 +4045,11 @@ socketListenAndMaybeSend info =
             listenInterface
 
         Just dataToSend ->
-            [ listenInterface
-            , SocketDataSend { address = info.address, data = dataToSend }
-                |> interfaceFromSingle
-            ]
-                |> interfaceBatch
+            interfaceBatch2
+                listenInterface
+                (SocketDataSend { address = info.address, data = dataToSend }
+                    |> interfaceFromSingle
+                )
 
 
 {-| An [`Interface`](Web#Interface) for generating a given count of cryptographically sound unsigned 32-bit `Int`s.
