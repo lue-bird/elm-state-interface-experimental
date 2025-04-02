@@ -1070,18 +1070,18 @@ interfaceSingleEditToJson edit =
                             )
                 }
 
-            EditAudio audioEditAtPaths ->
+            EditAudio audioEdits ->
                 { tag = "EditAudio"
                 , value =
-                    audioEditAtPaths
-                        |> Json.Encode.list
-                            (\editDomDiffAtPath ->
-                                Json.Encode.object
-                                    [ ( "url", editDomDiffAtPath.url |> Json.Encode.string )
-                                    , ( "startTime", editDomDiffAtPath.startTime |> Time.posixToMillis |> Json.Encode.int )
-                                    , ( "edit"
-                                      , Json.Encode.LocalExtra.variant
-                                            (case editDomDiffAtPath.edit of
+                    Json.Encode.object
+                        [ ( "url", audioEdits.url |> Json.Encode.string )
+                        , ( "startTime", audioEdits.startTime |> Time.posixToMillis |> Json.Encode.int )
+                        , ( "edits"
+                          , audioEdits.edits
+                                |> Json.Encode.list
+                                    (\editDomDiffAtPath ->
+                                        Json.Encode.LocalExtra.variant
+                                            (case editDomDiffAtPath of
                                                 AudioEditSetSpeed new ->
                                                     { tag = "Speed", value = new |> audioParameterTimelineToJson }
 
@@ -1096,9 +1096,9 @@ interfaceSingleEditToJson edit =
                                                     , value = new |> Json.Encode.list audioProcessingToJson
                                                     }
                                             )
-                                      )
-                                    ]
-                            )
+                                    )
+                          )
+                        ]
                 }
 
             EditNotification editNotificationDiff ->
@@ -3131,15 +3131,12 @@ interfaceSingleEdit interfaces =
             case interfaces.updated of
                 AudioPlay toPlay ->
                     EditAudio
-                        ({ old = previouslyPlayed, updated = toPlay }
-                            |> audioDiffMap
-                                (\diff ->
-                                    { url = toPlay.url
-                                    , startTime = toPlay.startTime
-                                    , edit = diff
-                                    }
-                                )
-                        )
+                        { url = toPlay.url
+                        , startTime = toPlay.startTime
+                        , edits =
+                            { old = previouslyPlayed, updated = toPlay }
+                                |> audioDiff
+                        }
                         |> Just
 
                 _ ->
@@ -3653,16 +3650,15 @@ sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList
                                 (onlyB bLowest initialFolded)
 
 
-audioDiffMap :
-    (AudioEditSingle -> fromAudioEdit)
-    -> { old : Audio, updated : Audio }
-    -> List fromAudioEdit
-audioDiffMap fromAudioEdit audios =
+audioDiff :
+    { old : Audio, updated : Audio }
+    -> List AudioEditSingle
+audioDiff audios =
     (if audios.old.volume == audios.updated.volume then
         []
 
      else
-        [ AudioEditSetVolume audios.updated.volume |> fromAudioEdit ]
+        [ AudioEditSetVolume audios.updated.volume ]
     )
         |> List.LocalExtra.consJust
             (if audios.old.speed == audios.updated.speed then
@@ -3670,7 +3666,6 @@ audioDiffMap fromAudioEdit audios =
 
              else
                 AudioEditSetSpeed audios.updated.speed
-                    |> fromAudioEdit
                     |> Just
             )
         |> List.LocalExtra.consJust
@@ -3679,7 +3674,6 @@ audioDiffMap fromAudioEdit audios =
 
              else
                 AudioEditSetStereoPan audios.updated.stereoPan
-                    |> fromAudioEdit
                     |> Just
             )
         |> List.LocalExtra.consJust
@@ -3691,7 +3685,6 @@ audioDiffMap fromAudioEdit audios =
                     (audios.updated.processingLastToFirst
                         |> List.reverse
                     )
-                    |> fromAudioEdit
                     |> Just
             )
 
@@ -3738,13 +3731,12 @@ describing changes to an existing interface with the same identity
 type InterfaceSingleEdit
     = EditDom (List { path : List Int, edit : DomEditSingle })
     | EditAudio
-        -- TODO move url and startTime out of list
-        (List
-            { url : String
-            , startTime : Time.Posix
-            , edit : AudioEditSingle
-            }
-        )
+        { url : String
+        , startTime : Time.Posix
+        , edits :
+            List
+                AudioEditSingle
+        }
     | EditNotification { id : String, message : String, details : String }
 
 

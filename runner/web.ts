@@ -371,8 +371,8 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                     }
                 }
             }
-            case "EditAudio": return (config: Array<{ url: string, startTime: number, edit: AudioEdit }>) => {
-                for (const diffAtPath of config) {
+            case "EditAudio": return (config: { url: string, startTime: number, edits: Array<AudioEdit> }) => {
+                for (const diffAtPath of config.edits) {
                     editAudio(id, diffAtPath)
                 }
             }
@@ -998,23 +998,19 @@ type AudioEdit =
 
 function editAudio(
     id: string,
-    config: {
-        url: string,
-        startTime: number,
-        edit: AudioEdit
-    }
+    edit: AudioEdit
 ) {
     const audioPlayingToEdit = audioPlaying.get(id)
     if (audioPlayingToEdit !== undefined) {
-        switch (config.edit.tag) {
+        switch (edit.tag) {
             case "Volume": {
-                audioParameterTimelineApplyTo(audioPlayingToEdit.gainNode.gain, config.edit.value)
+                audioParameterTimelineApplyTo(audioPlayingToEdit.gainNode.gain, edit.value)
                 break
             } case "Speed": {
-                audioParameterTimelineApplyTo(audioPlayingToEdit.sourceNode.playbackRate, config.edit.value)
+                audioParameterTimelineApplyTo(audioPlayingToEdit.sourceNode.playbackRate, edit.value)
                 break
             } case "StereoPan": {
-                audioParameterTimelineApplyTo(audioPlayingToEdit.stereoPanNode.pan, config.edit.value)
+                audioParameterTimelineApplyTo(audioPlayingToEdit.stereoPanNode.pan, edit.value)
                 break
             } case "Processing": {
                 const audioContext = getOrInitializeAudioContext()
