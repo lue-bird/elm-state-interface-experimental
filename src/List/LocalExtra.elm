@@ -13,7 +13,7 @@ atIndex index sticks =
 
             head :: tail ->
                 if index <= 0 then
-                    head |> Just
+                    Just head
 
                 else
                     atIndex (index - 1) tail
