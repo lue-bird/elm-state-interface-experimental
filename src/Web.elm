@@ -2067,79 +2067,84 @@ interfaceSingleFutureJsonDecoder interface =
             Nothing
 
         DomNodeRender domNode ->
-            Json.Decode.oneOf
-                [ domEventListenEventJsonDecoder
-                    |> Json.Decode.andThen
-                        (\specificEvent ->
-                            case domNode |> domNodeAtPath specificEvent.path of
-                                Nothing ->
-                                    Json.Decode.fail
-                                        ("received event of a DOM node which can't be found at path "
-                                            ++ pathToDebugString specificEvent.path
-                                        )
-
-                                Just domNodeTheEventIsFiredFor ->
-                                    case domNodeTheEventIsFiredFor of
-                                        DomText _ ->
+            Json.Decode.LocalExtra.choice
+                [ { tag = "EventListen"
+                  , value =
+                        domEventListenEventJsonDecoder
+                            |> Json.Decode.andThen
+                                (\specificEvent ->
+                                    case domNode |> domNodeAtPath specificEvent.path of
+                                        Nothing ->
                                             Json.Decode.fail
-                                                ("received event of a DOM text (!) which confuses me, found at path "
+                                                ("received event of a DOM node which can't be found at path "
                                                     ++ pathToDebugString specificEvent.path
                                                 )
 
-                                        DomElement domElementTheEventIsFiredFor ->
-                                            {- The fact that this can only be implemented linearly might seem shocking.
-                                               In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
-                                            -}
-                                            case
-                                                domElementTheEventIsFiredFor.header.eventListens
-                                                    |> sortedKeyValueListGetAtStringKey specificEvent.name
-                                            of
-                                                Nothing ->
+                                        Just domNodeTheEventIsFiredFor ->
+                                            case domNodeTheEventIsFiredFor of
+                                                DomText _ ->
                                                     Json.Decode.fail
-                                                        ("received event of a kind that isn't listened for. The element only listened for ["
-                                                            ++ (domElementTheEventIsFiredFor.header.eventListens
-                                                                    |> sortedKeyValueListToList
-                                                                    |> List.map .key
-                                                                    |> String.join ", "
-                                                               )
-                                                            ++ "]"
+                                                        ("received event of a DOM text (!) which confuses me, found at path "
+                                                            ++ pathToDebugString specificEvent.path
                                                         )
 
-                                                Just eventListen ->
-                                                    Json.Decode.succeed (eventListen.on specificEvent.value)
-                        )
-                , Json.Decode.LocalExtra.variant "ScrollPositionRequest"
-                    domElementScrollPositionJsonDecoder
-                    |> Json.Decode.andThen
-                        (\specificEvent ->
-                            case domNode |> domNodeAtPath specificEvent.path of
-                                Nothing ->
-                                    Json.Decode.fail
-                                        ("received scroll position of a DOM node which can't be found at path "
-                                            ++ pathToDebugString specificEvent.path
-                                        )
+                                                DomElement domElementTheEventIsFiredFor ->
+                                                    {- The fact that this can only be implemented linearly might seem shocking.
+                                                       In reality, merging and creating a FastDict.Dict that gets thrown away after the next .get is way heavier (that's the theory at least).
+                                                    -}
+                                                    case
+                                                        domElementTheEventIsFiredFor.header.eventListens
+                                                            |> sortedKeyValueListGetAtStringKey specificEvent.name
+                                                    of
+                                                        Nothing ->
+                                                            Json.Decode.fail
+                                                                ("received event of a kind that isn't listened for. The element only listened for ["
+                                                                    ++ (domElementTheEventIsFiredFor.header.eventListens
+                                                                            |> sortedKeyValueListToList
+                                                                            |> List.map .key
+                                                                            |> String.join ", "
+                                                                       )
+                                                                    ++ "]"
+                                                                )
 
-                                Just domNodeTheEventIsFiredFor ->
-                                    case domNodeTheEventIsFiredFor of
-                                        DomText _ ->
+                                                        Just eventListen ->
+                                                            Json.Decode.succeed (eventListen.on specificEvent.value)
+                                )
+                  }
+                , { tag = "ScrollPositionRequest"
+                  , value =
+                        domElementScrollPositionJsonDecoder
+                            |> Json.Decode.andThen
+                                (\specificEvent ->
+                                    case domNode |> domNodeAtPath specificEvent.path of
+                                        Nothing ->
                                             Json.Decode.fail
-                                                ("received scroll position of a DOM text (!) which confuses me, found at path "
+                                                ("received scroll position of a DOM node which can't be found at path "
                                                     ++ pathToDebugString specificEvent.path
                                                 )
 
-                                        DomElement domElementTheEventIsFiredFor ->
-                                            case domElementTheEventIsFiredFor.header.scrollPositionRequest of
-                                                Nothing ->
-                                                    Json.Decode.fail "received scroll position that wasn't requested"
-
-                                                Just request ->
-                                                    Json.Decode.succeed
-                                                        (request
-                                                            { fromLeft = specificEvent.fromLeft
-                                                            , fromTop = specificEvent.fromTop
-                                                            }
+                                        Just domNodeTheEventIsFiredFor ->
+                                            case domNodeTheEventIsFiredFor of
+                                                DomText _ ->
+                                                    Json.Decode.fail
+                                                        ("received scroll position of a DOM text (!) which confuses me, found at path "
+                                                            ++ pathToDebugString specificEvent.path
                                                         )
-                        )
+
+                                                DomElement domElementTheEventIsFiredFor ->
+                                                    case domElementTheEventIsFiredFor.header.scrollPositionRequest of
+                                                        Nothing ->
+                                                            Json.Decode.fail "received scroll position that wasn't requested"
+
+                                                        Just request ->
+                                                            Json.Decode.succeed
+                                                                (request
+                                                                    { fromLeft = specificEvent.fromLeft
+                                                                    , fromTop = specificEvent.fromTop
+                                                                    }
+                                                                )
+                                )
+                  }
                 ]
                 |> Just
 
@@ -2302,18 +2307,16 @@ domEventListenEventJsonDecoder :
         , value : Json.Decode.Value
         }
 domEventListenEventJsonDecoder =
-    Json.Decode.LocalExtra.variant "EventListen"
-        (Json.Decode.map3
-            (\name path value ->
-                { name = name
-                , path = path
-                , value = value
-                }
-            )
-            (Json.Decode.field "name" Json.Decode.string)
-            (Json.Decode.field "path" (Json.Decode.list Json.Decode.int))
-            (Json.Decode.field "event" Json.Decode.value)
+    Json.Decode.map3
+        (\name path value ->
+            { name = name
+            , path = path
+            , value = value
+            }
         )
+        (Json.Decode.field "name" Json.Decode.string)
+        (Json.Decode.field "path" (Json.Decode.list Json.Decode.int))
+        (Json.Decode.field "event" Json.Decode.value)
 
 
 httpRequestSendEventJsonDecoder : Json.Decode.Decoder (Result HttpError Bytes)
@@ -2404,17 +2407,21 @@ notificationResponseJsonDecoder =
 
 socketEventJsonDecoder : Json.Decode.Decoder SocketEvent
 socketEventJsonDecoder =
-    Json.Decode.oneOf
-        [ Json.Decode.LocalExtra.variant "SocketOpened" (Json.Decode.null SocketOpened)
-        , Json.Decode.LocalExtra.variant "SocketDataReceived"
-            (Json.Decode.map SocketDataReceived
-                Json.Decode.string
-            )
-        , Json.Decode.LocalExtra.variant "SocketClosed"
-            (Json.Decode.map2 (\code reason -> SocketClosed { code = code, reason = reason })
-                (Json.Decode.field "code" Json.Decode.int)
-                (Json.Decode.field "reason" Json.Decode.string)
-            )
+    Json.Decode.LocalExtra.choice
+        [ { tag = "SocketOpened"
+          , value = Json.Decode.null SocketOpened
+          }
+        , { tag = "SocketDataReceived"
+          , value =
+                Json.Decode.map SocketDataReceived
+                    Json.Decode.string
+          }
+        , { tag = "SocketClosed"
+          , value =
+                Json.Decode.map2 (\code reason -> SocketClosed { code = code, reason = reason })
+                    (Json.Decode.field "code" Json.Decode.int)
+                    (Json.Decode.field "reason" Json.Decode.string)
+          }
         ]
 
 

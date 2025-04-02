@@ -1,19 +1,39 @@
-module Json.Decode.LocalExtra exposing (onlyString, resultOkErr, variant)
+module Json.Decode.LocalExtra exposing (choice, onlyString, resultOkErr)
 
 import Json.Decode
+import List.LocalExtra
 
 
-variant : String -> Json.Decode.Decoder value -> Json.Decode.Decoder value
-variant name valueJsonDecoder =
+choice : List { tag : String, value : Json.Decode.Decoder value } -> Json.Decode.Decoder value
+choice variantDecoders =
     Json.Decode.field "tag" Json.Decode.string
         |> Json.Decode.andThen
             (\tag ->
-                if tag == name then
-                    Json.Decode.field "value" valueJsonDecoder
+                case
+                    variantDecoders
+                        |> List.LocalExtra.firstJustMap
+                            (\variantDecoder ->
+                                if variantDecoder.tag == tag then
+                                    Just variantDecoder.value
 
-                else
-                    ("expected only \"" ++ name ++ "\"")
-                        |> Json.Decode.fail
+                                else
+                                    Nothing
+                            )
+                of
+                    Just valueDecoder ->
+                        valueDecoder
+
+                    Nothing ->
+                        Json.Decode.fail
+                            ("expected one of the following tags: "
+                                ++ (variantDecoders
+                                        |> List.map
+                                            (\variantDecoder ->
+                                                "\"" ++ variantDecoder.tag ++ "\""
+                                            )
+                                        |> String.join ", "
+                                   )
+                            )
             )
 
 
@@ -53,5 +73,5 @@ resultOkErr okJsonDecoder errJsonDecoder =
                         valueErrJsonDecoder
 
                     _ ->
-                        Json.Decode.fail "expected either Ok or Err"
+                        Json.Decode.fail "expected either \"Ok\" or \"Err\""
             )

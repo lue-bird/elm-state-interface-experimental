@@ -967,11 +967,16 @@ interfaceSingleFutureJsonDecoder interface =
 
 streamReadEventJsonDecoder : Json.Decode.Decoder StreamReadEvent
 streamReadEventJsonDecoder =
-    Json.Decode.oneOf
-        [ Json.Decode.map StreamDataReceived
-            (Json.Decode.LocalExtra.variant "StreamDataReceived" Json.Decode.string)
-        , Json.Decode.LocalExtra.variant "StreamDataEndReached"
-            (Json.Decode.null StreamDataEndReached)
+    Json.Decode.LocalExtra.choice
+        [ { tag = "StreamDataReceived"
+          , value =
+                Json.Decode.map StreamDataReceived
+                    Json.Decode.string
+          }
+        , { tag = "StreamDataEndReached"
+          , value =
+                Json.Decode.null StreamDataEndReached
+          }
         ]
 
 
@@ -1033,11 +1038,15 @@ directoryMakeResultJsonDecoder =
 
 fileChangeJsonDecoder : Json.Decode.Decoder FileChange
 fileChangeJsonDecoder =
-    Json.Decode.oneOf
-        [ Json.Decode.LocalExtra.variant "Removed"
-            (Json.Decode.map FileRemoved Json.Decode.string)
-        , Json.Decode.LocalExtra.variant "AddedOrChanged"
-            (Json.Decode.map FileAddedOrChanged Json.Decode.string)
+    Json.Decode.LocalExtra.choice
+        [ { tag = "Removed"
+          , value =
+                Json.Decode.map FileRemoved Json.Decode.string
+          }
+        , { tag = "AddedOrChanged"
+          , value =
+                Json.Decode.map FileAddedOrChanged Json.Decode.string
+          }
         ]
 
 
@@ -1083,37 +1092,43 @@ fileResultJsonDecoder =
 
 httpServerEventJsonDecoder : Json.Decode.Decoder HttpServerEvent
 httpServerEventJsonDecoder =
-    Json.Decode.oneOf
-        [ Json.Decode.LocalExtra.variant "HttpServerOpened"
-            (Json.Decode.null HttpServerOpened)
-        , Json.Decode.LocalExtra.variant "HttpRequestReceived"
-            (Json.Decode.map3
-                (\method headers data ->
-                    HttpRequestReceived { method = method, headers = headers, data = data }
-                )
-                (Json.Decode.field "method" Json.Decode.string)
-                (Json.Decode.field "headers"
-                    (Json.Decode.list
-                        (Json.Decode.map2 (\name value -> { name = name, value = value })
-                            (Json.Decode.field "name" Json.Decode.string)
-                            (Json.Decode.field "value" Json.Decode.string)
+    Json.Decode.LocalExtra.choice
+        [ { tag = "HttpServerOpened"
+          , value =
+                Json.Decode.null HttpServerOpened
+          }
+        , { tag = "HttpRequestReceived"
+          , value =
+                Json.Decode.map3
+                    (\method headers data ->
+                        HttpRequestReceived { method = method, headers = headers, data = data }
+                    )
+                    (Json.Decode.field "method" Json.Decode.string)
+                    (Json.Decode.field "headers"
+                        (Json.Decode.list
+                            (Json.Decode.map2 (\name value -> { name = name, value = value })
+                                (Json.Decode.field "name" Json.Decode.string)
+                                (Json.Decode.field "value" Json.Decode.string)
+                            )
                         )
                     )
-                )
-                (Json.Decode.field "dataAsciiString"
-                    (Json.Decode.map AsciiString.toBytes Json.Decode.string)
-                )
-            )
-        , Json.Decode.LocalExtra.variant "HttpResponseSent"
-            (Json.Decode.null HttpResponseSent)
-        , Json.Decode.LocalExtra.variant "HttpServerFailed"
-            (Json.Decode.map2
-                (\code message ->
-                    HttpServerFailed { code = code, message = message }
-                )
-                (Json.Decode.field "code" Json.Decode.string)
-                (Json.Decode.field "message" Json.Decode.string)
-            )
+                    (Json.Decode.field "dataAsciiString"
+                        (Json.Decode.map AsciiString.toBytes Json.Decode.string)
+                    )
+          }
+        , { tag = "HttpResponseSent"
+          , value =
+                Json.Decode.null HttpResponseSent
+          }
+        , { tag = "HttpServerFailed"
+          , value =
+                Json.Decode.map2
+                    (\code message ->
+                        HttpServerFailed { code = code, message = message }
+                    )
+                    (Json.Decode.field "code" Json.Decode.string)
+                    (Json.Decode.field "message" Json.Decode.string)
+          }
         ]
 
 
