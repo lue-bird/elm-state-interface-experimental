@@ -3,7 +3,7 @@ module Json.Decode.LocalExtra exposing (onlyString, resultOkErr, variant)
 import Json.Decode
 
 
-variant : String -> (Json.Decode.Decoder value -> Json.Decode.Decoder value)
+variant : String -> Json.Decode.Decoder value -> Json.Decode.Decoder value
 variant name valueJsonDecoder =
     Json.Decode.field "tag" Json.Decode.string
         |> Json.Decode.andThen
