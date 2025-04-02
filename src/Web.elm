@@ -4205,15 +4205,15 @@ httpRequestSend :
     }
     -> Interface (Result HttpError Bytes)
 httpRequestSend request =
-    { url = request.url
-    , method = request.method
-    , headers = request.headers
-    , bodyAsciiString =
-        request.body
-            |> Maybe.map AsciiString.fromBytes
-    , on = identity
-    }
-        |> HttpRequestSend
+    HttpRequestSend
+        { url = request.url
+        , method = request.method
+        , headers = request.headers
+        , bodyAsciiString =
+            request.body
+                |> Maybe.map AsciiString.fromBytes
+        , on = identity
+        }
         |> interfaceFromSingle
 
 
