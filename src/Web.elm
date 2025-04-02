@@ -3027,19 +3027,16 @@ programUpdate appConfig event state =
         JsEventFailedToDecode jsonError ->
             ( state
             , let
-                notifyOfBugInterface : InterfaceSingle never_
-                notifyOfBugInterface =
-                    ([ "bug: js event failed to decode: "
-                     , jsonError |> Json.Decode.errorToString
-                     , ". Please open an issue on github.com/lue-bird/elm-state-interface-experimental"
-                     ]
-                        |> String.concat
-                    )
-                        |> ConsoleWarn
+                notifyOfSkippedEventInterface : InterfaceSingle never_
+                notifyOfSkippedEventInterface =
+                    ConsoleLog
+                        ("js event skipped because: "
+                            ++ (jsonError |> Json.Decode.errorToString)
+                        )
               in
               idAndDiffToJson
-                (notifyOfBugInterface |> interfaceSingleToStructuredId |> StructuredId.toString)
-                (notifyOfBugInterface |> Add)
+                (notifyOfSkippedEventInterface |> interfaceSingleToStructuredId |> StructuredId.toString)
+                (notifyOfSkippedEventInterface |> Add)
                 |> appConfig.ports.toJs
             )
 
