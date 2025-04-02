@@ -43,11 +43,11 @@ onlyString specificAllowedString =
         |> Json.Decode.andThen
             (\str ->
                 if str == specificAllowedString then
-                    () |> Json.Decode.succeed
+                    Json.Decode.succeed ()
 
                 else
-                    ("expected only \"" ++ specificAllowedString ++ "\"")
-                        |> Json.Decode.fail
+                    Json.Decode.fail
+                        ("expected only \"" ++ specificAllowedString ++ "\"")
             )
 
 
