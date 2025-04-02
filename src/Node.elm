@@ -821,15 +821,17 @@ programSubscriptions appConfig (State state) =
                                                 Json.Decode.field "eventData" eventDataDecoder
 
                                             Nothing ->
-                                                "interface did not expect any events" |> Json.Decode.fail
+                                                Json.Decode.fail
+                                                    "interface did not expect any events"
 
                                     Nothing ->
-                                        "no associated interface found among ids\n"
-                                            ++ (state.interface
-                                                    |> FastDict.keys
-                                                    |> String.join "\n"
-                                               )
-                                            |> Json.Decode.fail
+                                        Json.Decode.fail
+                                            ("no associated interface found among ids\n"
+                                                ++ (state.interface
+                                                        |> FastDict.keys
+                                                        |> String.join "\n"
+                                                   )
+                                            )
                             )
                         |> Json.Decode.map JsEventEnabledConstructionOfNewAppState
                     )
