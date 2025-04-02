@@ -1,17 +1,7 @@
-module List.LocalExtra exposing (appendFast, atIndex, consJust, firstJustMap, foldUpIndexedFrom, fromMaybe, justsMapIndexed, mapAnyOrder)
+module List.LocalExtra exposing (atIndex, consJust, firstJustMap, foldUpIndexedFrom, fromMaybe, justsMapIndexed, mapAnyOrder)
 
 
-appendFast : List a -> List a -> List a
-appendFast listA listB =
-    case listA of
-        [] ->
-            listB
-
-        x :: xs ->
-            appendFast xs (x :: listB)
-
-
-atIndex : Int -> (List a -> Maybe a)
+atIndex : Int -> List a -> Maybe a
 atIndex index sticks =
     if index <= -1 then
         Nothing
@@ -44,12 +34,12 @@ firstJustMap elementToMaybeFound list =
                     Just found
 
 
-mapAnyOrder : (a -> b) -> (List a -> List b)
+mapAnyOrder : (a -> b) -> List a -> List b
 mapAnyOrder elementChange list =
     list |> mapAnyOrderOnto [] elementChange
 
 
-mapAnyOrderOnto : List b -> (a -> b) -> (List a -> List b)
+mapAnyOrderOnto : List b -> (a -> b) -> List a -> List b
 mapAnyOrderOnto soFar elementChange list =
     case list of
         [] ->
@@ -81,7 +71,7 @@ consJust maybeHead list =
             value :: list
 
 
-justsMapIndexed : (Int -> element -> Maybe value) -> (List element -> List value)
+justsMapIndexed : (Int -> element -> Maybe value) -> List element -> List value
 justsMapIndexed elementToMaybe list =
     list
         |> List.foldr
@@ -104,8 +94,9 @@ justsMapIndexed elementToMaybe list =
 
 foldUpIndexedFrom :
     folded
-    -> (Int -> element -> (folded -> folded))
-    -> (List element -> folded)
+    -> (Int -> element -> folded -> folded)
+    -> List element
+    -> folded
 foldUpIndexedFrom initialFolded reduce list =
     list
         |> List.foldl
