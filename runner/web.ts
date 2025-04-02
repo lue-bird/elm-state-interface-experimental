@@ -409,11 +409,11 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     function editDom(
         path: number[],
         realDomNodeToEdit: ChildNode,
-        edit: { tag: "Node" | "RemoveLastNSubs" | "AppendSubs" | "Styles" | "Attributes" | "AttributesNamespaced" | "StringProperties" | "BoolProperties" | "ScrollToPosition" | "ScrollToShow" | "ScrollPositionRequest" | "EventListens", value: any },
+        edit: { tag: "ReplaceNode" | "RemoveLastNSubs" | "AppendSubs" | "SetStyles" | "SetAttributes" | "SetAttributesNamespaced" | "SetStringProperties" | "SetBoolProperties" | "SetScrollToPosition" | "SetScrollToShow" | "RequestScrollPosition" | "SetEventListens", value: any },
         sendToElm: (v: any) => void
     ) {
         switch (edit.tag) {
-            case "Node": {
+            case "ReplaceNode": {
                 if (realDomNodeToEdit instanceof Element) {
                     domListenAbortControllers.delete(realDomNodeToEdit)
                 }
@@ -447,7 +447,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 }
                 break
             }
-            case "Styles": case "Attributes": case "AttributesNamespaced": case "StringProperties": case "BoolProperties": case "ScrollToPosition": case "ScrollToShow": case "ScrollPositionRequest": case "EventListens": {
+            case "SetStyles": case "SetAttributes": case "SetAttributesNamespaced": case "SetStringProperties": case "SetBoolProperties": case "SetScrollToPosition": case "SetScrollToShow": case "RequestScrollPosition": case "SetEventListens": {
                 if (realDomNodeToEdit instanceof Element) {
                     editDomModifiers(
                         path,
@@ -498,13 +498,13 @@ function editDomModifiers(
     path: Array<number>,
     domElementToEdit: Element,
     replacement: {
-        tag: "Styles" | "Attributes" | "AttributesNamespaced" | "StringProperties" | "BoolProperties" | "ScrollToPosition" | "ScrollToShow" | "ScrollPositionRequest" | "EventListens",
+        tag: "SetStyles" | "SetAttributes" | "SetAttributesNamespaced" | "SetStringProperties" | "SetBoolProperties" | "SetScrollToPosition" | "SetScrollToShow" | "RequestScrollPosition" | "SetEventListens",
         value: any
     },
     sendToElm: (v: any) => void
 ) {
     switch (replacement.tag) {
-        case "Styles": {
+        case "SetStyles": {
             if ((domElementToEdit instanceof HTMLElement) || (domElementToEdit instanceof SVGElement)) {
                 replacement.value.remove.forEach((styleKey: string) => {
                     domElementToEdit?.style.removeProperty(styleKey)
@@ -513,51 +513,51 @@ function editDomModifiers(
             }
             break
         }
-        case "Attributes": {
+        case "SetAttributes": {
             replacement.value.remove.forEach((attributeKey: string) => {
                 domElementToEdit.removeAttribute(attributeKey)
             })
             domElementAddAttributes(domElementToEdit, replacement.value.edit)
             break
         }
-        case "AttributesNamespaced": {
+        case "SetAttributesNamespaced": {
             replacement.value.remove.forEach((attributeNamespacedId: { namespace: string, key: string }) => {
                 domElementToEdit.removeAttributeNS(attributeNamespacedId.namespace, attributeNamespacedId.key)
             })
             domElementAddAttributesNamespaced(domElementToEdit, replacement.value.edit)
             break
         }
-        case "StringProperties": {
+        case "SetStringProperties": {
             replacement.value.remove.forEach((propertyKey: string) => {
                 (domElementToEdit as { [key: string]: any })[propertyKey] = ""
             })
             domElementSetStringProperties(domElementToEdit, replacement.value.edit)
             break
         }
-        case "BoolProperties": {
+        case "SetBoolProperties": {
             replacement.value.remove.forEach((propertyKey: string) => {
                 (domElementToEdit as { [key: string]: any })[propertyKey] = false
             })
             domElementSetBoolProperties(domElementToEdit, replacement.value.edit)
             break
         }
-        case "ScrollToPosition": {
+        case "SetScrollToPosition": {
             if (replacement.value !== null) {
                 domElementToEdit.scrollTo({ top: replacement.value.fromTop, left: replacement.value.fromLeft })
             }
             break
         }
-        case "ScrollToShow": {
+        case "SetScrollToShow": {
             if (replacement.value !== null) {
                 domElementToEdit.scrollIntoView({ inline: replacement.value.x, block: replacement.value.y })
             }
             break
         }
-        case "ScrollPositionRequest": {
+        case "RequestScrollPosition": {
             domElementAddScrollPositionRequest(path, domElementToEdit, sendToElm)
             break
         }
-        case "EventListens": {
+        case "SetEventListens": {
             // alternative: _.replaceWith(_.cloneNode(true))
             // https://developer.mozilla.org/en-US/docs/Web/API/Node/cloneNode
             // TODO figure out performance

@@ -1065,7 +1065,7 @@ interfaceSingleEditToJson edit =
                             (\editDomDiffAtPath ->
                                 Json.Encode.object
                                     [ ( "path", editDomDiffAtPath.path |> Json.Encode.list Json.Encode.int )
-                                    , ( "edit", editDomDiffAtPath.edit |> editDomDiffToJson )
+                                    , ( "edit", editDomDiffAtPath.edit |> domEditSingleToJson )
                                     ]
                             )
                 }
@@ -1082,16 +1082,16 @@ interfaceSingleEditToJson edit =
                                     , ( "edit"
                                       , Json.Encode.LocalExtra.variant
                                             (case editDomDiffAtPath.edit of
-                                                ReplacementAudioSpeed new ->
+                                                AudioEditSetSpeed new ->
                                                     { tag = "Speed", value = new |> audioParameterTimelineToJson }
 
-                                                ReplacementAudioVolume new ->
+                                                AudioEditSetVolume new ->
                                                     { tag = "Volume", value = new |> audioParameterTimelineToJson }
 
-                                                ReplacementAudioStereoPan new ->
+                                                AudioEditSetStereoPan new ->
                                                     { tag = "StereoPan", value = new |> audioParameterTimelineToJson }
 
-                                                ReplacementAudioProcessing new ->
+                                                AudioEditSetProcessing new ->
                                                     { tag = "Processing"
                                                     , value = new |> Json.Encode.list audioProcessingToJson
                                                     }
@@ -1113,25 +1113,25 @@ interfaceSingleEditToJson edit =
         )
 
 
-editDomDiffToJson : DomEdit -> Json.Encode.Value
-editDomDiffToJson replacementInEditDomDiff =
+domEditSingleToJson : DomEditSingle -> Json.Encode.Value
+domEditSingleToJson domEditSingle =
     Json.Encode.LocalExtra.variant
-        (case replacementInEditDomDiff of
-            ReplacementDomNode node ->
-                { tag = "Node", value = node |> domNodeToJson }
+        (case domEditSingle of
+            DomEditReplaceNode node ->
+                { tag = "ReplaceNode", value = node |> domNodeToJson }
 
-            ReplacementDomElementRemoveLastNSubs removeFromTheLastSubCount ->
+            DomEditRemoveLastNSubs removeFromTheLastSubCount ->
                 { tag = "RemoveLastNSubs"
                 , value = removeFromTheLastSubCount |> Json.Encode.int
                 }
 
-            ReplacementDomElementAppendSubs subNodesToAdd ->
+            DomEditAppendSubs subNodesToAdd ->
                 { tag = "AppendSubs"
                 , value = subNodesToAdd |> Json.Encode.list domNodeToJson
                 }
 
-            ReplacementDomElementStyles styles ->
-                { tag = "Styles"
+            DomEditSetStyles styles ->
+                { tag = "SetStyles"
                 , value =
                     Json.Encode.object
                         [ ( "remove", styles.remove |> Json.Encode.list Json.Encode.string )
@@ -1148,8 +1148,8 @@ editDomDiffToJson replacementInEditDomDiff =
                         ]
                 }
 
-            ReplacementDomElementAttributes attributes ->
-                { tag = "Attributes"
+            DomEditSetAttributes attributes ->
+                { tag = "SetAttributes"
                 , value =
                     Json.Encode.object
                         [ ( "remove", attributes.remove |> Json.Encode.list Json.Encode.string )
@@ -1166,8 +1166,8 @@ editDomDiffToJson replacementInEditDomDiff =
                         ]
                 }
 
-            ReplacementDomElementAttributesNamespaced attributesNamespaced ->
-                { tag = "AttributesNamespaced"
+            DomEditSetAttributesNamespaced attributesNamespaced ->
+                { tag = "SetAttributesNamespaced"
                 , value =
                     Json.Encode.object
                         [ ( "remove"
@@ -1194,8 +1194,8 @@ editDomDiffToJson replacementInEditDomDiff =
                         ]
                 }
 
-            ReplacementDomElementStringProperties stringProperties ->
-                { tag = "StringProperties"
+            DomEditSetStringProperties stringProperties ->
+                { tag = "SetStringProperties"
                 , value =
                     Json.Encode.object
                         [ ( "remove", stringProperties.remove |> Json.Encode.list Json.Encode.string )
@@ -1212,8 +1212,8 @@ editDomDiffToJson replacementInEditDomDiff =
                         ]
                 }
 
-            ReplacementDomElementBoolProperties boolProperties ->
-                { tag = "StringProperties"
+            DomEditSetBoolProperties boolProperties ->
+                { tag = "SetBoolProperties"
                 , value =
                     Json.Encode.object
                         [ ( "remove", boolProperties.remove |> Json.Encode.list Json.Encode.string )
@@ -1230,21 +1230,21 @@ editDomDiffToJson replacementInEditDomDiff =
                         ]
                 }
 
-            ReplacementDomElementScrollToPosition maybePosition ->
-                { tag = "ScrollToPosition"
+            DomEditSetScrollToPosition maybePosition ->
+                { tag = "SetScrollToPosition"
                 , value = maybePosition |> Json.Encode.LocalExtra.nullable domElementScrollPositionToJson
                 }
 
-            ReplacementDomElementScrollToShow alignment ->
-                { tag = "ScrollToShow"
+            DomEditSetScrollToShow alignment ->
+                { tag = "SetScrollToShow"
                 , value = alignment |> Json.Encode.LocalExtra.nullable domElementVisibilityAlignmentsToJson
                 }
 
-            ReplacementDomElementScrollPositionRequest () ->
-                { tag = "ScrollPositionRequest", value = Json.Encode.null }
+            DomEditRequestScrollPosition () ->
+                { tag = "RequestScrollPosition", value = Json.Encode.null }
 
-            ReplacementDomElementEventListens listens ->
-                { tag = "EventListens"
+            DomEditSetEventListens listens ->
+                { tag = "SetEventListens"
                 , value =
                     listens
                         |> Json.Encode.list
@@ -3283,7 +3283,7 @@ interfaceSingleEdit interfaces =
 
 
 domNodeDiffMap :
-    ({ path : List Int, edit : DomEdit } -> fromDomEdit)
+    ({ path : List Int, edit : DomEditSingle } -> fromDomEdit)
     -> { old : DomNode future, updated : DomNode future }
     -> Rope fromDomEdit
 domNodeDiffMap fromDomEdit nodes =
@@ -3294,7 +3294,7 @@ domNodeDiffMap fromDomEdit nodes =
 
 domNodeDiffMapFrom :
     Rope fromDomEdit
-    -> ({ path : List Int, edit : DomEdit } -> fromDomEdit)
+    -> ({ path : List Int, edit : DomEditSingle } -> fromDomEdit)
     -> { old : DomNode future, updated : DomNode future }
     -> Rope fromDomEdit
 domNodeDiffMapFrom soFar fromDomEdit nodes =
@@ -3306,7 +3306,7 @@ domNodeDiffMapFrom soFar fromDomEdit nodes =
                         |> Rope.append
                             ({ path = []
                              , edit =
-                                ReplacementDomNode
+                                DomEditReplaceNode
                                     (DomElement
                                         (updatedElement
                                             |> domElementFutureMap (\_ -> ())
@@ -3324,7 +3324,7 @@ domNodeDiffMapFrom soFar fromDomEdit nodes =
                         soFar
                             |> Rope.append
                                 ({ path = []
-                                 , edit = ReplacementDomNode (DomText updatedText)
+                                 , edit = DomEditReplaceNode (DomText updatedText)
                                  }
                                     |> fromDomEdit
                                 )
@@ -3335,7 +3335,7 @@ domNodeDiffMapFrom soFar fromDomEdit nodes =
                     soFar
                         |> Rope.append
                             ({ path = []
-                             , edit = ReplacementDomNode (DomText textContent)
+                             , edit = DomEditReplaceNode (DomText textContent)
                              }
                                 |> fromDomEdit
                             )
@@ -3346,7 +3346,7 @@ domNodeDiffMapFrom soFar fromDomEdit nodes =
                             |> Rope.append
                                 ({ path = []
                                  , edit =
-                                    ReplacementDomNode
+                                    DomEditReplaceNode
                                         (DomElement
                                             (updatedElement
                                                 |> domElementFutureMap (\_ -> ())
@@ -3380,7 +3380,7 @@ domSubNodesDiffMapAtParentPathFromIndexAndSoFar :
     List Int
     -> Int
     -> Rope fromDomEdit
-    -> ({ path : List Int, edit : DomEdit } -> fromDomEdit)
+    -> ({ path : List Int, edit : DomEditSingle } -> fromDomEdit)
     ->
         { old : List (DomNode future)
         , updated : List (DomNode future)
@@ -3399,7 +3399,7 @@ domSubNodesDiffMapAtParentPathFromIndexAndSoFar parentPath index soFar fromDomEd
                             (fromDomEdit
                                 { path = parentPath
                                 , edit =
-                                    ReplacementDomElementAppendSubs
+                                    DomEditAppendSubs
                                         ((updatedSubHead :: updatedSubsTail)
                                             |> List.map (\sub -> sub |> domFutureMap (\_ -> ()))
                                         )
@@ -3414,7 +3414,7 @@ domSubNodesDiffMapAtParentPathFromIndexAndSoFar parentPath index soFar fromDomEd
                             (fromDomEdit
                                 { path = parentPath
                                 , edit =
-                                    ReplacementDomElementRemoveLastNSubs
+                                    DomEditRemoveLastNSubs
                                         (1 + (oldSubsTail |> List.length))
                                 }
                             )
@@ -3437,41 +3437,41 @@ domSubNodesDiffMapAtParentPathFromIndexAndSoFar parentPath index soFar fromDomEd
 
 
 domElementHeaderDiffMap :
-    (DomEdit -> fromDomEdit)
+    (DomEditSingle -> fromDomEdit)
     -> { old : DomElementHeader future, updated : DomElementHeader future }
     -> List fromDomEdit
 domElementHeaderDiffMap fromDomEdit elements =
     { old = elements.old.styles, updated = elements.updated.styles }
         |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-            (\d -> d |> ReplacementDomElementStyles |> fromDomEdit)
+            (\d -> d |> DomEditSetStyles |> fromDomEdit)
             Basics.identity
             Basics.identity
         |> List.LocalExtra.fromMaybe
         |> List.LocalExtra.consJust
             ({ old = elements.old.attributes, updated = elements.updated.attributes }
                 |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                    (\d -> d |> ReplacementDomElementAttributes |> fromDomEdit)
+                    (\d -> d |> DomEditSetAttributes |> fromDomEdit)
                     Basics.identity
                     Basics.identity
             )
         |> List.LocalExtra.consJust
             ({ old = elements.old.attributesNamespaced, updated = elements.updated.attributesNamespaced }
                 |> sortedKeyValueListEditAndRemoveDiffMapBy namespacedKeyToComparable
-                    (\d -> d |> ReplacementDomElementAttributesNamespaced |> fromDomEdit)
+                    (\d -> d |> DomEditSetAttributesNamespaced |> fromDomEdit)
                     (\entry -> { namespace = entry.key.namespace, key = entry.key.key, value = entry.value })
                     (\k -> { namespace = k.namespace, key = k.key })
             )
         |> List.LocalExtra.consJust
             ({ old = elements.old.stringProperties, updated = elements.updated.stringProperties }
                 |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                    (\d -> d |> ReplacementDomElementStringProperties |> fromDomEdit)
+                    (\d -> d |> DomEditSetStringProperties |> fromDomEdit)
                     Basics.identity
                     Basics.identity
             )
         |> List.LocalExtra.consJust
             ({ old = elements.old.boolProperties, updated = elements.updated.boolProperties }
                 |> sortedKeyValueListEditAndRemoveDiffMapBy Basics.identity
-                    (\d -> d |> ReplacementDomElementBoolProperties |> fromDomEdit)
+                    (\d -> d |> DomEditSetBoolProperties |> fromDomEdit)
                     Basics.identity
                     Basics.identity
             )
@@ -3480,7 +3480,7 @@ domElementHeaderDiffMap fromDomEdit elements =
                 Nothing
 
              else
-                ReplacementDomElementScrollToPosition elements.updated.scrollToPosition
+                DomEditSetScrollToPosition elements.updated.scrollToPosition
                     |> fromDomEdit
                     |> Just
             )
@@ -3489,7 +3489,7 @@ domElementHeaderDiffMap fromDomEdit elements =
                 Nothing
 
              else
-                ReplacementDomElementScrollToShow elements.updated.scrollToShow
+                DomEditSetScrollToShow elements.updated.scrollToShow
                     |> fromDomEdit
                     |> Just
             )
@@ -3532,15 +3532,15 @@ domElementHeaderDiffMap fromDomEdit elements =
                 Nothing
 
              else
-                ReplacementDomElementEventListens updatedElementEventListensId
+                DomEditSetEventListens updatedElementEventListensId
                     |> fromDomEdit
                     |> Just
             )
 
 
-replacementDomElementScrollPositionRequest : DomEdit
+replacementDomElementScrollPositionRequest : DomEditSingle
 replacementDomElementScrollPositionRequest =
-    ReplacementDomElementScrollPositionRequest ()
+    DomEditRequestScrollPosition ()
 
 
 sortedKeyValueListEditAndRemoveDiffMapBy :
@@ -3654,7 +3654,7 @@ sortedKeyValueListMergeBy keyToComparable onlyA bothAB onlyB aSortedKeyValueList
 
 
 audioDiffMap :
-    (AudioEdit -> fromAudioEdit)
+    (AudioEditSingle -> fromAudioEdit)
     -> { old : Audio, updated : Audio }
     -> List fromAudioEdit
 audioDiffMap fromAudioEdit audios =
@@ -3662,14 +3662,14 @@ audioDiffMap fromAudioEdit audios =
         []
 
      else
-        [ ReplacementAudioVolume audios.updated.volume |> fromAudioEdit ]
+        [ AudioEditSetVolume audios.updated.volume |> fromAudioEdit ]
     )
         |> List.LocalExtra.consJust
             (if audios.old.speed == audios.updated.speed then
                 Nothing
 
              else
-                ReplacementAudioSpeed audios.updated.speed
+                AudioEditSetSpeed audios.updated.speed
                     |> fromAudioEdit
                     |> Just
             )
@@ -3678,7 +3678,7 @@ audioDiffMap fromAudioEdit audios =
                 Nothing
 
              else
-                ReplacementAudioStereoPan audios.updated.stereoPan
+                AudioEditSetStereoPan audios.updated.stereoPan
                     |> fromAudioEdit
                     |> Just
             )
@@ -3687,7 +3687,7 @@ audioDiffMap fromAudioEdit audios =
                 Nothing
 
              else
-                ReplacementAudioProcessing
+                AudioEditSetProcessing
                     (audios.updated.processingLastToFirst
                         |> List.reverse
                     )
@@ -3736,24 +3736,25 @@ type InterfaceSingleDiff irrelevantFuture
 describing changes to an existing interface with the same identity
 -}
 type InterfaceSingleEdit
-    = EditDom (List { path : List Int, edit : DomEdit })
+    = EditDom (List { path : List Int, edit : DomEditSingle })
     | EditAudio
+        -- TODO move url and startTime out of list
         (List
             { url : String
             , startTime : Time.Posix
-            , edit : AudioEdit
+            , edit : AudioEditSingle
             }
         )
     | EditNotification { id : String, message : String, details : String }
 
 
-{-| What parts of an [`Audio`](#Audio) are replaced
+{-| Changes to an individual aspect of an [`Audio`](#Audio)
 -}
-type AudioEdit
-    = ReplacementAudioVolume AudioParameterTimeline
-    | ReplacementAudioSpeed AudioParameterTimeline
-    | ReplacementAudioStereoPan AudioParameterTimeline
-    | ReplacementAudioProcessing (List AudioProcessing)
+type AudioEditSingle
+    = AudioEditSetVolume AudioParameterTimeline
+    | AudioEditSetSpeed AudioParameterTimeline
+    | AudioEditSetStereoPan AudioParameterTimeline
+    | AudioEditSetProcessing (List AudioProcessing)
 
 
 {-| Some kind of sound we want to play. To create `Audio`, start with [`Web.audioFromSource`](Web#audioFromSource)
@@ -3816,19 +3817,19 @@ type alias AudioParameterTimeline =
 
 {-| What parts of a node are replaced. Either all modifiers of a certain kind or the whole node
 -}
-type DomEdit
-    = ReplacementDomNode (DomNode ())
-    | ReplacementDomElementAppendSubs (List (DomNode ()))
-    | ReplacementDomElementRemoveLastNSubs Int
-    | ReplacementDomElementStyles { edit : List { key : String, value : String }, remove : List String }
-    | ReplacementDomElementAttributes { edit : List { key : String, value : String }, remove : List String }
-    | ReplacementDomElementAttributesNamespaced { edit : List { namespace : String, key : String, value : String }, remove : List { namespace : String, key : String } }
-    | ReplacementDomElementStringProperties { edit : List { key : String, value : String }, remove : List String }
-    | ReplacementDomElementBoolProperties { edit : List { key : String, value : Bool }, remove : List String }
-    | ReplacementDomElementScrollToPosition (Maybe { fromLeft : Float, fromTop : Float })
-    | ReplacementDomElementScrollToShow (Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment })
-    | ReplacementDomElementScrollPositionRequest ()
-    | ReplacementDomElementEventListens (List { key : String, value : DefaultActionHandling })
+type DomEditSingle
+    = DomEditReplaceNode (DomNode ())
+    | DomEditAppendSubs (List (DomNode ()))
+    | DomEditRemoveLastNSubs Int
+    | DomEditSetStyles { edit : List { key : String, value : String }, remove : List String }
+    | DomEditSetAttributes { edit : List { key : String, value : String }, remove : List String }
+    | DomEditSetAttributesNamespaced { edit : List { namespace : String, key : String, value : String }, remove : List { namespace : String, key : String } }
+    | DomEditSetStringProperties { edit : List { key : String, value : String }, remove : List String }
+    | DomEditSetBoolProperties { edit : List { key : String, value : Bool }, remove : List String }
+    | DomEditSetScrollToPosition (Maybe { fromLeft : Float, fromTop : Float })
+    | DomEditSetScrollToShow (Maybe { x : DomElementVisibilityAlignment, y : DomElementVisibilityAlignment })
+    | DomEditRequestScrollPosition ()
+    | DomEditSetEventListens (List { key : String, value : DefaultActionHandling })
 
 
 {-| Create a [`Program`](#Program):
