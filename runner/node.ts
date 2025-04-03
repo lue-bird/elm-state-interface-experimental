@@ -6,7 +6,6 @@ import * as child_process from "node:child_process"
 // https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/57677
 import { default as process } from "node:process"
 import { Buffer } from "node:buffer"
-import { warn } from "node:console"
 
 
 export interface ElmPorts {
@@ -381,10 +380,22 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         detached: false,
                     }
                 )
-                subProcesses.set(subProcessKey(config), subProcess)
 
-                subProcess.addListener("exit", (code) => {
+                const subProcessAssociatedKey = subProcessKey(config)
+
+                subProcesses.set(subProcessAssociatedKey, subProcess)
+
+                function exitListen(code: number) {
                     sendToElm({ tag: "SubProcessExited", value: code })
+                }
+                subProcess.addListener("exit", exitListen)
+
+                subProcess.addListener("error", (error) => {
+                    if (abortSignal.aborted) {
+                        // error is expected due to abort
+                    } else {
+                        warn("sub-process failed: " + error.message)
+                    }
                 })
 
                 function standardErrorDataListen(buffer: Buffer) {
@@ -418,10 +429,12 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 subProcess.stdout.addListener("end", standardOutEndListen)
 
                 abortSignal.addEventListener("abort", (_event) => {
+                    subProcess.removeListener("exit", exitListen)
                     subProcess.stderr.removeListener("data", standardErrorDataListen)
                     subProcess.stderr.removeListener("end", standardErrorEndListen)
                     subProcess.stderr.removeListener("data", standardOutDataListen)
                     subProcess.stderr.removeListener("end", standardOutEndListen)
+                    subProcesses.delete(subProcessAssociatedKey)
                 })
             }
             case "SubProcessStandardInWrite": return (config: {
@@ -647,7 +660,9 @@ function bytesToAsciiString(bytes: Uint8Array): string {
 }
 
 
-
+function warn(warning: string) {
+    console.warn(warning + " (lue-bird/elm-state-interface-experimental)")
+}
 function notifyOfUnknownMessageKind(messageTag: string) {
     notifyOfBug("unknown message kind " + messageTag + " from elm. The associated js implementation is missing")
 }
