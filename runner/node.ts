@@ -143,6 +143,11 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     sendToElm(process.argv)
                 })
             }
+            case "EnvironmentVariablesRequest": return (_config: null) => {
+                queueAbortable(abortSignal, () => {
+                    sendToElm(process.env)
+                })
+            }
             case "Exit": return (code: number) => {
                 process.exitCode = code
             }

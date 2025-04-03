@@ -3,7 +3,7 @@ module Node exposing
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
-    , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
+    , workingDirectoryPathRequest, launchArgumentsRequest, environmentVariablesRequest, processTitleSet, exit
     , standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent(..)
     , terminalSizeRequest, terminalSizeChangeListen
     , subProcessSpawn, SubProcessEvent(..)
@@ -44,7 +44,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 ## process and terminal
 
-@docs workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
+@docs workingDirectoryPathRequest, launchArgumentsRequest, environmentVariablesRequest, processTitleSet, exit
 @docs standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent
 @docs terminalSizeRequest, terminalSizeChangeListen
 @docs subProcessSpawn, SubProcessEvent
@@ -193,6 +193,7 @@ To create one, use the helpers in [time](#time), [HTTP](#http) etc.
 type InterfaceSingle future
     = WorkingDirectoryPathRequest (String -> future)
     | LaunchArgumentsRequest (List String -> future)
+    | EnvironmentVariablesRequest (Dict.Dict String String -> future)
     | ProcessTitleSet String
     | StandardOutWrite String
     | StandardErrWrite String
@@ -483,6 +484,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         LaunchArgumentsRequest on ->
             LaunchArgumentsRequest (\arguments -> on arguments |> futureChange)
 
+        EnvironmentVariablesRequest on ->
+            EnvironmentVariablesRequest (\environmentVariables -> on environmentVariables |> futureChange)
+
         TerminalSizeRequest on ->
             TerminalSizeRequest (\size -> on size |> futureChange)
 
@@ -666,6 +670,9 @@ interfaceSingleToJson interfaceSingle =
             LaunchArgumentsRequest _ ->
                 { tag = "LaunchArgumentsRequest", value = Json.Encode.null }
 
+            EnvironmentVariablesRequest _ ->
+                { tag = "EnvironmentVariablesRequest", value = Json.Encode.null }
+
             TerminalSizeRequest _ ->
                 { tag = "TerminalSizeRequest", value = Json.Encode.null }
 
@@ -726,6 +733,11 @@ environmentVariablesToJson environmentVariables =
         |> Json.Encode.dict
             Basics.identity
             Json.Encode.string
+
+
+environmentVariablesJsonDecoder : Json.Decode.Decoder (Dict.Dict String String)
+environmentVariablesJsonDecoder =
+    Json.Decode.dict Json.Decode.string
 
 
 interfaceSingleToStructuredId : InterfaceSingle future_ -> StructuredId
@@ -833,6 +845,9 @@ interfaceSingleToStructuredId interfaceSingle =
 
             LaunchArgumentsRequest _ ->
                 { tag = "LaunchArgumentsRequest", value = StructuredId.ofUnit }
+
+            EnvironmentVariablesRequest _ ->
+                { tag = "EnvironmentVariablesRequest", value = StructuredId.ofUnit }
 
             TerminalSizeRequest _ ->
                 { tag = "TerminalSizeRequest", value = StructuredId.ofUnit }
@@ -1041,6 +1056,11 @@ interfaceSingleFutureJsonDecoder interface =
 
         LaunchArgumentsRequest on ->
             launchArgumentsJsonDecoder
+                |> Json.Decode.map on
+                |> Just
+
+        EnvironmentVariablesRequest on ->
+            environmentVariablesJsonDecoder
                 |> Json.Decode.map on
                 |> Just
 
@@ -1591,7 +1611,7 @@ timePeriodicallyListen intervalDuration =
         |> interfaceFromSingle
 
 
-{-| Very gracefully stop the process,
+{-| An [`Interface`](Node#Interface) for very gracefully stopping the process,
 completing all other current interface operations.
 Do not keep listens in the interface,
 otherwise the process will not die.
@@ -1612,7 +1632,7 @@ exit code =
         |> interfaceFromSingle
 
 
-{-| Replace the title of the running process.
+{-| An [`Interface`](Node#Interface) for replacing the title of the running process.
 This will usually display in the title bar of your terminal emulator or in activity monitors.
 
 Uses [`process.title = ...`](https://nodejs.org/api/process.html#processtitle)
@@ -1635,8 +1655,7 @@ workingDirectoryPathRequest =
         |> interfaceFromSingle
 
 
-{-| An [`Interface`](Node#Interface) for getting
-the command-line arguments passed when the Node.js process was launched.
+{-| An [`Interface`](Node#Interface) for getting the command-line arguments passed when the Node.js process was launched.
 
 For example, running
 
@@ -1661,6 +1680,16 @@ Uses [`process.argv`](https://nodejs.org/api/process.html#processargv)
 launchArgumentsRequest : Interface (List String)
 launchArgumentsRequest =
     LaunchArgumentsRequest identity
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Node#Interface) for getting the user's environment properties set for the process.
+
+Uses [`process.env`](https://nodejs.org/api/process.html#processenv)
+-}
+environmentVariablesRequest : Interface (Dict.Dict String String)
+environmentVariablesRequest =
+    EnvironmentVariablesRequest identity
         |> interfaceFromSingle
 
 
@@ -1773,7 +1802,7 @@ directorySubPathsRequest path =
 You can use these in all kinds of packages that allow creating an initial seed
 from ints like [NoRedInk/elm-random-pcg-extended](https://dark.elm.dmy.fr/packages/NoRedInk/elm-random-pcg-extended/latest/Random-Pcg-Extended#initialSeed)
 
-Note: uses [`crypto.getRandomValues`](https://nodejs.org/api/crypto.html#cryptogetrandomvaluestypedarray)
+Uses [`crypto.getRandomValues`](https://nodejs.org/api/crypto.html#cryptogetrandomvaluestypedarray)
 
 -}
 randomUnsignedInt32sRequest : Int -> Interface (List Int)
@@ -1858,16 +1887,16 @@ httpRequestListenAndMaybeRespond info =
             listenInterface
 
         Just response ->
-            [ listenInterface
-            , HttpResponseSend
-                { portNumber = info.portNumber
-                , statusCode = response.statusCode
-                , headers = response.headers
-                , dataAsciiString = response.data |> AsciiString.fromBytes
-                }
-                |> interfaceFromSingle
-            ]
-                |> interfaceBatch
+            interfaceBatch2
+                listenInterface
+                (HttpResponseSend
+                    { portNumber = info.portNumber
+                    , statusCode = response.statusCode
+                    , headers = response.headers
+                    , dataAsciiString = response.data |> AsciiString.fromBytes
+                    }
+                    |> interfaceFromSingle
+                )
 
 
 {-| An [`Interface`](Web#Interface) for sending an HTTP request
@@ -1936,15 +1965,15 @@ httpRequestSend :
     }
     -> Interface (Result HttpError Bytes)
 httpRequestSend request =
-    { url = request.url
-    , method = request.method
-    , headers = request.headers
-    , bodyAsciiString =
-        request.body
-            |> Maybe.map AsciiString.fromBytes
-    , on = identity
-    }
-        |> HttpRequestSend
+    HttpRequestSend
+        { url = request.url
+        , method = request.method
+        , headers = request.headers
+        , bodyAsciiString =
+            request.body
+                |> Maybe.map AsciiString.fromBytes
+        , on = identity
+        }
         |> interfaceFromSingle
 
 
@@ -1971,7 +2000,7 @@ type HttpError
         }
 
 
-{-| Read text from standard in.
+{-| An [`Interface`](Node#Interface) for reading text from standard in.
 If you want to intercept input before enter is sent,
 use [`Node.standardInRawListen`](#standardInRawListen)
 
@@ -1984,7 +2013,7 @@ standardInListen =
         |> interfaceFromSingle
 
 
-{-| Read text from standard in, regardless of linebreaks.
+{-| An [`Interface`](Node#Interface) for reading text from standard in, regardless of linebreaks.
 
 When used as a terminal interface, user input is read character by character (except modifiers)
 as [`StreamDataReceived`](#StreamReadEvent) events.
@@ -2061,7 +2090,7 @@ terminalSizeChangeListen =
         |> interfaceFromSingle
 
 
-{-| Open and interact with a new process.
+{-| An [`Interface`](Node#Interface) for opening and interacting with a new process.
 
     Node.subProcessSpawn
         { command = "elm"
@@ -2080,7 +2109,7 @@ If you want to inherit parts of the environment variables and working directory 
 store and explicitly pass from [`environmentVariablesRequest`](#environmentVariablesRequest)
 and [`workingDirectoryPathRequest`](#workingDirectoryPathRequest)
 
-Note: uses [`child_process.spawn`](https://nodejs.org/api/child_process.html#child_processspawncommand-args-options)
+Uses [`child_process.spawn`](https://nodejs.org/api/child_process.html#child_processspawncommand-args-options)
 -}
 subProcessSpawn :
     { command : String
