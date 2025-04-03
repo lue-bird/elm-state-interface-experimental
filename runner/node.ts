@@ -35,7 +35,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
         appConfig.ports.toJs.unsubscribe(listenToElm)
         showCursor()
     })
-    function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Edit" | "Remove", value: any } }) {
+    function listenToElm(fromElm: { id: string, diff: { tag: "Add" | "Remove", value: any } }) {
         // uncomment for debugging
         // (process.stdout as any)?._handle?.setBlocking(true) // make log sync https://github.com/nodejs/node/issues/11568#issuecomment-282765300
         // console.log("elm → js: ", fromElm)
@@ -50,7 +50,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
         interfaceDiffImplementation(fromElm.diff.tag, sendToElm, fromElm.id)(fromElm.diff.value)
     }
     appConfig.ports.toJs.subscribe(listenToElm)
-    function interfaceDiffImplementation(tag: "Add" | "Edit" | "Remove", sendToElm: (v: any) => void, id: string): ((config: any) => void) {
+    function interfaceDiffImplementation(tag: "Add" | "Remove", sendToElm: (v: any) => void, id: string): ((config: any) => void) {
         switch (tag) {
             case "Add": return (config: { tag: string, value: any }) => {
                 const abortController = new AbortController()
