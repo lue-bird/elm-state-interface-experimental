@@ -1685,6 +1685,12 @@ launchArgumentsRequest =
 
 {-| An [`Interface`](Node#Interface) for getting the user's environment properties set for the process.
 
+    elmHomeRequest : Node.Interface (Maybe String)
+    elmHomeRequest =
+        Node.environmentVariablesRequest
+            |> Node.interfaceFutureMap
+                (Dict.get "ELM_HOME")
+
 Uses [`process.env`](https://nodejs.org/api/process.html#processenv)
 -}
 environmentVariablesRequest : Interface (Dict.Dict String String)
