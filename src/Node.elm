@@ -6,6 +6,7 @@ module Node exposing
     , workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
     , standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent(..)
     , terminalSizeRequest, terminalSizeChangeListen
+    , subProcessSpawn, SubProcessEvent(..)
     , FileKind(..), fileInfoRequest, directorySubPathsRequest
     , directoryMake, fileWrite, fileRequest, fileRemove
     , fileChangeListen, FileChange(..)
@@ -46,6 +47,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 @docs workingDirectoryPathRequest, launchArgumentsRequest, processTitleSet, exit
 @docs standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent
 @docs terminalSizeRequest, terminalSizeChangeListen
+@docs subProcessSpawn, SubProcessEvent
 
 
 ## file system
@@ -104,6 +106,7 @@ If you need more things like json encoders/decoders, [open an issue](https://git
 
 import AsciiString
 import Bytes exposing (Bytes)
+import Dict
 import Duration exposing (Duration)
 import FastDict
 import Json.Decode
@@ -194,7 +197,7 @@ type InterfaceSingle future
     | StandardOutWrite String
     | StandardErrWrite String
     | StandardInListen (String -> future)
-    | StandardInRawListen (StreamReadEvent -> future)
+    | StandardInRawListen (StreamReadEvent String -> future)
     | TerminalSizeRequest ({ lines : Int, columns : Int } -> future)
     | TerminalSizeChangeListen ({ lines : Int, columns : Int } -> future)
     | HttpRequestSend
@@ -246,19 +249,42 @@ type InterfaceSingle future
         { path : String
         , on : Result { code : String, message : String } (List String) -> future
         }
+    | SubProcessSpawn
+        { command : String
+        , arguments : List String
+        , workingDirectoryPath : String
+        , environmentVariables : Dict.Dict String String
+        , on : SubProcessEvent -> future
+        }
+    | SubProcessStandardInWrite
+        { command : String
+        , arguments : List String
+        , workingDirectoryPath : String
+        , environmentVariables : Dict.Dict String String
+        , data : Bytes
+        }
+
+
+{-| Action a sub-process can perform that we can react to.
+Used by [`subProcessSpawn`](#subProcessSpawn)
+-}
+type SubProcessEvent
+    = SubProcessExited Int
+    | SubProcessStandardOutEvent (StreamReadEvent Bytes)
+    | SubProcessStandardErrorEvent (StreamReadEvent Bytes)
 
 
 {-| When data is sent (possibly in chunks), you'll get a `StreamDataReceived` event.
 Once it finished sending data, you'll get a `StreamDataEndReached` event
 
-Used in [`Node.standardInListen`](#standardInListen)
+Used in [`Node.standardInListen`](#standardInListen) and [`Node.subProcessSpawn`](#subProcessSpawn)
 
 Uses the readable stream [data event](https://nodejs.org/api/stream.html#event-data)
 and [end event](https://nodejs.org/api/stream.html#event-end)
 
 -}
-type StreamReadEvent
-    = StreamDataReceived String
+type StreamReadEvent data
+    = StreamDataReceived data
     | StreamDataEndReached
 
 
@@ -293,7 +319,15 @@ type FileChange
 -}
 interfaceBatch : List (Interface future) -> Interface future
 interfaceBatch interfaces =
-    interfaces |> List.foldl FastDict.union FastDict.empty
+    interfaces |> List.foldl interfaceBatch2 FastDict.empty
+
+
+{-| Combine 2 [`Interface`](#Interface)s into one.
+Equivalent to [`interfaceBatch [ a, b ]`](#interfaceBatch) but faster.
+-}
+interfaceBatch2 : Interface future -> Interface future -> Interface future
+interfaceBatch2 =
+    FastDict.union
 
 
 {-| Doing nothing as an [`Interface`](#Interface). These two examples are equivalent:
@@ -470,6 +504,18 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         StandardInRawListen on ->
             StandardInRawListen (\size -> on size |> futureChange)
 
+        SubProcessSpawn spawn ->
+            SubProcessSpawn
+                { command = spawn.command
+                , arguments = spawn.arguments
+                , workingDirectoryPath = spawn.workingDirectoryPath
+                , environmentVariables = spawn.environmentVariables
+                , on = \event -> spawn.on event |> futureChange
+                }
+
+        SubProcessStandardInWrite write ->
+            SubProcessStandardInWrite write
+
 
 {-| The "msg" in a [`Node.program`](#program)
 -}
@@ -640,7 +686,46 @@ interfaceSingleToJson interfaceSingle =
 
             StandardInRawListen _ ->
                 { tag = "StandardInRawListen", value = Json.Encode.null }
+
+            SubProcessSpawn spawn ->
+                { tag = "SubProcessSpawn"
+                , value =
+                    Json.Encode.object
+                        [ ( "command", spawn.command |> Json.Encode.string )
+                        , ( "arguments", spawn.arguments |> Json.Encode.list Json.Encode.string )
+                        , ( "workingDirectoryPath"
+                          , spawn.workingDirectoryPath |> Json.Encode.string
+                          )
+                        , ( "environmentVariables"
+                          , spawn.environmentVariables |> environmentVariablesToJson
+                          )
+                        ]
+                }
+
+            SubProcessStandardInWrite write ->
+                { tag = "SubProcessStandardInWrite"
+                , value =
+                    Json.Encode.object
+                        [ ( "command", write.command |> Json.Encode.string )
+                        , ( "arguments", write.arguments |> Json.Encode.list Json.Encode.string )
+                        , ( "workingDirectoryPath"
+                          , write.workingDirectoryPath |> Json.Encode.string
+                          )
+                        , ( "environmentVariables"
+                          , write.environmentVariables |> environmentVariablesToJson
+                          )
+                        , ( "data", write.data |> AsciiString.fromBytes |> Json.Encode.string )
+                        ]
+                }
         )
+
+
+environmentVariablesToJson : Dict.Dict String String -> Json.Encode.Value
+environmentVariablesToJson environmentVariables =
+    environmentVariables
+        |> Json.Encode.dict
+            Basics.identity
+            Json.Encode.string
 
 
 interfaceSingleToStructuredId : InterfaceSingle future_ -> StructuredId
@@ -775,6 +860,28 @@ interfaceSingleToStructuredId interfaceSingle =
 
             StandardInRawListen _ ->
                 { tag = "StandardInRawListen", value = StructuredId.ofUnit }
+
+            SubProcessSpawn spawn ->
+                { tag = "SubProcessSpawn"
+                , value =
+                    StructuredId.ofParts
+                        [ spawn.command |> StructuredId.ofString
+                        , spawn.arguments |> StructuredId.ofList StructuredId.ofString
+                        , spawn.workingDirectoryPath |> StructuredId.ofString
+                        , spawn.environmentVariables |> environmentVariablesToJson
+                        ]
+                }
+
+            SubProcessStandardInWrite write ->
+                { tag = "SubProcessStandardInWrite"
+                , value =
+                    StructuredId.ofParts
+                        [ write.command |> StructuredId.ofString
+                        , write.arguments |> StructuredId.ofList StructuredId.ofString
+                        , write.workingDirectoryPath |> StructuredId.ofString
+                        , write.environmentVariables |> environmentVariablesToJson
+                        ]
+                }
         )
 
 
@@ -962,17 +1069,64 @@ interfaceSingleFutureJsonDecoder interface =
                 |> Just
 
         StandardInRawListen on ->
-            streamReadEventJsonDecoder
+            streamReadEventOfStringDataJsonDecoder
                 |> Json.Decode.map on
                 |> Just
 
+        SubProcessSpawn spawn ->
+            subProcessEventJsonDecoder
+                |> Json.Decode.map spawn.on
+                |> Just
 
-streamReadEventJsonDecoder : Json.Decode.Decoder StreamReadEvent
-streamReadEventJsonDecoder =
+        SubProcessStandardInWrite _ ->
+            Nothing
+
+
+subProcessEventJsonDecoder : Json.Decode.Decoder SubProcessEvent
+subProcessEventJsonDecoder =
+    Json.Decode.LocalExtra.choice
+        [ { tag = "SubProcessExited"
+          , value =
+                Json.Decode.map SubProcessExited
+                    Json.Decode.int
+          }
+        , { tag = "SubProcessStandardOutEvent"
+          , value =
+                Json.Decode.map SubProcessStandardOutEvent
+                    streamReadEventOfBytesDataJsonDecoder
+          }
+        , { tag = "SubProcessStandardErrorEvent"
+          , value =
+                Json.Decode.map SubProcessStandardErrorEvent
+                    streamReadEventOfBytesDataJsonDecoder
+          }
+        ]
+
+
+streamReadEventOfStringDataJsonDecoder : Json.Decode.Decoder (StreamReadEvent String)
+streamReadEventOfStringDataJsonDecoder =
     Json.Decode.LocalExtra.choice
         [ { tag = "StreamDataReceived"
           , value =
                 Json.Decode.map StreamDataReceived
+                    Json.Decode.string
+          }
+        , { tag = "StreamDataEndReached"
+          , value =
+                Json.Decode.null StreamDataEndReached
+          }
+        ]
+
+
+streamReadEventOfBytesDataJsonDecoder : Json.Decode.Decoder (StreamReadEvent Bytes)
+streamReadEventOfBytesDataJsonDecoder =
+    Json.Decode.LocalExtra.choice
+        [ { tag = "StreamDataReceived"
+          , value =
+                Json.Decode.map
+                    (\asciiString ->
+                        StreamDataReceived (asciiString |> AsciiString.toBytes)
+                    )
                     Json.Decode.string
           }
         , { tag = "StreamDataEndReached"
@@ -1853,7 +2007,7 @@ Uses [`process.stdin.addListener("data", ...)`](https://nodejs.org/api/stream.ht
 in combination with (when used as a terminal interface) [`process.stdin.setRawMode(true)`](https://nodejs.org/api/tty.html#readstreamsetrawmodemode)
 
 -}
-standardInRawListen : Interface StreamReadEvent
+standardInRawListen : Interface (StreamReadEvent String)
 standardInRawListen =
     StandardInRawListen identity
         |> interfaceFromSingle
@@ -1905,3 +2059,63 @@ terminalSizeChangeListen : Interface { lines : Int, columns : Int }
 terminalSizeChangeListen =
     TerminalSizeChangeListen identity
         |> interfaceFromSingle
+
+
+{-| Open and interact with a new process.
+
+    Node.subProcessSpawn
+        { command = "elm"
+        , arguments = [ "make", "src/Main.elm", "--output=build/elm-output.js" ]
+        , workingDirectoryPath = "benchmarks"
+        , environmentVariables =
+            Dict.singleton "ELM_HOME" "elm-stuff/local-elm-home"
+        , writeToStandardIn = Nothing
+        }
+
+Even though the command will not be run in a shell,
+you should still tightly control user input to the command and arguments
+and in general, limit its use to local, small scripts.
+
+If you want to inherit parts of the environment variables and working directory path,
+store and explicitly pass from [`environmentVariablesRequest`](#environmentVariablesRequest)
+and [`workingDirectoryPathRequest`](#workingDirectoryPathRequest)
+
+Note: uses [`child_process.spawn`](https://nodejs.org/api/child_process.html#child_processspawncommand-args-options)
+-}
+subProcessSpawn :
+    { command : String
+    , arguments : List String
+    , workingDirectoryPath : String
+    , environmentVariables : Dict.Dict String String
+    , writeToStandardIn : Maybe Bytes
+    }
+    -> Interface SubProcessEvent
+subProcessSpawn config =
+    let
+        spawnInterface : Interface SubProcessEvent
+        spawnInterface =
+            SubProcessSpawn
+                { command = config.command
+                , arguments = config.arguments
+                , workingDirectoryPath = config.workingDirectoryPath
+                , environmentVariables = config.environmentVariables
+                , on = identity
+                }
+                |> interfaceFromSingle
+    in
+    case config.writeToStandardIn of
+        Nothing ->
+            spawnInterface
+
+        Just data ->
+            interfaceBatch2
+                spawnInterface
+                (SubProcessStandardInWrite
+                    { command = config.command
+                    , arguments = config.arguments
+                    , workingDirectoryPath = config.workingDirectoryPath
+                    , environmentVariables = config.environmentVariables
+                    , data = data
+                    }
+                    |> interfaceFromSingle
+                )

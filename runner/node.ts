@@ -2,9 +2,11 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import * as http from "node:http"
 import * as timers from "node:timers"
+import * as child_process from "node:child_process"
 // https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/57677
 import { default as process } from "node:process"
 import { Buffer } from "node:buffer"
+import { warn } from "node:console"
 
 
 export interface ElmPorts {
@@ -357,6 +359,85 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                         }
                     })
             }
+            case "SubProcessSpawn": return (config: {
+                command: string,
+                arguments: Array<string>,
+                workingDirectoryPath: string,
+                environmentVariables: { [key: string]: string },
+            }) => {
+                const subProcess = child_process.spawn(
+                    config.command,
+                    config.arguments,
+                    {
+                        cwd: config.workingDirectoryPath,
+                        env: config.environmentVariables,
+                        signal: abortSignal,
+                        shell: false,
+                        detached: false,
+                    }
+                )
+                subProcesses.set(subProcessKey(config), subProcess)
+
+                subProcess.addListener("exit", (code) => {
+                    sendToElm({ tag: "SubProcessExited", value: code })
+                })
+
+                function standardErrorDataListen(buffer: Buffer) {
+                    sendToElm({
+                        tag: "SubProcessStandardErrorEvent",
+                        value: { tag: "StreamDataReceived", value: bytesToAsciiString(buffer) }
+                    })
+                }
+                function standardErrorEndListen() {
+                    sendToElm({
+                        tag: "SubProcessStandardErrorEvent",
+                        value: { tag: "StreamDataEndReached", value: null }
+                    })
+                }
+                subProcess.stderr.addListener("data", standardErrorDataListen)
+                subProcess.stderr.addListener("end", standardErrorEndListen)
+
+                function standardOutDataListen(buffer: Buffer) {
+                    sendToElm({
+                        tag: "SubProcessStandardOutEvent",
+                        value: { tag: "StreamDataReceived", value: bytesToAsciiString(buffer) }
+                    })
+                }
+                function standardOutEndListen() {
+                    sendToElm({
+                        tag: "SubProcessStandardOutEvent",
+                        value: { tag: "StreamDataEndReached", value: null }
+                    })
+                }
+                subProcess.stdout.addListener("data", standardOutDataListen)
+                subProcess.stdout.addListener("end", standardOutEndListen)
+
+                abortSignal.addEventListener("abort", (_event) => {
+                    subProcess.stderr.removeListener("data", standardErrorDataListen)
+                    subProcess.stderr.removeListener("end", standardErrorEndListen)
+                    subProcess.stderr.removeListener("data", standardOutDataListen)
+                    subProcess.stderr.removeListener("end", standardOutEndListen)
+                })
+            }
+            case "SubProcessStandardInWrite": return (config: {
+                command: string,
+                arguments: Array<string>,
+                workingDirectoryPath: string,
+                environmentVariables: { [key: string]: string },
+                data: string,
+            }) => {
+                const addressedSubProcess = subProcesses.get(subProcessKey({
+                    command: config.command,
+                    arguments: config.arguments,
+                    workingDirectoryPath: config.workingDirectoryPath,
+                    environmentVariables: config.environmentVariables,
+                }))
+                if (addressedSubProcess === undefined) {
+                    warn("tried to write to standard in of a sub-process that hasn't been spawned, yet")
+                } else {
+                    addressedSubProcess.stdin.write(asciiStringToBytes(config.data))
+                }
+            }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Add." + tag)
             }
@@ -373,6 +454,27 @@ const httpResponsesAwaitingRequest: Map<number /* port */, HttpServerResponse> =
 // prevents watching and falling into duplicate work or even an infinite loop
 const recentlyWrittenToFilePaths: Set<string> =
     new Set()
+/** Use together with `subProcessKey` */
+const subProcesses: Map<
+    /* JSON.stringify({ command: string,
+        arguments: Array<string>,
+        workingDirectoryPath: string,
+        environmentVariables: { [key: string]: string }
+    })
+    */
+    string,
+    child_process.ChildProcessWithoutNullStreams
+> =
+    new Map()
+
+function subProcessKey(config: {
+    command: string,
+    arguments: Array<string>,
+    workingDirectoryPath: string,
+    environmentVariables: { [key: string]: string }
+}): string {
+    return JSON.stringify(config)
+}
 
 
 type HttpServerResponse = {
