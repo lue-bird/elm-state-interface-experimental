@@ -401,7 +401,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 function standardErrorDataListen(buffer: Buffer) {
                     sendToElm({
                         tag: "SubProcessStandardErrorEvent",
-                        value: { tag: "StreamDataReceived", value: bytesToAsciiString(buffer) }
+                        value: { tag: "StreamDataReceived", value: buffer.toString() }
                     })
                 }
                 function standardErrorEndListen() {
@@ -416,7 +416,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 function standardOutDataListen(buffer: Buffer) {
                     sendToElm({
                         tag: "SubProcessStandardOutEvent",
-                        value: { tag: "StreamDataReceived", value: buffer.toString() }
+                        value: { tag: "StreamDataReceived", value: bytesToAsciiString(buffer) }
                     })
                 }
                 function standardOutEndListen() {
