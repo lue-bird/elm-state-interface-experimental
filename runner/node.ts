@@ -57,9 +57,6 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 abortControllers.set(id, abortController)
                 interfaceAddImplementation(config.tag, sendToElm, abortController.signal)(config.value)
             }
-            case "Edit": return (config: { tag: string, value: any }) => {
-                interfaceEditImplementation(id)(config.value)
-            }
             case "Remove": return (_config: null) => {
                 const abortController = abortControllers.get(id)
                 if (abortController !== undefined) {
@@ -362,13 +359,6 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             }
             default: return (_config: any) => {
                 notifyOfUnknownMessageKind("Add." + tag)
-            }
-        }
-    }
-    function interfaceEditImplementation(tag: string): ((config: any) => void) {
-        switch (tag) {
-            default: return (_config: any) => {
-                notifyOfUnknownMessageKind("Edit." + tag)
             }
         }
     }
