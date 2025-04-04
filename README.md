@@ -19,7 +19,7 @@
 
 > If you know TEA, [get quick overview of the differences](#comparison-to-the-elm-architecture)
 
-↓ creates a number and a button that increments it
+Let's show a number and a button that increments it:
 
 ```elm
 import Web
@@ -30,10 +30,10 @@ app =
         \state ->
             Web.domElement "div"
                 []
-                [ state |> String.fromInt |> Web.domText
+                [ Web.domText (state |> String.fromInt)
                 , Web.domElement "button"
                     [ Web.domListenTo "click" ]
-                    [ "+" |> Web.domText ]
+                    [ Web.domText "+" ]
                     |> Web.domFutureMap (\_ -> state + 1)
                 ]
                 |> Web.domRender
@@ -89,10 +89,10 @@ Web.domElement "button"
 
 If we only "perform actions" without any events getting set back, we get the type
 ```elm
-"never change" |> Web.domText |> Web.domRender
+Web.domText "never change" |> Web.domRender
 : Interface nothingEverGetsSentBack
 
-"never change" |> Web.consoleLog
+Web.consoleLog "never change"
 : Interface nothingEverGetsSentBack
 ```
 `nothingEverGetsSentBack` is a variable, so it fits for any other interface type.
@@ -113,13 +113,13 @@ app =
         \(Counter counter) ->
             Web.domElement "div"
                 []
-                [ counter |> String.fromInt |> Web.domText
+                [ Web.domText (counter |> String.fromInt)
                 , Web.domElement "button"
                     [ Web.domListenTo "click"
                         |> Web.domModifierFutureMap
                             (\_ -> Counter (counter + 1))
                     ]
-                    [ "+" |> Web.domText ]
+                    [ Web.domText "+" ]
                 ]
                 |> Web.domRender
     }
@@ -150,14 +150,14 @@ app =
                         |> Web.domModifierFutureMap
                             (\_ -> Counter (counter + 1))
                     ]
-                    [ "+" |> Web.domText ]
-                , counter |> String.fromInt |> Web.domText
+                    [ Web.domText "+" ]
+                , Web.domText (counter |> String.fromInt)
                 , Web.domElement "button"
                     [ Web.domListenTo "click"
                         |> Web.domModifierFutureMap
                             (\_ -> Counter (counter - 1))
                     ]
-                    [ "-" |> Web.domText ]
+                    [ Web.domText "-" ]
                 ]
                 |> Web.domRender
     }
@@ -187,15 +187,15 @@ app =
                     [ Web.domListenTo "click"
                         |> Web.domModifierFutureMap (\_ -> PlusClicked)
                     ]
-                    [ "+" |> Web.domText ]
+                    [ Web.domText "+" ]
                 , Web.domElement "div"
                     []
-                    [ counter |> String.fromInt |> Web.domText ]
+                    [ Web.domText (counter |> String.fromInt) ]
                 , Web.domElement "button"
                     [ Web.domListenTo "click"
                         |> Web.domModifierFutureMap (\_ -> MinusClicked)
                     ]
-                    [ "-" |> Web.domText ]
+                    [ Web.domText "-" ]
                 ]
                 |> Web.domRender
                 |> Web.interfaceFutureMap
@@ -213,7 +213,7 @@ Now you just need a quick look at `Event` to see what our app will react to.
 
 Hmm... but when does anything from the interface actually trigger something on the outside?
 To explain, let's look at a text input field together with
-a text showing whether the entered text is a palindrome or not.
+a label showing whether the entered text is a palindrome or not.
 
 ```elm
 import Web
@@ -266,8 +266,8 @@ app =
                                 State
                                     { state
                                         | warnings =
-                                            state.warnings
-                                                |> (::) (error |> Json.Decode.errorToString)
+                                            (error |> Json.Decode.errorToString)
+                                                :: state.warnings
                                     }
                     )
     }
@@ -354,14 +354,14 @@ interface =
                     []
                     [ Web.domElement "button"
                         [ Web.domListenTo "click" ]
-                        [ "+" |> Web.domText ]
+                        [ Web.domText "+" ]
                         |> Web.domFutureMap (\_ -> PlusClicked)
                     , Web.domElement "div"
                         []
-                        [ counter |> String.fromInt |> Web.domText ]
+                        [ Web.domText (counter |> String.fromInt) ]
                     , Web.domElement "button"
                         [ Web.domListenTo "click" ]
-                        [ "-" |> Web.domText ]
+                        [ Web.domText "-" ]
                         |> Web.domFutureMap (\_ -> MinusClicked)
                     ]
                     |> Web.domRender
