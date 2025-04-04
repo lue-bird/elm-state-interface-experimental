@@ -419,7 +419,6 @@ import Json.Encode.LocalExtra
 import Length exposing (Length)
 import List.LocalExtra
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Result.LocalExtra
 import Rope exposing (Rope)
 import Speed exposing (Speed)
 import StructuredId exposing (StructuredId)
@@ -1007,6 +1006,7 @@ sortedKeyValueListMap elementChange (SortedKeyValueList sortedKeyValueList) =
 -}
 type ProgramEvent appState
     = JsEventFailedToDecode Json.Decode.Error
+    | JsEventCouldNotBeAssociated
     | JsEventEnabledConstructionOfNewAppState appState
 
 
@@ -1963,33 +1963,32 @@ programSubscriptions : ProgramConfig state -> ProgramState state -> Sub (Program
 programSubscriptions appConfig (State state) =
     appConfig.ports.fromJs
         (\interfaceJson ->
-            interfaceJson
-                |> Json.Decode.decodeValue
-                    (jsonDecodeFieldIdString
+            let
+                newStateJsonDecoder : Json.Decode.Decoder (NotAssociatedOr state)
+                newStateJsonDecoder =
+                    jsonDecodeFieldIdString
                         |> Json.Decode.andThen
                             (\originalInterfaceId ->
                                 case state.interface |> FastDict.get originalInterfaceId of
-                                    Just interfaceSingleAcceptingFuture ->
-                                        case interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder of
-                                            Just eventDataDecoder ->
-                                                Json.Decode.field "eventData" eventDataDecoder
-
-                                            Nothing ->
-                                                Json.Decode.fail "interface did not expect any events"
-
                                     Nothing ->
-                                        Json.Decode.fail
-                                            ("no associated interface found among ids\n"
-                                                ++ (state.interface
-                                                        |> FastDict.toList
-                                                        |> List.map Tuple.first
-                                                        |> String.join "\n"
-                                                   )
-                                            )
+                                        jsonDecodeSucceedNotAssociated
+
+                                    Just interfaceSingleAcceptingFuture ->
+                                        Json.Decode.field "eventData"
+                                            (interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder)
                             )
-                        |> Json.Decode.map JsEventEnabledConstructionOfNewAppState
-                    )
-                |> Result.LocalExtra.valueOrOnError JsEventFailedToDecode
+            in
+            case interfaceJson |> Json.Decode.decodeValue newStateJsonDecoder of
+                Ok result ->
+                    case result of
+                        Associated associated ->
+                            JsEventEnabledConstructionOfNewAppState associated
+
+                        NotAssociated ->
+                            JsEventCouldNotBeAssociated
+
+                Err error ->
+                    JsEventFailedToDecode error
         )
 
 
@@ -1998,67 +1997,78 @@ jsonDecodeFieldIdString =
     Json.Decode.field "id" Json.Decode.string
 
 
+type NotAssociatedOr associated
+    = Associated associated
+    | NotAssociated
+
+
+jsonDecodeSucceedNotAssociated : Json.Decode.Decoder (NotAssociatedOr associated_)
+jsonDecodeSucceedNotAssociated =
+    Json.Decode.succeed NotAssociated
+
+
 {-| [json `Decoder`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Decode#Decoder)
 for the transformed event data coming back
 -}
-interfaceSingleFutureJsonDecoder : InterfaceSingle future -> Maybe (Json.Decode.Decoder future)
+interfaceSingleFutureJsonDecoder : InterfaceSingle future -> Json.Decode.Decoder (NotAssociatedOr future)
 interfaceSingleFutureJsonDecoder interface =
     case interface of
         DocumentTitleReplaceBy _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         DocumentAuthorSet _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         DocumentKeywordsSet _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         DocumentDescriptionSet _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         ConsoleLog _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         ConsoleWarn _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         ConsoleError _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         DocumentEventListen listen ->
-            listen.on |> Just
+            listen.on |> Json.Decode.map Associated
 
         NavigationReplaceUrl _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         NavigationPushUrl _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         NavigationGo _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         NavigationLoad _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         NavigationReload () ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         NavigationUrlRequest toFuture ->
             urlJsonDecoder
-                |> Json.Decode.map AppUrl.fromUrl
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map
+                    (\url ->
+                        Associated (toFuture (url |> AppUrl.fromUrl))
+                    )
 
         FileDownload _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         ClipboardReplaceBy _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         ClipboardRequest toFuture ->
             Json.Decode.string
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map
+                    (\content -> Associated (toFuture content))
 
         AudioSourceLoad sourceLoad ->
             Json.Decode.LocalExtra.resultOkErr
@@ -2068,33 +2078,26 @@ interfaceSingleFutureJsonDecoder interface =
                     )
                 )
                 (Json.Decode.map Err audioSourceLoadErrorJsonDecoder)
-                |> Json.Decode.map sourceLoad.on
-                |> Just
+                |> Json.Decode.map (\source -> Associated (sourceLoad.on source))
 
         AudioPlay _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         DomNodeRender domNode ->
             Json.Decode.LocalExtra.choice
                 [ { tag = "EventListen"
                   , value =
                         domEventListenEventJsonDecoder
-                            |> Json.Decode.andThen
+                            |> Json.Decode.map
                                 (\specificEvent ->
                                     case domNode |> domNodeAtPath specificEvent.path of
                                         Nothing ->
-                                            Json.Decode.fail
-                                                ("received event of a DOM node which can't be found at path "
-                                                    ++ pathToDebugString specificEvent.path
-                                                )
+                                            NotAssociated
 
                                         Just domNodeTheEventIsFiredFor ->
                                             case domNodeTheEventIsFiredFor of
                                                 DomText _ ->
-                                                    Json.Decode.fail
-                                                        ("received event of a DOM text (!) which confuses me, found at path "
-                                                            ++ pathToDebugString specificEvent.path
-                                                        )
+                                                    NotAssociated
 
                                                 DomElement domElementTheEventIsFiredFor ->
                                                     {- The fact that this can only be implemented linearly might seem shocking.
@@ -2105,47 +2108,33 @@ interfaceSingleFutureJsonDecoder interface =
                                                             |> sortedKeyValueListGetAtStringKey specificEvent.name
                                                     of
                                                         Nothing ->
-                                                            Json.Decode.fail
-                                                                ("received event of a kind that isn't listened for. The element only listened for ["
-                                                                    ++ (domElementTheEventIsFiredFor.header.eventListens
-                                                                            |> sortedKeyValueListToList
-                                                                            |> List.map .key
-                                                                            |> String.join ", "
-                                                                       )
-                                                                    ++ "]"
-                                                                )
+                                                            NotAssociated
 
                                                         Just eventListen ->
-                                                            Json.Decode.succeed (eventListen.on specificEvent.value)
+                                                            Associated (eventListen.on specificEvent.value)
                                 )
                   }
                 , { tag = "ScrollPositionRequest"
                   , value =
                         domElementScrollPositionJsonDecoder
-                            |> Json.Decode.andThen
+                            |> Json.Decode.map
                                 (\specificEvent ->
                                     case domNode |> domNodeAtPath specificEvent.path of
                                         Nothing ->
-                                            Json.Decode.fail
-                                                ("received scroll position of a DOM node which can't be found at path "
-                                                    ++ pathToDebugString specificEvent.path
-                                                )
+                                            NotAssociated
 
                                         Just domNodeTheEventIsFiredFor ->
                                             case domNodeTheEventIsFiredFor of
                                                 DomText _ ->
-                                                    Json.Decode.fail
-                                                        ("received scroll position of a DOM text (!) which confuses me, found at path "
-                                                            ++ pathToDebugString specificEvent.path
-                                                        )
+                                                    NotAssociated
 
                                                 DomElement domElementTheEventIsFiredFor ->
                                                     case domElementTheEventIsFiredFor.header.scrollPositionRequest of
                                                         Nothing ->
-                                                            Json.Decode.fail "received scroll position that wasn't requested"
+                                                            NotAssociated
 
                                                         Just request ->
-                                                            Json.Decode.succeed
+                                                            Associated
                                                                 (request
                                                                     { fromLeft = specificEvent.fromLeft
                                                                     , fromTop = specificEvent.fromTop
@@ -2154,124 +2143,109 @@ interfaceSingleFutureJsonDecoder interface =
                                 )
                   }
                 ]
-                |> Just
 
         NotificationAskForPermission () ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         NotificationShow show ->
             notificationResponseJsonDecoder
-                |> Json.Decode.map show.on
-                |> Just
+                |> Json.Decode.map (\response -> Associated (show.on response))
 
         HttpRequestSend request ->
             httpRequestSendEventJsonDecoder
-                |> Json.Decode.map request.on
-                |> Just
+                |> Json.Decode.map (\response -> Associated (request.on response))
 
         TimePosixRequest toFuture ->
             Time.LocalExtra.posixJsonDecoder
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map (\posix -> Associated (toFuture posix))
 
         TimezoneOffsetRequest toFuture ->
             Json.Decode.int
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map (\offset -> Associated (toFuture offset))
 
         TimePeriodicallyListen periodicallyListen ->
             Time.LocalExtra.posixJsonDecoder
-                |> Json.Decode.map periodicallyListen.on
-                |> Just
+                |> Json.Decode.map (\posix -> Associated (periodicallyListen.on posix))
 
         TimeOnce once ->
             Time.LocalExtra.posixJsonDecoder
-                |> Json.Decode.map once.on
-                |> Just
+                |> Json.Decode.map (\posix -> Associated (once.on posix))
 
         TimezoneNameRequest toFuture ->
             Json.Decode.string
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map (\zone -> Associated (toFuture zone))
 
         RandomUnsignedInt32sRequest request ->
             Json.Decode.list Json.Decode.int
-                |> Json.Decode.map request.on
-                |> Just
+                |> Json.Decode.map (\randomness -> Associated (request.on randomness))
 
         WindowSizeRequest toFuture ->
             windowSizeJsonDecoder
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map (\size -> Associated (toFuture size))
 
         WindowPreferredLanguagesRequest toFuture ->
             Json.Decode.list Json.Decode.string
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map (\languages -> Associated (toFuture languages))
 
         WindowEventListen listen ->
-            listen.on |> Just
+            listen.on |> Json.Decode.map Associated
 
         WindowVisibilityChangeListen toFuture ->
             windowVisibilityJsonDecoder
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map (\visibility -> Associated (toFuture visibility))
 
         WindowAnimationFrameListen toFuture ->
             Time.LocalExtra.posixJsonDecoder
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map (\posix -> Associated (toFuture posix))
 
         WindowPreferredLanguagesChangeListen toFuture ->
             Json.Decode.list Json.Decode.string
-                |> Json.Decode.map toFuture
-                |> Just
+                |> Json.Decode.map (\languages -> Associated (toFuture languages))
 
         SocketListen listen ->
             socketEventJsonDecoder
-                |> Json.Decode.map listen.on
-                |> Just
+                |> Json.Decode.map (\event -> Associated (listen.on event))
 
         SocketDataSend _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         LocalStorageSet _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         LocalStorageRequest request ->
             Json.Decode.nullable Json.Decode.string
-                |> Json.Decode.map request.on
-                |> Just
+                |> Json.Decode.map (\value -> Associated (request.on value))
 
         LocalStorageRemoveOnADifferentTabListen listen ->
             urlJsonDecoder
-                |> Json.Decode.map AppUrl.fromUrl
-                |> Json.Decode.map listen.on
-                |> Just
+                |> Json.Decode.map
+                    (\url ->
+                        Associated (listen.on (url |> AppUrl.fromUrl))
+                    )
 
         LocalStorageSetOnADifferentTabListen listen ->
             localStorageSetOnADifferentTabEventJsonDecoder
-                |> Json.Decode.map listen.on
-                |> Just
+                |> Json.Decode.map (\value -> Associated (listen.on value))
 
         GeoLocationRequest toFuture ->
-            geoLocationJsonDecoder |> Json.Decode.map toFuture |> Just
+            geoLocationJsonDecoder
+                |> Json.Decode.map
+                    (\geoLocation -> Associated (toFuture geoLocation))
 
         GeoLocationChangeListen toFuture ->
-            geoLocationJsonDecoder |> Json.Decode.map toFuture |> Just
+            geoLocationJsonDecoder
+                |> Json.Decode.map
+                    (\geoLocation -> Associated (toFuture geoLocation))
 
         GamepadsRequest toFuture ->
-            gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
+            gamepadsJsonDecoder
+                |> Json.Decode.map
+                    (\gamepads -> Associated (toFuture gamepads))
 
         GamepadsChangeListen toFuture ->
-            gamepadsJsonDecoder |> Json.Decode.map toFuture |> Just
-
-
-pathToDebugString : List Int -> String
-pathToDebugString path =
-    path
-        |> List.map String.fromInt
-        |> String.join ">"
+            gamepadsJsonDecoder
+                |> Json.Decode.map
+                    (\gamepads -> Associated (toFuture gamepads))
 
 
 domNodeAtPath : List Int -> DomNode future -> Maybe (DomNode future)
@@ -3044,9 +3018,10 @@ programUpdate appConfig event state =
             , let
                 notifyOfSkippedEventInterface : InterfaceSingle never_
                 notifyOfSkippedEventInterface =
-                    ConsoleLog
-                        ("js event skipped because: "
+                    ConsoleError
+                        ("bug: js event skipped because it failed to decode: "
                             ++ (jsonError |> Json.Decode.errorToString)
+                            ++ "\n\nPlease open an issue on github.com/lue-bird/elm-state-interface-experimental"
                         )
               in
               idAndDiffToJson
@@ -3054,6 +3029,17 @@ programUpdate appConfig event state =
                 (notifyOfSkippedEventInterface |> Add)
                 |> appConfig.ports.toJs
             )
+
+        JsEventCouldNotBeAssociated ->
+            -- this usually happens when multiple events are sent simultaneously from js
+            -- and the interface changes between the two.
+            -- e.g. we listen for mouse move events while dragging and remove the listen
+            -- after mouse up. But since mouse move events are frequent, there still might be
+            -- a few move events coming through before their listens are removed on the js side.
+            --
+            -- Historical note, this was once reported as errors (like json decode errors)
+            -- but happened barely frequent enough to be annoying while not being helpful.
+            ( state, Cmd.none )
 
         JsEventEnabledConstructionOfNewAppState updatedAppState ->
             let
