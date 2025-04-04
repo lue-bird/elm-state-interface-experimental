@@ -236,23 +236,22 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 )
             }
             case "SocketListen": return (config: { address: string }) => {
-                const createdSocket = new WebSocket(config.address)
-                sockets.set(config.address, createdSocket)
-                createdSocket.addEventListener(
+                const socket = getExistingOrOpenSocket(config.address)
+                socket.addEventListener(
                     "open",
                     (_event) => {
                         sendToElm({ tag: "SocketOpened", value: null })
                     },
                     { signal: abortSignal }
                 )
-                createdSocket.addEventListener(
+                socket.addEventListener(
                     "close",
                     (event) => {
                         sendToElm({ tag: "SocketClosed", value: event })
                     },
                     { signal: abortSignal }
                 )
-                createdSocket.addEventListener(
+                socket.addEventListener(
                     "message",
                     (event) => {
                         sendToElm({ tag: "SocketDataReceived", value: event.data })
@@ -261,17 +260,13 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                 )
 
                 abortSignal.addEventListener("abort", (_event) => {
-                    createdSocket.close()
+                    socket.close()
                     sockets.delete(config.address)
                 })
             }
             case "SocketDataSend": return (config: { address: string, data: string }) => {
-                const socket = sockets.get(config.address)
-                if (socket !== undefined) {
-                    socket.send(config.data)
-                } else {
-                    notifyOfBug("trying to send messages on closed socket")
-                }
+                const addressedSocket = getExistingOrOpenSocket(config.address)
+                addressedSocket.send(config.data)
             }
             case "LocalStorageSet": return (config: { key: string, value: string | null }) => {
                 try {
@@ -484,6 +479,17 @@ const sockets: Map<string, WebSocket> = new Map()
 
 
 //// other helpers
+
+function getExistingOrOpenSocket(address: string): WebSocket {
+    const socket = sockets.get(address)
+    if (socket !== undefined) {
+        return socket
+    } else {
+        const createdSocket = new WebSocket(address)
+        sockets.set(address, createdSocket)
+        return createdSocket
+    }
+}
 
 function getOrInitializeAudioContext(): AudioContext {
     if (audioContext !== null) {
