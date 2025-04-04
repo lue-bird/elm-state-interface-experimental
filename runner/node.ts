@@ -369,7 +369,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 workingDirectoryPath: string,
                 environmentVariables: { [key: string]: string },
             }) => {
-                const subProcess = subProcessGetExistingOrSpawn(config, abortSignal)
+                const subProcess = subProcessGetExistingOrSpawn(config)
 
                 function exitListen(code: number) {
                     sendToElm({ tag: "SubProcessExited", value: code })
@@ -420,6 +420,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     subProcess.stderr.removeListener("end", standardErrorEndListen)
                     subProcess.stderr.removeListener("data", standardOutDataListen)
                     subProcess.stderr.removeListener("end", standardOutEndListen)
+                    subProcess.kill()
                     subProcesses.delete(subProcessKey(config))
                 })
             }
@@ -430,7 +431,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 environmentVariables: { [key: string]: string },
                 data: string,
             }) => {
-                const addressedSubProcess = subProcessGetExistingOrSpawn(config, abortSignal)
+                const addressedSubProcess = subProcessGetExistingOrSpawn(config)
                 if (addressedSubProcess === undefined) {
                     warn("tried to write to standard in of a sub-process that hasn't been spawned, yet")
                 } else {
@@ -481,8 +482,7 @@ function subProcessGetExistingOrSpawn(
         arguments: Array<string>,
         workingDirectoryPath: string,
         environmentVariables: { [key: string]: string },
-    },
-    abortSignal: AbortSignal
+    }
 ): child_process.ChildProcessWithoutNullStreams {
     const subProcessAssociatedKey = subProcessKey(config)
     const existingSubProcess = subProcesses.get(subProcessAssociatedKey)
@@ -495,7 +495,6 @@ function subProcessGetExistingOrSpawn(
             {
                 cwd: config.workingDirectoryPath,
                 env: config.environmentVariables,
-                signal: abortSignal,
                 shell: false,
                 detached: false,
             }
