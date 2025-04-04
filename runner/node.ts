@@ -369,21 +369,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 workingDirectoryPath: string,
                 environmentVariables: { [key: string]: string },
             }) => {
-                const subProcess = child_process.spawn(
-                    config.command,
-                    config.arguments,
-                    {
-                        cwd: config.workingDirectoryPath,
-                        env: config.environmentVariables,
-                        signal: abortSignal,
-                        shell: false,
-                        detached: false,
-                    }
-                )
-
-                const subProcessAssociatedKey = subProcessKey(config)
-
-                subProcesses.set(subProcessAssociatedKey, subProcess)
+                const subProcess = subProcessGetExistingOrSpawn(config, abortSignal)
 
                 function exitListen(code: number) {
                     sendToElm({ tag: "SubProcessExited", value: code })
@@ -434,7 +420,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     subProcess.stderr.removeListener("end", standardErrorEndListen)
                     subProcess.stderr.removeListener("data", standardOutDataListen)
                     subProcess.stderr.removeListener("end", standardOutEndListen)
-                    subProcesses.delete(subProcessAssociatedKey)
+                    subProcesses.delete(subProcessKey(config))
                 })
             }
             case "SubProcessStandardInWrite": return (config: {
@@ -444,12 +430,7 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 environmentVariables: { [key: string]: string },
                 data: string,
             }) => {
-                const addressedSubProcess = subProcesses.get(subProcessKey({
-                    command: config.command,
-                    arguments: config.arguments,
-                    workingDirectoryPath: config.workingDirectoryPath,
-                    environmentVariables: config.environmentVariables,
-                }))
+                const addressedSubProcess = subProcessGetExistingOrSpawn(config, abortSignal)
                 if (addressedSubProcess === undefined) {
                     warn("tried to write to standard in of a sub-process that hasn't been spawned, yet")
                 } else {
@@ -492,6 +473,36 @@ function subProcessKey(config: {
     environmentVariables: { [key: string]: string }
 }): string {
     return JSON.stringify(config)
+}
+
+function subProcessGetExistingOrSpawn(
+    config: {
+        command: string,
+        arguments: Array<string>,
+        workingDirectoryPath: string,
+        environmentVariables: { [key: string]: string },
+    },
+    abortSignal: AbortSignal
+): child_process.ChildProcessWithoutNullStreams {
+    const subProcessAssociatedKey = subProcessKey(config)
+    const existingSubProcess = subProcesses.get(subProcessAssociatedKey)
+    if (existingSubProcess !== undefined) {
+        return existingSubProcess
+    } else {
+        const spawnedSubProcess = child_process.spawn(
+            config.command,
+            config.arguments,
+            {
+                cwd: config.workingDirectoryPath,
+                env: config.environmentVariables,
+                signal: abortSignal,
+                shell: false,
+                detached: false,
+            }
+        )
+        subProcesses.set(subProcessAssociatedKey, spawnedSubProcess)
+        return spawnedSubProcess
+    }
 }
 
 
