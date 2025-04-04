@@ -2071,6 +2071,8 @@ standardOutWrite text =
 
 > input file does not exits. Is the path correct?
 
+If you find that the last line gets eaten, append a \n
+
 Uses [`process.stderr.write`](https://nodejs.org/api/stream.html#writablewritechunk-encoding-callback)
 
 -}
