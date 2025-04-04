@@ -86,7 +86,6 @@ Web.domElement "button"
     |> Web.domRender
 : Interface Int
 ```
-Anywhere a type used for an interface has data it can come back with.
 
 If we only "perform actions" without any events getting set back, we get the type
 ```elm
