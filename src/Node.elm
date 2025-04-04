@@ -272,7 +272,7 @@ Used by [`subProcessSpawn`](#subProcessSpawn)
 type SubProcessEvent
     = SubProcessExited Int
     | SubProcessStandardOutEvent (StreamReadEvent Bytes)
-    | SubProcessStandardErrorEvent (StreamReadEvent String)
+    | SubProcessStandardErrEvent (StreamReadEvent String)
 
 
 {-| When data is sent (possibly in chunks), you'll get a `StreamDataReceived` event.
@@ -1115,9 +1115,9 @@ subProcessEventJsonDecoder =
                 Json.Decode.map SubProcessStandardOutEvent
                     streamReadEventOfBytesDataJsonDecoder
           }
-        , { tag = "SubProcessStandardErrorEvent"
+        , { tag = "SubProcessStandardErrEvent"
           , value =
-                Json.Decode.map SubProcessStandardErrorEvent
+                Json.Decode.map SubProcessStandardErrEvent
                     streamReadEventOfStringDataJsonDecoder
           }
         ]

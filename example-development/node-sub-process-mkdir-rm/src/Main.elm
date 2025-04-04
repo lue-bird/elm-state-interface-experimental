@@ -84,7 +84,7 @@ interface state =
                                             ++ (mkdirOutEvent |> streamDataOfBytesToString)
                                     }
 
-                            Node.SubProcessStandardErrorEvent mkdirErrorEvent ->
+                            Node.SubProcessStandardErrEvent mkdirErrorEvent ->
                                 WaitingForMkdir
                                     { path = waitingForMkdir.path
                                     , mkdirErrorOutput =
@@ -130,7 +130,7 @@ interface state =
                                             ++ (mkdirOutEvent |> streamDataOfBytesToString)
                                     }
 
-                            Node.SubProcessStandardErrorEvent mkdirErrorEvent ->
+                            Node.SubProcessStandardErrEvent mkdirErrorEvent ->
                                 MkdirCompletedWaitingForRm
                                     { path = mkdirCompletedWaitingForRm.path
                                     , rmErrorOutput =

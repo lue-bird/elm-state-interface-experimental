@@ -386,13 +386,13 @@ export function programStart(appConfig: { ports: ElmPorts }) {
 
                 function standardErrorDataListen(buffer: Buffer) {
                     sendToElm({
-                        tag: "SubProcessStandardErrorEvent",
+                        tag: "SubProcessStandardErrEvent",
                         value: { tag: "StreamDataReceived", value: buffer.toString() }
                     })
                 }
                 function standardErrorEndListen() {
                     sendToElm({
-                        tag: "SubProcessStandardErrorEvent",
+                        tag: "SubProcessStandardErrEvent",
                         value: { tag: "StreamDataEndReached", value: null }
                     })
                 }
