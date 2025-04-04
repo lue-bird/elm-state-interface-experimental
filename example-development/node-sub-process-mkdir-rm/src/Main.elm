@@ -51,7 +51,7 @@ interface state =
                     )
 
         ArgumentsMalformed message ->
-            [ Node.standardErrWrite message
+            [ Node.standardErrWrite (message ++ "\n")
             , Node.exit 1
             ]
                 |> Node.interfaceBatch
