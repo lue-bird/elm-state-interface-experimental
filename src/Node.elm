@@ -2115,7 +2115,9 @@ and in general, limit its use to local, small scripts.
 
 If you want to inherit parts of the environment variables and working directory path,
 store and explicitly pass from [`environmentVariablesRequest`](#environmentVariablesRequest)
-and [`workingDirectoryPathRequest`](#workingDirectoryPathRequest)
+and [`workingDirectoryPathRequest`](#workingDirectoryPathRequest).
+If you find that [`subProcessSpawn`](#subProcessSpawn) does not seem to do anything,
+it's highly likely the command needs certain (default) environment variables you might not have thought of.
 
 Uses [`child_process.spawn`](https://nodejs.org/api/child_process.html#child_processspawncommand-args-options)
 -}
