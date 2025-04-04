@@ -114,7 +114,6 @@ import Json.Decode.LocalExtra
 import Json.Encode
 import Json.Encode.LocalExtra
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
-import Result.LocalExtra
 import StructuredId exposing (StructuredId)
 import Time
 import Time.LocalExtra
@@ -525,6 +524,7 @@ interfaceSingleFutureMap futureChange interfaceSingle =
 -}
 type ProgramEvent appState
     = JsEventFailedToDecode Json.Decode.Error
+    | JsEventCouldNotBeAssociated
     | JsEventEnabledConstructionOfNewAppState appState
 
 
@@ -931,45 +931,54 @@ programSubscriptions : ProgramConfig state -> ProgramState state -> Sub (Program
 programSubscriptions appConfig (State state) =
     appConfig.ports.fromJs
         (\interfaceJson ->
-            interfaceJson
-                |> Json.Decode.decodeValue
-                    (idStringJsonDecoder
+            let
+                newStateJsonDecoder : Json.Decode.Decoder (NotAssociatedOr state)
+                newStateJsonDecoder =
+                    jsonDecodeFieldIdString
                         |> Json.Decode.andThen
                             (\originalInterfaceId ->
                                 case state.interface |> FastDict.get originalInterfaceId of
-                                    Just interfaceSingleAcceptingFuture ->
-                                        case interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder of
-                                            Just eventDataDecoder ->
-                                                Json.Decode.field "eventData" eventDataDecoder
-
-                                            Nothing ->
-                                                Json.Decode.fail
-                                                    "interface did not expect any events"
-
                                     Nothing ->
-                                        Json.Decode.fail
-                                            ("no associated interface found among ids\n"
-                                                ++ (state.interface
-                                                        |> FastDict.keys
-                                                        |> String.join "\n"
-                                                   )
-                                            )
+                                        jsonDecodeSucceedNotAssociated
+
+                                    Just interfaceSingleAcceptingFuture ->
+                                        Json.Decode.field "eventData"
+                                            (interfaceSingleAcceptingFuture |> interfaceSingleFutureJsonDecoder)
                             )
-                        |> Json.Decode.map JsEventEnabledConstructionOfNewAppState
-                    )
-                |> Result.LocalExtra.valueOrOnError JsEventFailedToDecode
+            in
+            case interfaceJson |> Json.Decode.decodeValue newStateJsonDecoder of
+                Ok result ->
+                    case result of
+                        Associated associated ->
+                            JsEventEnabledConstructionOfNewAppState associated
+
+                        NotAssociated ->
+                            JsEventCouldNotBeAssociated
+
+                Err error ->
+                    JsEventFailedToDecode error
         )
 
 
-idStringJsonDecoder : Json.Decode.Decoder String
-idStringJsonDecoder =
+jsonDecodeFieldIdString : Json.Decode.Decoder String
+jsonDecodeFieldIdString =
     Json.Decode.field "id" Json.Decode.string
+
+
+type NotAssociatedOr associated
+    = Associated associated
+    | NotAssociated
+
+
+jsonDecodeSucceedNotAssociated : Json.Decode.Decoder (NotAssociatedOr associated_)
+jsonDecodeSucceedNotAssociated =
+    Json.Decode.succeed NotAssociated
 
 
 {-| [json `Decoder`](https://dark.elm.dmy.fr/packages/elm/json/latest/Json-Decode#Decoder)
 for the transformed event data coming back
 -}
-interfaceSingleFutureJsonDecoder : InterfaceSingle future -> Maybe (Json.Decode.Decoder future)
+interfaceSingleFutureJsonDecoder : InterfaceSingle future -> Json.Decode.Decoder (NotAssociatedOr future)
 interfaceSingleFutureJsonDecoder interface =
     case interface of
         HttpRequestSend send ->
@@ -978,128 +987,134 @@ interfaceSingleFutureJsonDecoder interface =
                 (httpErrorJsonDecoder
                     |> Json.Decode.map Err
                 )
-                |> Json.Decode.map send.on
-                |> Just
+                |> Json.Decode.map
+                    (\result -> Associated (send.on result))
 
         HttpRequestListen listen ->
             httpServerEventJsonDecoder
-                |> Json.Decode.map listen.on
-                |> Just
+                |> Json.Decode.map
+                    (\event -> Associated (listen.on event))
 
         HttpResponseSend _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         TimePosixRequest toFuture ->
-            Time.LocalExtra.posixJsonDecoder |> Json.Decode.map toFuture |> Just
+            Time.LocalExtra.posixJsonDecoder
+                |> Json.Decode.map
+                    (\posix -> Associated (toFuture posix))
 
         TimezoneOffsetRequest toFuture ->
-            Json.Decode.int |> Json.Decode.map toFuture |> Just
+            Json.Decode.int
+                |> Json.Decode.map
+                    (\offset -> Associated (toFuture offset))
 
         TimePeriodicallyListen periodicallyListen ->
             Time.LocalExtra.posixJsonDecoder
-                |> Json.Decode.map periodicallyListen.on
-                |> Just
+                |> Json.Decode.map
+                    (\posix -> Associated (periodicallyListen.on posix))
 
         TimeOnce once ->
             Time.LocalExtra.posixJsonDecoder
-                |> Json.Decode.map once.on
-                |> Just
+                |> Json.Decode.map
+                    (\posix -> Associated (once.on posix))
 
         TimezoneNameRequest toFuture ->
-            Json.Decode.string |> Json.Decode.map toFuture |> Just
+            Json.Decode.string
+                |> Json.Decode.map
+                    (\zone -> Associated (toFuture zone))
 
         RandomUnsignedInt32sRequest request ->
             Json.Decode.list Json.Decode.int
-                |> Json.Decode.map request.on
-                |> Just
+                |> Json.Decode.map
+                    (\randomness -> Associated (request.on randomness))
 
         Exit _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         DirectoryMake make ->
             directoryMakeResultJsonDecoder
-                |> Json.Decode.map make.on
-                |> Just
+                |> Json.Decode.map
+                    (\result -> Associated (make.on result))
 
         FileRemove _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         FileWrite write ->
             fileWriteResultJsonDecoder
-                |> Json.Decode.map write.on
-                |> Just
+                |> Json.Decode.map
+                    (\result -> Associated (write.on result))
 
         FileRequest request ->
             fileResultJsonDecoder
-                |> Json.Decode.map request.on
-                |> Just
+                |> Json.Decode.map
+                    (\result -> Associated (request.on result))
 
         FileChangeListen listen ->
             fileChangeJsonDecoder
-                |> Json.Decode.map listen.on
-                |> Just
+                |> Json.Decode.map
+                    (\change -> Associated (listen.on change))
 
         FileInfoRequest request ->
             fileInfoJsonDecoder
-                |> Json.Decode.map request.on
-                |> Just
+                |> Json.Decode.map
+                    (\info -> Associated (request.on info))
 
         DirectorySubPathsRequest request ->
             directorySubPathsResultJsonDecoder
-                |> Json.Decode.map request.on
-                |> Just
+                |> Json.Decode.map
+                    (\subPaths -> Associated (request.on subPaths))
 
         WorkingDirectoryPathRequest on ->
             Json.Decode.string
-                |> Json.Decode.map on
-                |> Just
+                |> Json.Decode.map
+                    (\path -> Associated (on path))
 
         LaunchArgumentsRequest on ->
             launchArgumentsJsonDecoder
-                |> Json.Decode.map on
-                |> Just
+                |> Json.Decode.map
+                    (\launchArguments -> Associated (on launchArguments))
 
         EnvironmentVariablesRequest on ->
             environmentVariablesJsonDecoder
-                |> Json.Decode.map on
-                |> Just
+                |> Json.Decode.map
+                    (\environmentVariables -> Associated (on environmentVariables))
 
         TerminalSizeRequest on ->
             terminalSizeJsonDecoder
-                |> Json.Decode.map on
-                |> Just
+                |> Json.Decode.map
+                    (\size -> Associated (on size))
 
         TerminalSizeChangeListen on ->
             terminalSizeJsonDecoder
-                |> Json.Decode.map on
-                |> Just
+                |> Json.Decode.map
+                    (\size -> Associated (on size))
 
         ProcessTitleSet _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         StandardOutWrite _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         StandardErrWrite _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
         StandardInListen on ->
             Json.Decode.string
-                |> Json.Decode.map on
-                |> Just
+                |> Json.Decode.map
+                    (\event -> Associated (on event))
 
         StandardInRawListen on ->
             streamReadEventOfStringDataJsonDecoder
-                |> Json.Decode.map on
-                |> Just
+                |> Json.Decode.map
+                    (\event -> Associated (on event))
 
         SubProcessSpawn spawn ->
             subProcessEventJsonDecoder
-                |> Json.Decode.map spawn.on
-                |> Just
+                |> Json.Decode.map
+                    (\event -> Associated (spawn.on event))
 
         SubProcessStandardInWrite _ ->
-            Nothing
+            jsonDecodeSucceedNotAssociated
 
 
 subProcessEventJsonDecoder : Json.Decode.Decoder SubProcessEvent
@@ -1406,6 +1421,16 @@ programUpdate appConfig event state =
                 (notifyOfSkippedEventInterface |> Add)
                 |> appConfig.ports.toJs
             )
+
+        JsEventCouldNotBeAssociated ->
+            -- this usually happens when multiple events are sent simultaneously from js
+            -- and the interface changes between the two.
+            -- e.g. we listen to standard input which is streaming in in chunks
+            -- and suddenly decide we have enough and remove the listen from the interface.
+            --
+            -- Historical note, this was once reported as errors (like json decode errors)
+            -- but happened barely frequent enough to be annoying while not being helpful.
+            ( state, Cmd.none )
 
         JsEventEnabledConstructionOfNewAppState updatedAppState ->
             let
