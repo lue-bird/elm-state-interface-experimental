@@ -86,7 +86,7 @@ interface state =
 
         HttpServerFailed error ->
             [ Node.standardErrWrite
-                ("HTTP server can't run because " ++ error.message)
+                ("HTTP server can't run because " ++ error.message ++ ".\n")
             , Node.exit 1
             ]
                 |> Node.interfaceBatch
