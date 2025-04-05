@@ -52,7 +52,6 @@ function copyExampleDevelopmentToExample(sub) {
     exampleElmJson.dependencies.direct[packageElmJson.name] = packageElmJson.version
     moveFromDirectToIndirect(exampleElmJson, "miniBill/elm-fast-dict")
     moveFromDirectToIndirect(exampleElmJson, "miniBill/elm-rope")
-    moveFromDirectToIndirect(exampleElmJson, "elm/bytes")
     fs.writeFileSync(exampleElmJsonPath, JSON.stringify(exampleElmJson, null, 4))
 
 
