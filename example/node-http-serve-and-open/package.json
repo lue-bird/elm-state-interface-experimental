@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "name": "elm-type-search",
+  "name": "node-http-serve-and-open",
   "devDependencies": {
     "elm-esm": "^1.1.4",
     "@lue-bird/elm-state-interface-experimental": "^6.0.0"
