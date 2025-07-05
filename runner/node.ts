@@ -143,6 +143,11 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     sendToElm(os.homedir())
                 })
             }
+            case "NullDevicePathRequest": return (_config: null) => {
+                queueAbortable(abortSignal, () => {
+                    sendToElm(os.devNull)
+                })
+            }
             case "LaunchArgumentsRequest": return (_config: null) => {
                 queueAbortable(abortSignal, () => {
                     sendToElm(process.argv)

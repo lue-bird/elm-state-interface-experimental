@@ -3,7 +3,8 @@ module Node exposing
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
-    , workingDirectoryPathRequest, homeDirectoryPathRequest, launchArgumentsRequest, environmentVariablesRequest, processTitleSet, exit
+    , workingDirectoryPathRequest, homeDirectoryPathRequest, nullDevicePathRequest, launchArgumentsRequest, environmentVariablesRequest
+    , processTitleSet, exit
     , standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent(..)
     , terminalSizeRequest, terminalSizeChangeListen
     , subProcessSpawn, SubProcessEvent(..)
@@ -44,7 +45,8 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 ## process and terminal
 
-@docs workingDirectoryPathRequest, homeDirectoryPathRequest, launchArgumentsRequest, environmentVariablesRequest, processTitleSet, exit
+@docs workingDirectoryPathRequest, homeDirectoryPathRequest, nullDevicePathRequest, launchArgumentsRequest, environmentVariablesRequest
+@docs processTitleSet, exit
 @docs standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent
 @docs terminalSizeRequest, terminalSizeChangeListen
 @docs subProcessSpawn, SubProcessEvent
@@ -192,6 +194,7 @@ To create one, use the helpers in [time](#time), [HTTP](#http) etc.
 type InterfaceSingle future
     = WorkingDirectoryPathRequest (String -> future)
     | HomeDirectoryPathRequest (String -> future)
+    | NullDevicePathRequest (String -> future)
     | LaunchArgumentsRequest (List String -> future)
     | EnvironmentVariablesRequest (Dict.Dict String String -> future)
     | ProcessTitleSet String
@@ -484,6 +487,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         HomeDirectoryPathRequest on ->
             HomeDirectoryPathRequest (\path -> on path |> futureChange)
 
+        NullDevicePathRequest on ->
+            NullDevicePathRequest (\path -> on path |> futureChange)
+
         LaunchArgumentsRequest on ->
             LaunchArgumentsRequest (\arguments -> on arguments |> futureChange)
 
@@ -674,6 +680,9 @@ interfaceSingleToJson interfaceSingle =
             HomeDirectoryPathRequest _ ->
                 { tag = "HomeDirectoryPathRequest", value = Json.Encode.null }
 
+            NullDevicePathRequest _ ->
+                { tag = "NullDevicePathRequest", value = Json.Encode.null }
+
             LaunchArgumentsRequest _ ->
                 { tag = "LaunchArgumentsRequest", value = Json.Encode.null }
 
@@ -852,6 +861,9 @@ interfaceSingleToStructuredId interfaceSingle =
 
             HomeDirectoryPathRequest _ ->
                 { tag = "HomeDirectoryPathRequest", value = StructuredId.ofUnit }
+
+            NullDevicePathRequest _ ->
+                { tag = "NullDevicePathRequest", value = StructuredId.ofUnit }
 
             LaunchArgumentsRequest _ ->
                 { tag = "LaunchArgumentsRequest", value = StructuredId.ofUnit }
@@ -1080,6 +1092,11 @@ interfaceSingleFutureJsonDecoder interface =
                     (\path -> Associated (on path))
 
         HomeDirectoryPathRequest on ->
+            Json.Decode.string
+                |> Json.Decode.map
+                    (\path -> Associated (on path))
+
+        NullDevicePathRequest on ->
             Json.Decode.string
                 |> Json.Decode.map
                     (\path -> Associated (on path))
@@ -1700,12 +1717,34 @@ workingDirectoryPathRequest =
   - on POSIX it's the `$HOME` environment variable if defined else the [effective UID](https://en.wikipedia.org/wiki/User_identifier#Effective_user_ID)
   - on Windows it's the `USERPROFILE` environment variable if defined else the path to the profile directory of the current user
 
+Many applications use a sub-directory of this home directory to store user data.
+For example, by default, elm caches packages locally in `.elm` in the home directory.
+
 Uses [`os.homedir`](https://nodejs.org/api/os.html#oshomedir)
 
 -}
 homeDirectoryPathRequest : Interface String
 homeDirectoryPathRequest =
     HomeDirectoryPathRequest identity
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Node#Interface) for getting a stream path which
+
+  - when written to disposes of any output, e.g. `elm make ... --output /dev/null`
+  - when read from immediately inputs the end-of-file character, e.g. to prevent a process from waiting for local input
+
+This path is platform-specific:
+
+  - on POSIX it's `/dev/null`
+  - on Windows it's `\\.\nul`
+
+Uses [`os.devNull`](https://nodejs.org/api/os.html#osdevnull)
+
+-}
+nullDevicePathRequest : Interface String
+nullDevicePathRequest =
+    NullDevicePathRequest identity
         |> interfaceFromSingle
 
 
