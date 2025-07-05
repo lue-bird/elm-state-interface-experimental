@@ -3,7 +3,7 @@ module Node exposing
     , Interface, interfaceBatch, interfaceNone, interfaceFutureMap
     , timePosixRequest, timeZoneRequest, timeZoneNameRequest
     , timePeriodicallyListen, timeOnceAt
-    , workingDirectoryPathRequest, launchArgumentsRequest, environmentVariablesRequest, processTitleSet, exit
+    , workingDirectoryPathRequest, homeDirectoryPathRequest, launchArgumentsRequest, environmentVariablesRequest, processTitleSet, exit
     , standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent(..)
     , terminalSizeRequest, terminalSizeChangeListen
     , subProcessSpawn, SubProcessEvent(..)
@@ -44,7 +44,7 @@ See [`elm/time`](https://dark.elm.dmy.fr/packages/elm/time/)
 
 ## process and terminal
 
-@docs workingDirectoryPathRequest, launchArgumentsRequest, environmentVariablesRequest, processTitleSet, exit
+@docs workingDirectoryPathRequest, homeDirectoryPathRequest, launchArgumentsRequest, environmentVariablesRequest, processTitleSet, exit
 @docs standardOutWrite, standardErrWrite, standardInListen, standardInRawListen, StreamReadEvent
 @docs terminalSizeRequest, terminalSizeChangeListen
 @docs subProcessSpawn, SubProcessEvent
@@ -191,6 +191,7 @@ To create one, use the helpers in [time](#time), [HTTP](#http) etc.
 -}
 type InterfaceSingle future
     = WorkingDirectoryPathRequest (String -> future)
+    | HomeDirectoryPathRequest (String -> future)
     | LaunchArgumentsRequest (List String -> future)
     | EnvironmentVariablesRequest (Dict.Dict String String -> future)
     | ProcessTitleSet String
@@ -480,6 +481,9 @@ interfaceSingleFutureMap futureChange interfaceSingle =
         WorkingDirectoryPathRequest on ->
             WorkingDirectoryPathRequest (\path -> on path |> futureChange)
 
+        HomeDirectoryPathRequest on ->
+            HomeDirectoryPathRequest (\path -> on path |> futureChange)
+
         LaunchArgumentsRequest on ->
             LaunchArgumentsRequest (\arguments -> on arguments |> futureChange)
 
@@ -667,6 +671,9 @@ interfaceSingleToJson interfaceSingle =
             WorkingDirectoryPathRequest _ ->
                 { tag = "WorkingDirectoryPathRequest", value = Json.Encode.null }
 
+            HomeDirectoryPathRequest _ ->
+                { tag = "HomeDirectoryPathRequest", value = Json.Encode.null }
+
             LaunchArgumentsRequest _ ->
                 { tag = "LaunchArgumentsRequest", value = Json.Encode.null }
 
@@ -842,6 +849,9 @@ interfaceSingleToStructuredId interfaceSingle =
 
             WorkingDirectoryPathRequest _ ->
                 { tag = "WorkingDirectoryPathRequest", value = StructuredId.ofUnit }
+
+            HomeDirectoryPathRequest _ ->
+                { tag = "HomeDirectoryPathRequest", value = StructuredId.ofUnit }
 
             LaunchArgumentsRequest _ ->
                 { tag = "LaunchArgumentsRequest", value = StructuredId.ofUnit }
@@ -1065,6 +1075,11 @@ interfaceSingleFutureJsonDecoder interface =
                     (\subPaths -> Associated (request.on subPaths))
 
         WorkingDirectoryPathRequest on ->
+            Json.Decode.string
+                |> Json.Decode.map
+                    (\path -> Associated (on path))
+
+        HomeDirectoryPathRequest on ->
             Json.Decode.string
                 |> Json.Decode.map
                     (\path -> Associated (on path))
@@ -1680,6 +1695,20 @@ workingDirectoryPathRequest =
         |> interfaceFromSingle
 
 
+{-| An [`Interface`](Node#Interface) for getting the dedicated user directory.
+
+  - on POSIX it's the `$HOME` environment variable if defined else the [effective UID](https://en.wikipedia.org/wiki/User_identifier#Effective_user_ID)
+  - on Windows it's the `USERPROFILE` environment variable if defined else the path to the profile directory of the current user
+
+Uses [`os.homedir`](https://nodejs.org/api/os.html#oshomedir)
+
+-}
+homeDirectoryPathRequest : Interface String
+homeDirectoryPathRequest =
+    HomeDirectoryPathRequest identity
+        |> interfaceFromSingle
+
+
 {-| An [`Interface`](Node#Interface) for getting the command-line arguments passed when the Node.js process was launched.
 
 For example, running
@@ -1717,6 +1746,7 @@ launchArgumentsRequest =
                 (Dict.get "ELM_HOME")
 
 Uses [`process.env`](https://nodejs.org/api/process.html#processenv)
+
 -}
 environmentVariablesRequest : Interface (Dict.Dict String String)
 environmentVariablesRequest =
@@ -2145,6 +2175,7 @@ If you find that [`subProcessSpawn`](#subProcessSpawn) does not seem to do anyth
 it's highly likely the command needs certain (default) environment variables you might not have thought of.
 
 Uses [`child_process.spawn`](https://nodejs.org/api/child_process.html#child_processspawncommand-args-options)
+
 -}
 subProcessSpawn :
     { command : String

@@ -3,6 +3,7 @@ import * as path from "node:path"
 import * as http from "node:http"
 import * as timers from "node:timers"
 import * as child_process from "node:child_process"
+import * as os from "node:os"
 // https://github.com/DefinitelyTyped/DefinitelyTyped/discussions/57677
 import { default as process } from "node:process"
 import { Buffer } from "node:buffer"
@@ -135,6 +136,11 @@ export function programStart(appConfig: { ports: ElmPorts }) {
             case "WorkingDirectoryPathRequest": return (_config: null) => {
                 queueAbortable(abortSignal, () => {
                     sendToElm(process.cwd())
+                })
+            }
+            case "HomeDirectoryPathRequest": return (_config: null) => {
+                queueAbortable(abortSignal, () => {
+                    sendToElm(os.homedir())
                 })
             }
             case "LaunchArgumentsRequest": return (_config: null) => {
