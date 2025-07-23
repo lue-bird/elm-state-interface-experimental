@@ -9,6 +9,12 @@ module Web exposing
     , domAttribute, domAttributeNamespaced, domStyle, domBoolProperty, domStringProperty
     , domListenTo, domListenToPreventingDefaultAction
     , domScrollToShow, DomElementVisibilityAlignment(..), domScrollPositionRequest, domScrollToPosition
+    , animationFrameListen, windowVisibilityChangeListen, WindowVisibility(..)
+    , windowSizeRequest, windowSizeChangeListen
+    , preferredLanguagesRequest, preferredLanguagesChangeListen
+    , documentListenTo, windowListenTo
+    , mediaQueryRequest, mediaQueryChangeListen
+    , titleReplaceBy, authorSet, keywordsSet, descriptionSet
     , urlRequest
     , urlPush, urlReplace
     , navigateForward, navigateBack, navigationListen
@@ -29,11 +35,6 @@ module Web exposing
     , GeoLocation, geoLocationRequest, geoLocationChangeListen
     , Gamepad, GamepadButton(..), gamepadsRequest, gamepadsChangeListen
     , notificationAskForPermission, notificationShow, NotificationClicked(..)
-    , animationFrameListen, windowVisibilityChangeListen, WindowVisibility(..)
-    , windowSizeRequest, windowSizeChangeListen
-    , preferredLanguagesRequest, preferredLanguagesChangeListen
-    , documentListenTo, windowListenTo
-    , titleReplaceBy, authorSet, keywordsSet, descriptionSet
     , ProgramConfig, programInit, programUpdate, programSubscriptions
     , DomElement, DefaultActionHandling(..), DomModifierSingle(..)
     , ProgramState(..), ProgramEvent(..), InterfaceSingle(..), DomTextOrElementHeader(..), DomElementHeader
@@ -71,6 +72,22 @@ Primitives used for SVG and HTML
 @docs domAttribute, domAttributeNamespaced, domStyle, domBoolProperty, domStringProperty
 @docs domListenTo, domListenToPreventingDefaultAction
 @docs domScrollToShow, DomElementVisibilityAlignment, domScrollPositionRequest, domScrollToPosition
+
+
+## window
+
+Observe and alter the page's global environment
+
+@docs animationFrameListen, windowVisibilityChangeListen, WindowVisibility
+@docs windowSizeRequest, windowSizeChangeListen
+@docs preferredLanguagesRequest, preferredLanguagesChangeListen
+@docs documentListenTo, windowListenTo
+@docs mediaQueryRequest, mediaQueryChangeListen
+
+When navigating to a new page on the same site,
+you may want to change the document's context:
+
+@docs titleReplaceBy, authorSet, keywordsSet, descriptionSet
 
 
 ## navigation
@@ -360,20 +377,6 @@ to only notify users when they're on a different page
                 |> Web.interfaceBatch
 
 
-## window
-
-Observe and alter the page's global environment
-
-@docs animationFrameListen, windowVisibilityChangeListen, WindowVisibility
-@docs windowSizeRequest, windowSizeChangeListen
-@docs preferredLanguagesRequest, preferredLanguagesChangeListen
-@docs documentListenTo, windowListenTo
-
-When navigating to a new page on the same site,
-you may want to change the document's context:
-
-@docs titleReplaceBy, authorSet, keywordsSet, descriptionSet
-
 
 ## embed
 
@@ -558,6 +561,8 @@ type InterfaceSingle future
     | WindowVisibilityChangeListen (WindowVisibility -> future)
     | WindowAnimationFrameListen (Time.Posix -> future)
     | WindowPreferredLanguagesChangeListen (List String -> future)
+    | MediaQueryRequest { queryString : String, on : Bool -> future }
+    | MediaQueryChangeListen { queryString : String, on : Bool -> future }
     | SocketListen
         { address : String
         , on : SocketEvent -> future
@@ -927,6 +932,18 @@ interfaceSingleFutureMap futureChange interfaceSingle =
 
         WindowPreferredLanguagesChangeListen toFuture ->
             (\event -> toFuture event |> futureChange) |> WindowPreferredLanguagesChangeListen
+
+        MediaQueryChangeListen listen ->
+            { queryString = listen.queryString
+            , on = \event -> listen.on event |> futureChange
+            }
+                |> MediaQueryChangeListen
+
+        MediaQueryRequest request ->
+            { queryString = request.queryString
+            , on = \event -> request.on event |> futureChange
+            }
+                |> MediaQueryRequest
 
         TimePeriodicallyListen periodicallyListen ->
             { intervalDurationMilliSeconds = periodicallyListen.intervalDurationMilliSeconds
@@ -1448,6 +1465,12 @@ interfaceSingleToJson interfaceSingle =
             WindowPreferredLanguagesChangeListen _ ->
                 { tag = "WindowPreferredLanguagesChangeListen", value = Json.Encode.null }
 
+            MediaQueryRequest request ->
+                { tag = "MediaQueryRequest", value = request.queryString |> Json.Encode.string }
+
+            MediaQueryChangeListen listen ->
+                { tag = "MediaQueryChangeListen", value = listen.queryString |> Json.Encode.string }
+
             DocumentEventListen listen ->
                 { tag = "DocumentEventListen", value = listen.eventName |> Json.Encode.string }
 
@@ -1861,6 +1884,16 @@ interfaceSingleToStructuredId interfaceSingle =
             WindowPreferredLanguagesRequest _ ->
                 { tag = "WindowPreferredLanguagesRequest", value = StructuredId.ofUnit }
 
+            MediaQueryRequest request ->
+                { tag = "MediaQueryRequest"
+                , value = request.queryString |> StructuredId.ofString
+                }
+
+            MediaQueryChangeListen listen ->
+                { tag = "MediaQueryChangeListen"
+                , value = listen.queryString |> StructuredId.ofString
+                }
+
             NavigationUrlRequest _ ->
                 { tag = "NavigationUrlRequest", value = StructuredId.ofUnit }
 
@@ -2201,6 +2234,14 @@ interfaceSingleFutureJsonDecoder interface =
         WindowPreferredLanguagesChangeListen toFuture ->
             Json.Decode.list Json.Decode.string
                 |> Json.Decode.map (\languages -> Associated (toFuture languages))
+
+        MediaQueryRequest request ->
+            Json.Decode.bool
+                |> Json.Decode.map (\matched -> Associated (request.on matched))
+
+        MediaQueryChangeListen listen ->
+            Json.Decode.bool
+                |> Json.Decode.map (\matched -> Associated (listen.on matched))
 
         SocketListen listen ->
             socketEventJsonDecoder
@@ -3232,6 +3273,12 @@ interfaceSingleEdit interfaces =
             Nothing
 
         WindowPreferredLanguagesChangeListen _ ->
+            Nothing
+
+        MediaQueryRequest _ ->
+            Nothing
+
+        MediaQueryChangeListen _ ->
             Nothing
 
         SocketListen _ ->
@@ -4504,6 +4551,68 @@ preferredLanguagesChangeListen : Interface (List String)
 preferredLanguagesChangeListen =
     WindowPreferredLanguagesChangeListen identity
         |> interfaceFromSingle
+
+
+{-| An [`Interface`](Web#Interface) for checking
+if a given [CSS @media query](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries) matches.
+For example
+
+    Web.mediaQueryRequest "(prefers-color-scheme: dark)"
+    Web.mediaQueryRequest "(orientation: landscape)"
+    Web.mediaQuery "(prefers-reduced-motion) and (prefers-contrast: more)"
+    Web.mediaQueryRequest "(100px < width < 700px)"
+
+Note: uses [`window.matchMedia(_).matches`](https://developer.mozilla.org/en-US/docs/Web/API/MediaQueryList/matches)
+
+-}
+mediaQueryRequest : String -> Interface Bool
+mediaQueryRequest queryStringToCheckIfMatches =
+    MediaQueryRequest
+        { queryString = queryStringToCheckIfMatches |> mediaQueryStringNormalize
+        , on = identity
+        }
+        |> interfaceFromSingle
+
+
+{-| An [`Interface`](Web#Interface) for watching for when
+a given [CSS @media query](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries)
+starts to match and stops to match.
+
+    Web.mediaQueryRequest "(prefers-color-scheme: dark)"
+        |> Web.futureMap
+            (\enableDarkMode ->
+                { state
+                    | configuredBackgroundColor =
+                        if enableDarkMode then
+                            Color.black
+
+                        else
+                            Color.white
+                }
+            )
+
+Note: listens to the [`window.matchMedia(_).*Listener(...)`](https://developer.mozilla.org/en-US/docs/Web/API/MediaQueryList#instance_methods)
+
+-}
+mediaQueryChangeListen : String -> Interface Bool
+mediaQueryChangeListen queryStringToCheckIfMatches =
+    MediaQueryChangeListen
+        { queryString = queryStringToCheckIfMatches
+        , on = identity
+        }
+        |> interfaceFromSingle
+
+
+mediaQueryStringNormalize : String -> String
+mediaQueryStringNormalize queryStringRaw =
+    if
+        (queryStringRaw |> String.startsWith "(")
+            || (queryStringRaw |> String.endsWith ")")
+    then
+        queryStringRaw
+
+    else
+        "(" ++ queryStringRaw ++ ")"
 
 
 {-| An [`Interface`](Web#Interface) for getting the current page's [app-specific URL](https://dark.elm.dmy.fr/packages/lydell/elm-app-url/latest/).

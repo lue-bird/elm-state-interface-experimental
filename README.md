@@ -9,6 +9,7 @@
 >   - simplify web socket API
 >   - simplify web http request send API
 >   - fix bugs and avoid warnings when there is no failure
+>   - add `Web.mediaQueryRequest` and `Web.mediaQueryChangeListen`
 >   - internal: replace `Dict` values and some Rope values to sorted assoc-list or `FastDict.Dict`
 >   - internal: change dom diffing algorithm (faster initial create, faster replacing big chunks, easier to understand with less weirdness)
 >   - internal: transport `Bytes` over ports faster

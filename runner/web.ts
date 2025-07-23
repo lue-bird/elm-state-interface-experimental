@@ -235,6 +235,20 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
                     { signal: abortSignal }
                 )
             }
+            case "MediaQueryRequest": return (queryString: string) => {
+                if (window.matchMedia !== undefined) {
+                    sendToElm(window.matchMedia(queryString).matches)
+                }
+            }
+            case "MediaQueryChangeListen": return (queryString: string) => {
+                if (window.matchMedia !== undefined) {
+                    window.matchMedia(queryString).addEventListener(
+                        "change",
+                        event => { sendToElm(event.matches) },
+                        { signal: abortSignal }
+                    )
+                }
+            }
             case "SocketListen": return (config: { address: string }) => {
                 const socket = getExistingOrOpenSocket(config.address)
                 socket.addEventListener(
