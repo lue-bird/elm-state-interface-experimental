@@ -90,7 +90,9 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                 process.stdin.addListener("data", listen)
                 abortSignal.addEventListener("abort", (_event) => {
                     process.stdin.removeListener("data", listen)
-                    process.stdin.unref()
+                    if (process.stdin.unref !== undefined) {
+                        process.stdin.unref()
+                    }
                 })
             }
             case "StandardInRawListen": return (_config: null) => {
@@ -124,7 +126,9 @@ export function programStart(appConfig: { ports: ElmPorts }) {
                     if (process.stdin.setRawMode !== undefined) {
                         process.stdin.setRawMode(false)
                     }
-                    process.stdin.unref()
+                    if (process.stdin.unref !== undefined) {
+                        process.stdin.unref()
+                    }
                 })
             }
             case "StandardOutWrite": return (text: string) => {
