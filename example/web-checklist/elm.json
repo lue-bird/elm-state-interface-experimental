@@ -16,7 +16,7 @@
             "ianmackenzie/elm-units": "2.10.0",
             "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.8",
             "lydell/elm-app-url": "1.0.4",
-            "lue-bird/elm-state-interface-experimental": "11.0.0"
+            "lue-bird/elm-state-interface-experimental": "13.0.0"
         },
         "indirect": {
             "bburdette/toop": "1.2.0",
