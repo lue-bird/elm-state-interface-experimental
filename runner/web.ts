@@ -416,7 +416,7 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
     }
 
     function editDom(
-        path: number[],
+        path: number[], // &mut
         realDomNodeToEdit: ChildNode,
         edit: { tag: "ReplaceNode" | "RemoveLastNSubs" | "AppendSubs" | "SetStyles" | "SetAttributes" | "SetAttributesNamespaced" | "SetStringProperties" | "SetBoolProperties" | "SetScrollToPosition" | "SetScrollToShow" | "RequestScrollPosition" | "SetEventListens", value: any },
         sendToElm: (v: any) => void
@@ -434,9 +434,12 @@ export function programStart(appConfig: { ports: ElmPorts, domElement: Element }
             case "AppendSubs": {
                 if (realDomNodeToEdit instanceof Element) {
                     const indexToStartAppendingFrom = realDomNodeToEdit.childNodes.length
-                    const subsAsRealDomNodes = edit.value.map((subNode: DomNode, subIndex: number) =>
-                        createDomNode([...path, indexToStartAppendingFrom + subIndex], subNode, sendToElm)
-                    )
+                    const subsAsRealDomNodes: Array<Node> = edit.value.map((subNode: DomNode, subIndex: number) => {
+                        path.push(indexToStartAppendingFrom + subIndex)
+                        let added_sub_node = createDomNode(path, subNode, sendToElm)
+                        path.pop()
+                        return added_sub_node
+                    })
                     realDomNodeToEdit.append(...subsAsRealDomNodes)
                 } else {
                     warn("the DOM node I wanted to append sub-nodes to has been replaced by text. Try to disable potential interfering extensions")
@@ -515,7 +518,7 @@ function getOrInitializeAudioContext(): AudioContext {
 }
 
 function editDomModifiers(
-    path: Array<number>,
+    path: Array<number>,  // &mut
     domElementToEdit: Element,
     replacement: {
         tag: "SetStyles" | "SetAttributes" | "SetAttributesNamespaced" | "SetStringProperties" | "SetBoolProperties" | "SetScrollToPosition" | "SetScrollToShow" | "RequestScrollPosition" | "SetEventListens",
@@ -622,7 +625,11 @@ type DomElementHeader = {
     eventListens: Array<any>
 }
 
-function createDomNode(path: Array<number>, node: DomNode, sendToElm: (v: any) => void): Node {
+function createDomNode(
+    path: Array<number>,  // &mut
+    node: DomNode,
+    sendToElm: (v: any) => void
+): Node {
     switch (node.tag) {
         case "Text": {
             return document.createTextNode(node.value)
@@ -633,7 +640,11 @@ function createDomNode(path: Array<number>, node: DomNode, sendToElm: (v: any) =
     }
 }
 
-function createDomElement(path: Array<number>, node: DomElement, sendToElm: (v: any) => void): Element {
+function createDomElement(
+    path: Array<number>,  // &mut
+    node: DomElement,
+    sendToElm: (v: any) => void
+): Element {
     const realDomElement =
         node.header.namespace !== null ?
             document.createElementNS(node.header.namespace, noScript(node.header.tag))
@@ -657,24 +668,28 @@ function createDomElement(path: Array<number>, node: DomElement, sendToElm: (v: 
         domElementAddScrollPositionRequest(path, realDomElement, sendToElm)
     }
     domElementAddEventListens(path, realDomElement, node.header.eventListens, sendToElm)
-    const subsAsRealDomNodes = node.subs.map((subNode, subIndex) =>
-        createDomNode([...path, subIndex], subNode, sendToElm)
-    )
+    const subsAsRealDomNodes: Array<Node> = node.subs.map((subNode, subIndex) => {
+        path.push(subIndex)
+        let created_sub_node = createDomNode(path, subNode, sendToElm)
+        path.pop()
+        return created_sub_node
+    })
     realDomElement.append(...subsAsRealDomNodes)
     return realDomElement
 }
 function domElementAddScrollPositionRequest(
-    path: Array<number>,
+    path: Array<number>, // &mut
     domElement: Element,
     sendToElm: (v: any) => void
 ) {
     // guarantee it has painted drawn at least once
+    let pathClone = [...path] // because argument path is &mut
     window.requestAnimationFrame(_timestamp => {
         window.requestAnimationFrame(_timestamp => {
             sendToElm({
                 tag: "ScrollPositionRequest",
                 value: {
-                    path: path,
+                    path: pathClone,
                     fromLeft: domElement.scrollLeft,
                     fromTop: domElement.scrollTop
                 }
@@ -749,13 +764,14 @@ function domElementAddAttributesNamespaced(domElement: Element, attributesNamesp
     })
 }
 function domElementAddEventListens(
-    path: Array<number>,
+    path: Array<number>, // &mut
     domElement: Element,
     eventListens: { name: string, defaultActionHandling: "DefaultActionPrevent" | "DefaultActionExecute" }[],
     sendToElm: (v: any) => void
 ) {
     if (eventListens.length >= 1) {
         const abortController: AbortController = new AbortController()
+        let pathClone = [...path] // because argument path is &mut
         eventListens.forEach(eventListen => {
             domElement.addEventListener(
                 eventListen.name,
@@ -764,7 +780,7 @@ function domElementAddEventListens(
                     sendToElm({
                         tag: "EventListen", value: {
                             name: eventListen.name,
-                            path: path,
+                            path: pathClone,
                             event: triggeredEvent
                         }
                     })
