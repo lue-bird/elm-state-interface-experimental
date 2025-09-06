@@ -317,10 +317,8 @@ Done? Here's the solution
   - `state → 4`: our prior interface had `Web.consoleLog "even"` which is also part of the new one. Nothing is printed
 
 So in the end, the app will have printed
-```
-even
-odd
-```
+1. even
+2. odd
 
 That being said, I encourage you to not think about when exactly certain actions on the outside are triggered. Try just thinking along the lines of
 > "oh, if the app is in this state, these actions will have happened at some point"
