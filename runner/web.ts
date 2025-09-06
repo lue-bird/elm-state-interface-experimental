@@ -778,7 +778,8 @@ function domElementAddEventListens(
                 (triggeredEvent) => {
                     triggeredEvent.stopPropagation()
                     sendToElm({
-                        tag: "EventListen", value: {
+                        tag: "EventListen",
+                        value: {
                             name: eventListen.name,
                             path: pathClone,
                             event: triggeredEvent
@@ -809,12 +810,10 @@ function domElementAddEventListens(
 // So '\tjava\tSCRIPT:alert("!!!")' and 'javascript:alert("!!!")' are the same
 // in practice. That is why RE_js and RE_js_html look
 // so freaky.
-
 const RE_script = /^script$/i
 const RE_on_formAction = /^(on|formAction$)/i
 const RE_js = /^\s*j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:/i
 const RE_js_html = /^\s*(j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:|d\s*a\s*t\s*a\s*:\s*t\s*e\s*x\s*t\s*\/\s*h\s*t\s*m\s*l\s*(,|;))/i
-
 function noScript(tag: string) {
     return RE_script.test(tag) ? "p" : tag
 }
@@ -896,24 +895,6 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
 }
 
 
-type AudioInfo = {
-    url: string,
-    startTime: number,
-    volume: AudioParameterTimeline,
-    speed: AudioParameterTimeline,
-    stereoPan: AudioParameterTimeline,
-    processing: AudioProcessingInfo[]
-}
-type AudioProcessingInfo =
-    | { tag: "LinearConvolution", value: { sourceUrl: string } }
-    | { tag: "Lowpass", value: { cutoffFrequency: AudioParameterTimeline } }
-    | { tag: "Highpass", value: { cutoffFrequency: AudioParameterTimeline } }
-
-type AudioParameterTimeline = {
-    startValue: number,
-    keyFrames: { time: number, value: number }[]
-}
-
 function audioSourceLoad(url: string, sendToElm: (v: any) => void, abortSignal: AbortSignal) {
     const audioContext = getOrInitializeAudioContext()
     fetch(url, { signal: abortSignal })
@@ -930,30 +911,21 @@ function audioSourceLoad(url: string, sendToElm: (v: any) => void, abortSignal: 
         })
 }
 
-function audioParameterTimelineApplyTo(audioParam: AudioParam, timeline: AudioParameterTimeline) {
-    const audioContext = getOrInitializeAudioContext()
-    const currentTime = audioContext.currentTime
-    audioParam.cancelScheduledValues(currentTime)
-    audioParam.setValueAtTime(timeline.startValue, 0)
-    const fullTimeline = [
-        { time: currentTime, value: timeline.startValue },
-        ...timeline.keyFrames.map(keyframe => { return { value: keyframe.value, time: posixToContextTime(keyframe.time, currentTime) } })
-    ]
-    forEachConsecutive(fullTimeline, pair => {
-        if (currentTime >= pair.current.time) {
-            audioParam.setValueAtTime(
-                linearlyInterpolate(
-                    pair.current.value,
-                    pair.next.value,
-                    // since start / duration
-                    (currentTime - pair.current.time) / (pair.next.time - pair.current.time)
-                ),
-                0
-            )
-        }
-        audioParam.linearRampToValueAtTime(pair.next.value, pair.next.time - pair.current.time)
-    })
-    return audioParam
+type AudioInfo = {
+    url: string,
+    startTime: number,
+    volume: AudioParameterTimeline,
+    speed: AudioParameterTimeline,
+    stereoPan: AudioParameterTimeline,
+    processing: AudioProcessingInfo[]
+}
+type AudioProcessingInfo =
+    | { tag: "LinearConvolution", value: { sourceUrl: string } }
+    | { tag: "Lowpass", value: { cutoffFrequency: AudioParameterTimeline } }
+    | { tag: "Highpass", value: { cutoffFrequency: AudioParameterTimeline } }
+type AudioParameterTimeline = {
+    startValue: number,
+    keyFrames: { time: number, value: number }[]
 }
 
 type AudioPlaying = {
@@ -1030,8 +1002,6 @@ type AudioEdit =
     | { tag: "Speed", value: AudioParameterTimeline }
     | { tag: "StereoPan", value: AudioParameterTimeline }
     | { tag: "Processing", value: AudioProcessingInfo[] }
-
-
 function editAudio(
     id: string,
     edit: AudioEdit
@@ -1061,6 +1031,32 @@ function editAudio(
             }
         }
     }
+}
+
+function audioParameterTimelineApplyTo(audioParam: AudioParam, timeline: AudioParameterTimeline) {
+    const audioContext = getOrInitializeAudioContext()
+    const currentTime = audioContext.currentTime
+    audioParam.cancelScheduledValues(currentTime)
+    audioParam.setValueAtTime(timeline.startValue, 0)
+    const fullTimeline = [
+        { time: currentTime, value: timeline.startValue },
+        ...timeline.keyFrames.map(keyframe => { return { value: keyframe.value, time: posixToContextTime(keyframe.time, currentTime) } })
+    ]
+    forEachConsecutive(fullTimeline, pair => {
+        if (currentTime >= pair.current.time) {
+            audioParam.setValueAtTime(
+                linearlyInterpolate(
+                    pair.current.value,
+                    pair.next.value,
+                    // since start / duration
+                    (currentTime - pair.current.time) / (pair.next.time - pair.current.time)
+                ),
+                0
+            )
+        }
+        audioParam.linearRampToValueAtTime(pair.next.value, pair.next.time - pair.current.time)
+    })
+    return audioParam
 }
 
 function askForNotificationPermissionIfNotAsked(): Promise<"granted" | "denied"> {
@@ -1096,7 +1092,6 @@ function bytesToAsciiString(bytes: Uint8Array): string {
     }
     return result
 }
-
 
 function warn(warning: string) {
     window?.console.warn(warning + " (lue-bird/elm-state-interface-experimental)")
