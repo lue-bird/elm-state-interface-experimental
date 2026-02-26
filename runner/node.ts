@@ -639,7 +639,7 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
         body:
             request.bodyAsciiString === null ?
                 null
-                : asciiStringToBytes(request.bodyAsciiString),
+                : new Uint8Array(asciiStringToBytes(request.bodyAsciiString)),
         headers: new Headers(request.headers.map(header => {
             // removing the type makes ts think that  tuple: string[]
             const tuple: [string, string] = [header.name, header.value]

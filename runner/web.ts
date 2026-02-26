@@ -867,12 +867,7 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
         body:
             request.bodyAsciiString === null ?
                 null
-                : new ReadableStream({
-                    start(controller) {
-                        controller.enqueue(asciiStringToBytes(request.bodyAsciiString as string));
-                        controller.close();
-                    },
-                }),
+                : new Uint8Array(asciiStringToBytes(request.bodyAsciiString)),
         headers: new Headers(request.headers.map(header => {
             // removing the type makes ts think that  tuple: string[]
             const tuple: [string, string] = [header.name, header.value]
