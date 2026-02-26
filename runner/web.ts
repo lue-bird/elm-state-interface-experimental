@@ -825,7 +825,7 @@ function noOnOrFormAction(key: string) {
 function fileDownloadBytes(config: { mimeType: string, name: string, contentAsciiString: string }) {
     const temporaryAnchorDomElement: HTMLAnchorElement = window.document.createElement("a")
     const blob = new Blob(
-        [asciiStringToBytes(config.contentAsciiString)],
+        [Buffer.from(asciiStringToBytes(config.contentAsciiString))],
         { type: config.mimeType }
     )
     const objectUrl = URL.createObjectURL(blob)
@@ -867,7 +867,12 @@ function httpFetch(request: HttpRequest, abortSignal: AbortSignal): Promise<Http
         body:
             request.bodyAsciiString === null ?
                 null
-                : asciiStringToBytes(request.bodyAsciiString),
+                : new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(asciiStringToBytes(request.bodyAsciiString as string));
+                        controller.close();
+                    },
+                }),
         headers: new Headers(request.headers.map(header => {
             // removing the type makes ts think that  tuple: string[]
             const tuple: [string, string] = [header.name, header.value]
